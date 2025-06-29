@@ -13,6 +13,10 @@ get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
 }
 
+get_mouse_pos :: proc() -> Vec2 {
+	return Vec2 { cast(f32) rl.GetMouseX(), cast(f32) rl.GetMouseY() };
+}
+
 Vec2 :: [2]f32;
 Rect :: [4]f32;
 
@@ -51,7 +55,7 @@ kg :: proc(num: f32) -> f32 {
 
 Physics_Object_Flag :: enum u32 {
 	Non_Kinematic 			= 1 << 0,
-	No_Dampen_Velocity 		= 1 << 1,
+	No_Velocity_Dampening 	= 1 << 1,
 	No_Collisions 			= 1 << 2,
 	No_Gravity				= 1 << 3,
 }
@@ -61,7 +65,7 @@ Hitbox :: [2]f32;
 draw_hitbox_at :: proc(pos: Vec2, box: ^Hitbox) {
 	hue := hlsl.fmod_float(linalg.length(box^), 360.0); // holy shit this is cool
 	colour := rl.ColorFromHSV(hue, 1.0, 1.0);
-	draw_rectangle(pos - (box^ / 2.0), cast(Vec2) box^);
+	draw_rectangle(pos, cast(Vec2) box^);
 }
 
 update_physics_object :: proc(obj: ^Physics_Object, world: ^Physics_World, dt: f32) {
@@ -69,7 +73,7 @@ update_physics_object :: proc(obj: ^Physics_Object, world: ^Physics_World, dt: f
 		return;
 	}
 	resistance: f32 = 0.0;
-	if !phys_obj_has_flag(obj, Physics_Object_Flag.No_Dampen_Velocity) {
+	if !phys_obj_has_flag(obj, Physics_Object_Flag.No_Velocity_Dampening) {
 		resistance = ARBITRARY_DRAG_COEFFICIENT;
 	}
 	next_pos := obj.pos + obj.vel * dt;
@@ -86,12 +90,33 @@ update_physics_object :: proc(obj: ^Physics_Object, world: ^Physics_World, dt: f
 	}
 
 	for &other_obj in world.objects {
-		r1 := phys_obj_to_rect(obj);
-		r2 := phys_obj_to_rect(&other_obj);
-		if rl.CheckCollisionRecs(transmute(rl.Rectangle) r1, transmute(rl.Rectangle) r2) {
-			unimplemented("Collision solving"); 
+		if 
+			other_obj == obj^ || phys_obj_has_flag(&other_obj, Physics_Object_Flag.No_Collisions)
+		{ continue; }
+
+		r1 := transmute(rl.Rectangle) phys_obj_to_rect(obj);
+		r2 := transmute(rl.Rectangle) phys_obj_to_rect(&other_obj);
+		if rl.CheckCollisionRecs(r1, r2) {
+			collision_rect := rl.GetCollisionRec(r1, r2);
+			// choose the smallest of the two coordinates to move back by
+			move_back := linalg.normalize((obj.pos + obj.hitbox / 2.0) - (other_obj.pos + other_obj.hitbox / 2.0));
+			if collision_rect.width > collision_rect.height {
+				sign := -1.0 if move_back.y < 0.0 else f32(1.0);
+				move_back.y = collision_rect.height * sign;
+				move_back.x = 0.0;
+			}
+			else {
+				sign := -1.0 if move_back.x < 0.0 else f32(1.0);
+				move_back.x = collision_rect.width * sign;
+				move_back.y = 0.0;
+			}
+			next_pos += move_back;
+			next_vel = Vec2{};
 		}
 	}
+
+	obj.pos = next_pos;
+	obj.vel = next_vel;
 }
 
 Physics_World :: struct #no_copy {
@@ -230,16 +255,18 @@ main :: proc() {
 	if !ok do return;
 
 	player: Player;
-	player.obj = add_phys_object(pos = get_screen_centre(), mass = kg(1.0), scale = Vec2 { 100.0, 100.0 });
+	player.obj = add_phys_object(pos = get_screen_centre(), mass = kg(0.1), scale = Vec2 { 100.0, 100.0 });
 	fmt.println(calculate_terminal_velocity(EARTH_GRAVITY, player.obj.mass, ARBITRARY_DRAG_COEFFICIENT));
-	player.obj.flags |= u32(Physics_Object_Flag.No_Collisions);
 
 	add_phys_object(
-		mass = 0.0, 
-		scale = Vec2 {500.0, 100.0}, 
-		pos = get_screen_centre() + Vec2 { 0, 500},
-		flags = u32(Physics_Object_Flag.No_Collisions),
+		mass = 10.0,
+		scale = Vec2 {500.0, 50.0},
+		pos = get_screen_centre() + Vec2 { 0, 150 },
+		flags = u32(Physics_Object_Flag.Non_Kinematic),
 	);
+
+	selected: ^Physics_Object;
+	og_flags: u32;
 
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime();
@@ -252,6 +279,28 @@ main :: proc() {
 		}
 		// camera.pos += Vec2 {10.0, 10.0} * dt;
 		update_phys_world(dt);
+
+		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+			for &obj in phys_world.objects {
+				if rl.CheckCollisionPointRec(
+					transmute(rl.Vector2) get_mouse_pos(), 
+					transmute(rl.Rectangle) phys_obj_to_rect(&obj)
+				) {
+					og_flags = obj.flags;
+					obj.flags |= u32(Physics_Object_Flag.Non_Kinematic);
+					selected = &obj;
+					break; // if hovering multiple objects, tant pis
+				}
+			}
+		}
+		if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && selected != nil {
+			selected.flags = og_flags;
+			// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
+			selected = nil;
+		}
+		if selected != nil {
+			selected.pos = get_mouse_pos() - selected.hitbox / 2.0;
+		}
 		
 		rl.EndDrawing();
 	}
