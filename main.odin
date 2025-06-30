@@ -20,6 +20,8 @@ get_mouse_pos :: proc() -> Vec2 {
 Vec2 :: [2]f32;
 Rect :: [4]f32;
 
+PLAYER_HORIZ_ACCEL :: 50_000_000_000_000.0;
+
 Player :: struct {
 	obj: ^Physics_Object,
 }
@@ -72,12 +74,16 @@ update_physics_object :: proc(obj: ^Physics_Object, world: ^Physics_World, dt: f
 	if phys_obj_has_flag(obj, Physics_Object_Flag.Non_Kinematic) {
 		return;
 	}
-	resistance: f32 = 0.0;
+	resistance: f32 = 1.0;
 	if !phys_obj_has_flag(obj, Physics_Object_Flag.No_Velocity_Dampening) {
-		resistance = ARBITRARY_DRAG_COEFFICIENT;
+		resistance = 1.0 - ARBITRARY_DRAG_COEFFICIENT;
 	}
+	
+	// if linalg.length(obj.vel) < MINIMUM_VELOCITY_MAGNITUDE do obj.vel = Vec2{};
+
 	next_pos := obj.pos + obj.vel * dt;
-	next_vel := (obj.vel + obj.acc * dt) - obj.vel * resistance;
+
+	next_vel := (obj.vel + obj.acc * dt) * resistance;
 
 	if !phys_obj_has_flag(obj, Physics_Object_Flag.No_Gravity) {
 		obj.acc = {0, EARTH_GRAVITY} * obj.mass;
@@ -94,24 +100,28 @@ update_physics_object :: proc(obj: ^Physics_Object, world: ^Physics_World, dt: f
 			other_obj == obj^ || phys_obj_has_flag(&other_obj, Physics_Object_Flag.No_Collisions)
 		{ continue; }
 
-		r1 := transmute(rl.Rectangle) phys_obj_to_rect(obj);
+		r1 := transmute(rl.Rectangle) Rect { next_pos.x, next_pos.y, obj.hitbox.x, obj.hitbox.y };
 		r2 := transmute(rl.Rectangle) phys_obj_to_rect(&other_obj);
 		if rl.CheckCollisionRecs(r1, r2) {
 			collision_rect := rl.GetCollisionRec(r1, r2);
-			// choose the smallest of the two coordinates to move back by
+			// use obj.pos instead of next_pos so we know where we came from
 			move_back := linalg.normalize((obj.pos + obj.hitbox / 2.0) - (other_obj.pos + other_obj.hitbox / 2.0));
+			// choose the smallest of the two coordinates to move back by
 			if collision_rect.width > collision_rect.height {
 				sign := -1.0 if move_back.y < 0.0 else f32(1.0);
 				move_back.y = collision_rect.height * sign;
+				next_vel.y = -next_vel.y;
+
 				move_back.x = 0.0;
 			}
 			else {
 				sign := -1.0 if move_back.x < 0.0 else f32(1.0);
 				move_back.x = collision_rect.width * sign;
+				next_vel.x = -next_vel.x;
+
 				move_back.y = 0.0;
 			}
 			next_pos += move_back;
-			next_vel = Vec2{};
 		}
 	}
 
@@ -240,7 +250,19 @@ resources 	: Resources;
 phys_world  : Physics_World;
 // --------------   END   --------------
 
+import "tiled";
+
 main :: proc() {
+	path := "test_map.tmx";
+	tilemap, ok := tiled.parse_tilemap(path);
+	if !ok {
+		fmt.println("Error parsing tilemap:", path);
+		return;
+	}
+	fmt.printfln("%#v",tilemap);
+}
+
+main_ :: proc() {
 	rl.InitWindow(window_width, window_height, "yeah");
 	
 	initialise_camera();
@@ -255,7 +277,7 @@ main :: proc() {
 	if !ok do return;
 
 	player: Player;
-	player.obj = add_phys_object(pos = get_screen_centre(), mass = kg(0.1), scale = Vec2 { 100.0, 100.0 });
+	player.obj = add_phys_object(pos = get_screen_centre(), mass = kg(1.0), scale = Vec2 { 100.0, 100.0 });
 	fmt.println(calculate_terminal_velocity(EARTH_GRAVITY, player.obj.mass, ARBITRARY_DRAG_COEFFICIENT));
 
 	add_phys_object(
@@ -279,6 +301,24 @@ main :: proc() {
 		}
 		// camera.pos += Vec2 {10.0, 10.0} * dt;
 		update_phys_world(dt);
+
+		move: f32 = 0.0;
+		if rl.IsKeyDown(rl.KeyboardKey.D) {
+			move +=  1;
+		}
+		if rl.IsKeyDown(rl.KeyboardKey.A) {
+			move += -1;
+		}
+
+		if move != 0.0 {
+			// acc = 1/2 * force / mass * t²
+			player.obj.acc.x = (move * PLAYER_HORIZ_ACCEL) * dt*dt / player.obj.mass;
+			fmt.println(player.obj.acc);
+		}
+		else {
+			player.obj.acc.x = 0.0;
+		}
+		// player.obj.vel += move * PLAYER_SPEED * dt;
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 			for &obj in phys_world.objects {
