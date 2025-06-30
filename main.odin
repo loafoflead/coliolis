@@ -6,6 +6,12 @@ import "core:math/linalg/hlsl";
 import "core:math";
 import "core:fmt";
 
+import "core:os";
+
+import "core:strings";
+
+import "tiled";
+
 window_width : i32 = 600;
 window_height : i32 = 400;
 
@@ -222,16 +228,24 @@ world_pos_to_screen_pos :: proc(camera: Camera2D, pos: Vec2) -> Vec2 {
 	return pos - camera.pos;
 }
 
+Tilemap :: struct {
+	using tilemap: tiled.Tilemap,
+	id: int,
+}
+
 Resources :: struct #no_copy {
 	textures: [dynamic]rl.Texture2D,
+	tilemaps: [dynamic]Tilemap,
 }
 
 initialise_resources :: proc() {
 	resources.textures = make([dynamic]rl.Texture2D, 10);
+	resources.tilemaps = make([dynamic]Tilemap, 10);
 }
 
 free_resources :: proc() {
 	delete(resources.textures)
+	delete(resources.tilemaps)
 }
 
 load_texture :: proc(path: cstring) -> (int, bool) {
@@ -244,27 +258,35 @@ load_texture :: proc(path: cstring) -> (int, bool) {
 	return index, success;
 }
 
+import c "core:c/libc";
+
+load_tilemap :: proc(path: string) -> (_idx: int, err: bool) {
+	tilemap := tiled.parse_tilemap(path) or_return;
+	
+	builder: strings.Builder;
+
+	_, ok := strings.builder_init_len(&builder, len(path));
+	if ok != nil do return {}, false;
+	defer strings.builder_destroy(&builder);
+
+	strings.write_string(&builder, path);
+	c.printf("%s", transmute(cstring) &builder.buf);
+
+	texture_id := load_texture(transmute(cstring) &builder.buf) or_return;
+
+	index := len(resources.tilemaps);
+	append(&resources.tilemaps, Tilemap { tilemap = tilemap, id = texture_id });
+
+	return index, true;
+}
+
 // -------------- GLOBALS --------------
 camera 		: Camera2D;
 resources 	: Resources;
 phys_world  : Physics_World;
 // --------------   END   --------------
 
-import "tiled";
-
-main :: proc() {
-	path := "test_map.tmx";
-	tilemap, ok := tiled.parse_tilemap(path);
-	if !ok {
-		fmt.println("Error parsing tilemap:", path);
-		return;
-	}
-	fmt.printfln("%#v",tilemap);
-}
-
-main_ :: proc() {
-	rl.InitWindow(window_width, window_height, "yeah");
-	
+main :: proc() {	
 	initialise_camera();
 
 	initialise_resources();
@@ -273,8 +295,14 @@ main_ :: proc() {
 	initialise_phys_world();
 	defer free_phys_world();
 
+	rl.InitWindow(window_width, window_height, "yeah");
+
 	five_w, ok := load_texture("5W.png");
-	if !ok do return;
+	if !ok do os.exit(1);
+	
+	test_map, tmap_ok := load_tilemap("test_map.tmx");
+	if !tmap_ok do os.exit(1);
+
 
 	player: Player;
 	player.obj = add_phys_object(pos = get_screen_centre(), mass = kg(1.0), scale = Vec2 { 100.0, 100.0 });

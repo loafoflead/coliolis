@@ -25,6 +25,9 @@ parse_tilemap :: proc(path: string, parse_tileset_automatically: bool = true, ch
 		fmt.printfln("ERROR: Tilemap `{}` not found in {}", path, os.get_current_directory());
 		return Tilemap{}, false;
 	}
+
+
+	
 	infinite := xml.find_attribute_val_by_key(doc, 0, "infinite") or_return;
 	if infinite != "0" {
 		fmt.println("ERROR: `infinite` is expected to be \"0\", not `",infinite,"`");
