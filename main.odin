@@ -228,7 +228,7 @@ world_pos_to_screen_pos :: proc(camera: Camera2D, pos: Vec2) -> Vec2 {
 
 Tilemap :: struct {
 	using tilemap: tiled.Tilemap,
-	id: int,
+	texture_id: int,
 }
 
 Resources :: struct #no_copy {
@@ -242,8 +242,9 @@ initialise_resources :: proc() {
 }
 
 free_resources :: proc() {
-	delete(resources.textures)
-	delete(resources.tilemaps)
+	delete(resources.textures);
+	// TODO: check if the xml library requires unloading
+	delete(resources.tilemaps);
 }
 
 load_texture :: proc(path: cstring) -> (int, bool) {
@@ -256,24 +257,25 @@ load_texture :: proc(path: cstring) -> (int, bool) {
 	return index, success;
 }
 
-import c "core:c/libc";
-
-load_tilemap :: proc(path: string) -> (_idx: int, err: bool) {
+load_tilemap :: proc(path: string) -> (index: int, err: bool = true) {
 	tilemap := tiled.parse_tilemap(path) or_return;
 	
 	builder := strings.builder_make(context.temp_allocator);
 	defer strings.builder_destroy(&builder);
 
 	strings.write_string(&builder, tilemap.tileset.source);
-	fmt.println(strings.to_string(builder));
-	c.printf("%s\n", strings.to_cstring(&builder));
 
 	texture_id := load_texture(strings.to_cstring(&builder)) or_return;
 
-	index := len(resources.tilemaps);
-	append(&resources.tilemaps, Tilemap { tilemap = tilemap, id = texture_id });
+	index = len(resources.tilemaps);
+	append(&resources.tilemaps, Tilemap { tilemap = tilemap, texture_id = texture_id });
 
-	return index, true;
+	return;
+}
+
+draw_tilemap :: proc(index: int, pos: Vec2) {
+	src_idx := resources.tilemaps[index].texture_id;
+	draw_texture(src_idx, pos);
 }
 
 // -------------- GLOBALS --------------
@@ -319,7 +321,7 @@ main :: proc() {
 		rl.BeginDrawing();
 		rl.ClearBackground(rl.GetColor(0x181818));
 
-		draw_texture(five_w, {0., 0.});
+		draw_tilemap(test_map, {0., 0.});
 		for &obj in phys_world.objects {
 			draw_hitbox_at(obj.pos, &obj.hitbox);
 		}
