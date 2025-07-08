@@ -39,7 +39,7 @@ ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 Physics_Object :: struct {
 	pos, vel, acc: Vec2,
 	mass: f32,
-	flags: u32,
+	flags: Physics_Object_Flagset,
 	hitbox: Hitbox,
 }
 
@@ -47,10 +47,6 @@ phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect {
 	return Rect {
 		obj.pos.x, obj.pos.y, obj.hitbox.x, obj.hitbox.y,
 	};
-}
-
-phys_obj_has_flag :: proc(obj: ^Physics_Object, flag: Physics_Object_Flag) -> bool {
-	return obj.flags & u32(flag) != 0;
 }
 
 calculate_terminal_velocity :: proc(gravity, mass, drag: f32) -> f32 {
@@ -68,6 +64,8 @@ Physics_Object_Flag :: enum u32 {
 	No_Gravity				= 1 << 3,
 }
 
+Physics_Object_Flagset :: bit_set[Physics_Object_Flag];
+
 Hitbox :: [2]f32;
 
 draw_hitbox_at :: proc(pos: Vec2, box: ^Hitbox) {
@@ -77,11 +75,11 @@ draw_hitbox_at :: proc(pos: Vec2, box: ^Hitbox) {
 }
 
 update_physics_object :: proc(obj: ^Physics_Object, world: ^Physics_World, dt: f32) {
-	if phys_obj_has_flag(obj, Physics_Object_Flag.Non_Kinematic) {
+	if Physics_Object_Flag.Non_Kinematic in obj.flags {
 		return;
 	}
 	resistance: f32 = 1.0;
-	if !phys_obj_has_flag(obj, Physics_Object_Flag.No_Velocity_Dampening) {
+	if Physics_Object_Flag.No_Velocity_Dampening not_in obj.flags {
 		resistance = 1.0 - ARBITRARY_DRAG_COEFFICIENT;
 	}
 	
@@ -91,11 +89,11 @@ update_physics_object :: proc(obj: ^Physics_Object, world: ^Physics_World, dt: f
 
 	next_vel := (obj.vel + obj.acc * dt) * resistance;
 
-	if !phys_obj_has_flag(obj, Physics_Object_Flag.No_Gravity) {
+	if Physics_Object_Flag.No_Gravity not_in obj.flags {
 		obj.acc = {0, EARTH_GRAVITY} * obj.mass;
 	}
 
-	if phys_obj_has_flag(obj, Physics_Object_Flag.No_Collisions) {
+	if Physics_Object_Flag.No_Collisions in obj.flags {
 		obj.pos = next_pos;
 		obj.vel = next_vel;
 		return;
@@ -103,7 +101,7 @@ update_physics_object :: proc(obj: ^Physics_Object, world: ^Physics_World, dt: f
 
 	for &other_obj in world.objects {
 		if 
-			other_obj == obj^ || phys_obj_has_flag(&other_obj, Physics_Object_Flag.No_Collisions)
+			other_obj == obj^ || Physics_Object_Flag.No_Collisions in other_obj.flags
 		{ continue; }
 
 		r1 := transmute(rl.Rectangle) Rect { next_pos.x, next_pos.y, obj.hitbox.x, obj.hitbox.y };
@@ -154,7 +152,7 @@ add_phys_object :: proc(
 	pos:   Vec2 = Vec2{}, 
 	vel:   Vec2 = Vec2{}, 
 	acc:   Vec2 = Vec2{}, 
-	flags: u32  = 0
+	flags: Physics_Object_Flagset = {}
 ) -> ^Physics_Object 
 {
 	obj := Physics_Object {
@@ -263,16 +261,14 @@ import c "core:c/libc";
 load_tilemap :: proc(path: string) -> (_idx: int, err: bool) {
 	tilemap := tiled.parse_tilemap(path) or_return;
 	
-	builder: strings.Builder;
-
-	_, ok := strings.builder_init_len(&builder, len(path));
-	if ok != nil do return {}, false;
+	builder := strings.builder_make(context.temp_allocator);
 	defer strings.builder_destroy(&builder);
 
-	strings.write_string(&builder, path);
-	c.printf("%s", transmute(cstring) &builder.buf);
+	strings.write_string(&builder, tilemap.tileset.source);
+	fmt.println(strings.to_string(builder));
+	c.printf("%s\n", strings.to_cstring(&builder));
 
-	texture_id := load_texture(transmute(cstring) &builder.buf) or_return;
+	texture_id := load_texture(strings.to_cstring(&builder)) or_return;
 
 	index := len(resources.tilemaps);
 	append(&resources.tilemaps, Tilemap { tilemap = tilemap, id = texture_id });
@@ -312,11 +308,11 @@ main :: proc() {
 		mass = 10.0,
 		scale = Vec2 {500.0, 50.0},
 		pos = get_screen_centre() + Vec2 { 0, 150 },
-		flags = u32(Physics_Object_Flag.Non_Kinematic),
+		flags = {.Non_Kinematic},
 	);
 
 	selected: ^Physics_Object;
-	og_flags: u32;
+	og_flags: Physics_Object_Flagset;
 
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime();
@@ -355,7 +351,7 @@ main :: proc() {
 					transmute(rl.Rectangle) phys_obj_to_rect(&obj)
 				) {
 					og_flags = obj.flags;
-					obj.flags |= u32(Physics_Object_Flag.Non_Kinematic);
+					obj.flags |= {.Non_Kinematic};
 					selected = &obj;
 					break; // if hovering multiple objects, tant pis
 				}
