@@ -3,6 +3,11 @@ import rl "thirdparty/raylib";
 import "core:math/linalg/hlsl";
 import "core:math/linalg";
 
+
+EARTH_GRAVITY :: 5.0;
+// terminal velocity = sqrt((gravity * mass) / (drag coeff))
+ARBITRARY_DRAG_COEFFICIENT :: 0.01;
+
 Physics_Object :: struct {
 	using transform: World_Transform,
 	vel, acc: Vec2,
@@ -18,10 +23,11 @@ phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect {
 }
 
 Physics_Object_Flag :: enum u32 {
-	Non_Kinematic 			= 1 << 0,
-	No_Velocity_Dampening 	= 1 << 1,
-	No_Collisions 			= 1 << 2,
-	No_Gravity				= 1 << 3,
+	Non_Kinematic,
+	No_Velocity_Dampening,
+	No_Collisions,
+	No_Gravity,
+	Drag_Exception,
 }
 
 Physics_Object_Flagset :: bit_set[Physics_Object_Flag];
@@ -34,14 +40,57 @@ draw_hitbox_at :: proc(pos: Vec2, box: ^Hitbox) {
 	draw_rectangle(pos, cast(Vec2) box^);
 }
 
+point_collides_in_world :: proc(point: Vec2) -> (
+	collided_with: ^Physics_Object = nil, 
+	success: bool = false
+) 
+{
+	for &other_obj, i in phys_world.objects {
+		if Physics_Object_Flag.No_Collisions in other_obj.flags do continue;
+
+		if rl.CheckCollisionPointRec(transmute(rl.Vector2) point, transmute(rl.Rectangle) phys_obj_to_rect(&other_obj)) {
+			collided_with = &other_obj;
+			success = true;
+			return;
+		}
+	}
+	return;
+}
+
+get_first_collision_in_world :: proc(obj_id: int, set_pos: Vec2 = MARKER_VEC2) -> (rl.Rectangle, ^Physics_Object, bool) {
+	if .No_Collisions in phys_world.objects[obj_id].flags do return rl.Rectangle{}, nil, false;
+	obj := phys_world.objects[obj_id];
+	for &other_obj, i in phys_world.objects {
+		if 
+			i == obj_id || Physics_Object_Flag.No_Collisions in other_obj.flags
+		{ continue; }
+
+		pos: Vec2;
+		if set_pos == MARKER_VEC2 do pos = obj.pos;
+		else do pos = set_pos;
+		r1 := transmute(rl.Rectangle) Rect { pos.x, pos.y, obj.hitbox.x, obj.hitbox.y };
+		r2 := transmute(rl.Rectangle) phys_obj_to_rect(&other_obj);
+		if rl.CheckCollisionRecs(r1, r2) {
+			collision_rect := rl.GetCollisionRec(r1, r2);
+			return collision_rect, &other_obj, true;
+		}
+	}
+	return rl.Rectangle{}, nil, false;
+}
+
 update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	obj := &phys_world.objects[obj_id];
 	if Physics_Object_Flag.Non_Kinematic in obj.flags {
 		return;
 	}
-	resistance: f32 = 1.0;
+	resistance: Vec2 = Vec2 {1.0, 1.0};
 	if Physics_Object_Flag.No_Velocity_Dampening not_in obj.flags {
-		resistance = 1.0 - ARBITRARY_DRAG_COEFFICIENT;
+		resistance.x = 1.0 - ARBITRARY_DRAG_COEFFICIENT;
+		resistance.y = 1.0 - ARBITRARY_DRAG_COEFFICIENT;
+	}
+	if .Drag_Exception in obj.flags {
+		resistance.x = 0.98;
+		resistance.y = 0.99;
 	}
 	
 	// if linalg.length(obj.vel) < MINIMUM_VELOCITY_MAGNITUDE do obj.vel = Vec2{};
@@ -55,34 +104,26 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	}
 
 	if Physics_Object_Flag.No_Collisions not_in obj.flags {
-		for &other_obj, i in world.objects {
-			if 
-				i == obj_id || Physics_Object_Flag.No_Collisions in other_obj.flags
-			{ continue; }
+		collision_rect, other_obj, ok := get_first_collision_in_world(obj_id, set_pos = next_pos);
+		if ok {
+			// use obj.pos instead of next_pos so we know where we came from
+			move_back := linalg.normalize((obj.pos + obj.hitbox / 2.0) - (other_obj.pos + other_obj.hitbox / 2.0));
+			// choose the smallest of the two coordinates to move back by
+			if collision_rect.width > collision_rect.height {
+				sign := -1.0 if move_back.y < 0.0 else f32(1.0);
+				move_back.y = collision_rect.height * sign;
+				next_vel.y = -next_vel.y;
 
-			r1 := transmute(rl.Rectangle) Rect { next_pos.x, next_pos.y, obj.hitbox.x, obj.hitbox.y };
-			r2 := transmute(rl.Rectangle) phys_obj_to_rect(&other_obj);
-			if rl.CheckCollisionRecs(r1, r2) {
-				collision_rect := rl.GetCollisionRec(r1, r2);
-				// use obj.pos instead of next_pos so we know where we came from
-				move_back := linalg.normalize((obj.pos + obj.hitbox / 2.0) - (other_obj.pos + other_obj.hitbox / 2.0));
-				// choose the smallest of the two coordinates to move back by
-				if collision_rect.width > collision_rect.height {
-					sign := -1.0 if move_back.y < 0.0 else f32(1.0);
-					move_back.y = collision_rect.height * sign;
-					next_vel.y = -next_vel.y;
-
-					move_back.x = 0.0;
-				}
-				else {
-					sign := -1.0 if move_back.x < 0.0 else f32(1.0);
-					move_back.x = collision_rect.width * sign;
-					next_vel.x = -next_vel.x;
-
-					move_back.y = 0.0;
-				}
-				next_pos += move_back;
+				move_back.x = 0.0;
 			}
+			else {
+				sign := -1.0 if move_back.x < 0.0 else f32(1.0);
+				move_back.x = collision_rect.width * sign;
+				next_vel.x = -next_vel.x;
+
+				move_back.y = 0.0;
+			}
+			next_pos += move_back;
 		}
 	}
 
@@ -92,6 +133,17 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		child.pos += delta;
 	}
 	obj.vel = next_vel;
+}
+
+// TODO: naïve assumption that an object is grounded if it touches something...
+phys_obj_grounded :: proc(obj_id: int) -> bool {
+	ok: bool;
+	obj := phys_world.objects[obj_id];
+	// man this is amazing, i didn't even mean for this to be possible
+	centre := obj.pos + obj.hitbox / 2;
+	point := centre + obj.hitbox.y; 
+	_, ok = point_collides_in_world(point);
+	return ok;
 }
 
 Physics_World :: struct #no_copy {
@@ -115,7 +167,7 @@ add_phys_object_aabb :: proc(
 	acc:   Vec2 = Vec2{},
 	parent: ^World_Transform = nil,
 	flags: Physics_Object_Flagset = {}
-) -> ^Physics_Object 
+) -> (ptr: ^Physics_Object, id: int)
 {
 	obj := Physics_Object {
 		pos = pos, 
@@ -126,8 +178,14 @@ add_phys_object_aabb :: proc(
 		flags = flags, 
 		hitbox = cast(Hitbox) scale,
 	};
+
+	id = len(phys_world.objects);
+	
 	append(&phys_world.objects, obj);
-	return &phys_world.objects[len(phys_world.objects)-1];
+	
+	ptr = &phys_world.objects[id];
+
+	return;
 }
 
 update_phys_world :: proc(dt: f32) {

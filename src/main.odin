@@ -35,11 +35,6 @@ MARKER_VEC2 :: Vec2 { math.F32_MAX, math.F32_MAX };
 MARKER_RECT :: Rect { math.F32_MAX, math.F32_MAX, math.F32_MAX, math.F32_MAX };
 
 
-EARTH_GRAVITY :: 9.8;
-// terminal velocity = sqrt((gravity * mass) / (drag coeff))
-ARBITRARY_DRAG_COEFFICIENT :: 0.01;
-
-
 
 calculate_terminal_velocity :: proc(gravity, mass, drag: f32) -> f32 {
 	return math.sqrt((gravity * mass) / drag);
@@ -78,7 +73,12 @@ main :: proc() {
 	generate_static_physics_for_tilemap(test_map, 0);
 
 	player: Player;
-	player.obj = add_phys_object_aabb(pos = get_screen_centre(), mass = kg(1.0), scale = Vec2 { 30.0, 30.0 });
+	player.obj, player.obj_id = add_phys_object_aabb(
+		pos = get_screen_centre(), 
+		mass = kg(1.0), 
+		scale = Vec2 { 30.0, 30.0 },
+		flags = {.Drag_Exception}, 
+	);
 	fmt.println(calculate_terminal_velocity(EARTH_GRAVITY, player.obj.mass, ARBITRARY_DRAG_COEFFICIENT));
 
 	add_phys_object_aabb(
@@ -95,6 +95,11 @@ main :: proc() {
 	drag_og: Vec2;
 
 	pointer : Vec2;
+
+	in_air: bool;
+	jump_timer: f32;
+	jumping: bool;
+	wants_to_jump: bool;
 
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime();
@@ -116,9 +121,56 @@ main :: proc() {
 			move += -1;
 		}
 
+		if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
+			if !in_air {
+				jumping = true;
+			}
+		}
+		if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
+			if jumping {
+				player.obj.acc.y = -PLAYER_JUMP_STR * (1 - ease_out_expo(jump_timer));
+				fmt.println((1 - ease_out_expo(jump_timer)));
+				jump_timer += dt;
+			}
+		}
+		else {
+			jumping = false;
+		}
+
+		if phys_obj_grounded(player.obj_id) {
+			in_air = false;
+		}
+		else {
+			in_air = true;
+		}
+		// if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
+		// 	if !jumping && jump_timer == 0.0 do jumping = true;
+		// }
+
+		// if rl.IsKeyReleased(rl.KeyboardKey.SPACE) && jumping {
+		// 	jumping = false;
+		// }
+
+		// if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
+		// 	if jumping {
+		// 		player.obj.acc.y = -PLAYER_JUMP_STR * (1 - ease_out_expo(jump_timer));
+		// 		fmt.println((1 - ease_out_expo(jump_timer)));
+		// 		jump_timer += dt;
+		// 	}
+		// 	if jump_timer >= 1.0 do wants_to_jump = true;
+		// }
+		// else {
+		// 	wants_to_jump = false;
+		// }
+
+		// if jump_timer >= 0.0 &&  {
+		// 	jump_timer = 0;
+		// 	if wants_to_jump do jumping = true;
+		// }
+		// else if jump_timer >= 1.0 do jumping = false;
+
 		if move != 0.0 {
-			// acc = 1/2 * force / mass * t²
-			player.obj.acc.x = (move * PLAYER_HORIZ_ACCEL) * dt*dt / player.obj.mass;
+			player.obj.acc.x = move * PLAYER_HORIZ_ACCEL;
 		}
 		else {
 			player.obj.acc.x = 0.0;
