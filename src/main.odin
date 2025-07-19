@@ -12,6 +12,7 @@ import "tiled";
 camera 		: Camera2D;
 resources 	: Resources;
 phys_world  : Physics_World;
+timers  	: Timer_Handler;
 
 window_width : i32 = 600;
 window_height : i32 = 400;
@@ -63,6 +64,9 @@ main :: proc() {
 	initialise_phys_world();
 	defer free_phys_world();
 
+	initialise_timers();
+	defer free_timers();
+
 	rl.InitWindow(window_width, window_height, "yeah");
 
 	five_w, ok := load_texture("5W.png");
@@ -89,7 +93,7 @@ main :: proc() {
 	);
 
 	selected: ^Physics_Object;
-	og_flags: Physics_Object_Flagset;
+	og_flags: bit_set[Physics_Object_Flag];
 
 	dragging: bool;
 	drag_og: Vec2;
@@ -97,9 +101,9 @@ main :: proc() {
 	pointer : Vec2;
 
 	in_air: bool;
-	jump_timer: f32;
+	jump_timer := get_temp_timer(0.2);
 	jumping: bool;
-	wants_to_jump: bool;
+	coyote_timer := get_temp_timer(0.25);
 
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime();
@@ -107,11 +111,14 @@ main :: proc() {
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR));
 
 		draw_tilemap(test_map, {0., 0.});
-		for &obj in phys_world.objects {
-			draw_hitbox_at(obj.pos, &obj.hitbox);
-		}
+		draw_hitbox_at(player.obj.pos, &player.obj.hitbox);
+		// for &obj in phys_world.objects {
+		// 	draw_hitbox_at(obj.pos, &obj.hitbox);
+		// }
 		// camera.pos += Vec2 {10.0, 10.0} * dt;
 		update_phys_world(dt);
+		update_timers(dt);
+		camera.pos = player.obj.pos - get_screen_centre();
 
 		move: f32 = 0.0;
 		if rl.IsKeyDown(rl.KeyboardKey.D) {
@@ -122,15 +129,15 @@ main :: proc() {
 		}
 
 		if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-			if !in_air {
+			if !in_air || !is_timer_done(coyote_timer) {
 				jumping = true;
+				if !is_timer_done(coyote_timer) do coyote_timer.current = 999;
 			}
 		}
 		if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
-			if jumping {
-				player.obj.acc.y = -PLAYER_JUMP_STR * (1 - ease_out_expo(jump_timer));
-				fmt.println((1 - ease_out_expo(jump_timer)));
-				jump_timer += dt;
+			if jumping && !is_timer_done(jump_timer) {
+				player.obj.vel.y = -PLAYER_JUMP_STR * (1 - ease_out_expo(jump_timer.current));
+				update_timer(jump_timer, dt);
 			}
 		}
 		else {
@@ -139,8 +146,11 @@ main :: proc() {
 
 		if phys_obj_grounded(player.obj_id) {
 			in_air = false;
+			reset_timer(jump_timer);
+			reset_timer(coyote_timer);
 		}
 		else {
+			update_timer(coyote_timer, dt);
 			in_air = true;
 		}
 		// if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {

@@ -12,7 +12,7 @@ Physics_Object :: struct {
 	using transform: World_Transform,
 	vel, acc: Vec2,
 	mass: f32,
-	flags: Physics_Object_Flagset,
+	flags: bit_set[Physics_Object_Flag],
 	hitbox: Hitbox,
 }
 
@@ -29,8 +29,6 @@ Physics_Object_Flag :: enum u32 {
 	No_Gravity,
 	Drag_Exception,
 }
-
-Physics_Object_Flagset :: bit_set[Physics_Object_Flag];
 
 Hitbox :: [2]f32;
 
@@ -141,8 +139,8 @@ phys_obj_grounded :: proc(obj_id: int) -> bool {
 	obj := phys_world.objects[obj_id];
 	// man this is amazing, i didn't even mean for this to be possible
 	centre := obj.pos + obj.hitbox / 2;
-	point := centre + obj.hitbox.y; 
-	_, ok = point_collides_in_world(point);
+	centre.y += obj.hitbox.y;
+	_, ok = point_collides_in_world(centre);
 	return ok;
 }
 
@@ -166,7 +164,7 @@ add_phys_object_aabb :: proc(
 	vel:   Vec2 = Vec2{},
 	acc:   Vec2 = Vec2{},
 	parent: ^World_Transform = nil,
-	flags: Physics_Object_Flagset = {}
+	flags: bit_set[Physics_Object_Flag] = {}
 ) -> (ptr: ^Physics_Object, id: int)
 {
 	obj := Physics_Object {
