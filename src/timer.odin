@@ -5,6 +5,7 @@ import "core:fmt";
 Timer_Flags :: enum {
 	Update_Automatically,
 	Finished,
+	Repeating,
 }
 
 NUM_UNNAMED_TIMERS :: 16;
@@ -33,11 +34,17 @@ free_timers :: proc() {
 
 update_timers :: proc(dt: f32) {
 	for &timer in timers.unnamed {
-		if .Finished in timer.flags 				do continue;
+		if .Finished in timer.flags {
+			if .Repeating in timer.flags do reset_timer(&timer);
+			else do continue;
+		}
 		if .Update_Automatically in timer.flags 	do update_timer(&timer, dt);
 	}
 	for _, &timer in timers.named {
-		if .Finished in timer.flags 				do continue;
+		if .Finished in timer.flags {
+			if .Repeating in timer.flags do reset_timer(&timer);
+			else do continue;
+		}
 		if .Update_Automatically in timer.flags 	do update_timer(&timer, dt);
 	}
 }

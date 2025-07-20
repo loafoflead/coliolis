@@ -106,7 +106,6 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 		append(&layers, layer);
 	}
 
-	fmt.println(layers);
 	// layer_def := xml.find_attribute_val_by_key(doc, 0, "renderorder") or_return;
 
 	tilemap.layers = layers;

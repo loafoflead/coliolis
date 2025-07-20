@@ -8,8 +8,7 @@ EARTH_GRAVITY :: 5.0;
 // terminal velocity = sqrt((gravity * mass) / (drag coeff))
 ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 
-// TODO
-// Physics_Object_Id :: int; 
+Physics_Object_Id :: int; 
 
 Physics_Object :: struct {
 	using transform: World_Transform,
@@ -17,6 +16,11 @@ Physics_Object :: struct {
 	mass: f32,
 	flags: bit_set[Physics_Object_Flag],
 	hitbox: Hitbox,
+}
+
+phys_obj :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
+	if len(phys_world.objects) < cast(int) id || cast(int) id == -1 do return nil, false;
+	return &phys_world.objects[cast(int)id], true;
 }
 
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect {
@@ -42,16 +46,19 @@ draw_hitbox_at :: proc(pos: Vec2, box: ^Hitbox) {
 	draw_rectangle(pos, cast(Vec2) box^);
 }
 
-point_collides_in_world :: proc(point: Vec2) -> (
+point_collides_in_world :: proc(point: Vec2, count_triggers: bool = false) -> (
 	collided_with: ^Physics_Object = nil, 
+	collided_with_id: Physics_Object_Id = -1,
 	success: bool = false
 ) 
 {
 	for &other_obj, i in phys_world.objects {
 		if Physics_Object_Flag.No_Collisions in other_obj.flags do continue;
+		if !count_triggers && .Trigger in other_obj.flags do continue;
 
 		if rl.CheckCollisionPointRec(transmute(rl.Vector2) point, transmute(rl.Rectangle) phys_obj_to_rect(&other_obj)) {
 			collided_with = &other_obj;
+			collided_with_id = i;
 			success = true;
 			return;
 		}
@@ -59,13 +66,14 @@ point_collides_in_world :: proc(point: Vec2) -> (
 	return;
 }
 
-get_first_collision_in_world :: proc(obj_id: int, set_pos: Vec2 = MARKER_VEC2) -> (rl.Rectangle, ^Physics_Object, bool) {
-	if .No_Collisions in phys_world.objects[obj_id].flags do return rl.Rectangle{}, nil, false;
-	obj := phys_world.objects[obj_id];
+get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = MARKER_VEC2, count_triggers: bool = false) -> (rl.Rectangle, ^Physics_Object, bool) {
+	obj := phys_obj(obj_id);
+	if .No_Collisions in obj.flags do return rl.Rectangle{}, nil, false;
 	for &other_obj, i in phys_world.objects {
 		if 
 			i == obj_id || Physics_Object_Flag.No_Collisions in other_obj.flags
 		{ continue; }
+		if !count_triggers && .Trigger in other_obj.flags do continue;
 
 		pos: Vec2;
 		if set_pos == MARKER_VEC2 do pos = obj.pos;
@@ -80,8 +88,23 @@ get_first_collision_in_world :: proc(obj_id: int, set_pos: Vec2 = MARKER_VEC2) -
 	return rl.Rectangle{}, nil, false;
 }
 
+get_collision_between_objs_in_world :: proc(obj_id: Physics_Object_Id, other_obj_id: Physics_Object_Id) -> (rl.Rectangle, bool) {
+	obj := phys_obj(obj_id);
+	other_obj := phys_obj(other_obj_id);
+
+	if .No_Collisions in obj.flags 			do return rl.Rectangle{}, false;
+	if .No_Collisions in other_obj.flags 	do return rl.Rectangle{}, false;
+	r1 := transmute(rl.Rectangle) phys_obj_to_rect(obj);
+	r2 := transmute(rl.Rectangle) phys_obj_to_rect(other_obj);
+	if rl.CheckCollisionRecs(r1, r2) {
+		collision_rect := rl.GetCollisionRec(r1, r2);
+		return collision_rect, true;
+	}
+	else do return rl.Rectangle{}, false;
+}
+
 update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
-	obj := &phys_world.objects[obj_id];
+	obj := phys_obj(obj_id);
 	if Physics_Object_Flag.Non_Kinematic in obj.flags || .Trigger in obj.flags {
 		return;
 	}
@@ -144,7 +167,7 @@ phys_obj_grounded :: proc(obj_id: int) -> bool {
 	// man this is amazing, i didn't even mean for this to be possible
 	centre := obj.pos + obj.hitbox / 2;
 	centre.y += obj.hitbox.y;
-	_, ok = point_collides_in_world(centre);
+	_, _, ok = point_collides_in_world(centre);
 	return ok;
 }
 
@@ -172,7 +195,7 @@ add_phys_object_aabb :: proc(
 	acc:   Vec2 = Vec2{},
 	parent: ^World_Transform = nil,
 	flags: bit_set[Physics_Object_Flag] = {}
-) -> (ptr: ^Physics_Object, id: int)
+) -> (id: Physics_Object_Id)
 {
 	obj := Physics_Object {
 		pos = pos, 
@@ -188,8 +211,6 @@ add_phys_object_aabb :: proc(
 	
 	append(&phys_world.objects, obj);
 	
-	ptr = &phys_world.objects[id];
-
 	return;
 }
 

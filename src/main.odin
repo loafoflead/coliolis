@@ -3,6 +3,7 @@ package main;
 import rl "thirdparty/raylib";
 import "core:math";
 import "core:fmt";
+import "core:mem";
 
 import "core:os";
 
@@ -13,7 +14,7 @@ camera 		: Camera2D;
 resources 	: Resources;
 phys_world  : Physics_World;
 timers  	: Timer_Handler;
-portals 	: Portal_Handler;
+portal_handler 	: Portal_Handler;
 
 window_width : i32 = 600;
 window_height : i32 = 400;
@@ -57,54 +58,66 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
 }
 
-Portal :: enum {
-	Pete,
-	Leth,
+Portal_State :: enum {
+	Connected,
+	Alive,
+	Occupied,
+}
+
+Portal :: struct {
+	obj: Physics_Object_Id,
+	state: bit_set[Portal_State],
 }
 
 Portal_Handler :: struct {
-	pete_obj, leth_obj: ^Physics_Object,
-	active: bit_set[Portal],
+	portals: [2]Portal,
 }
 
-initialise_portals :: proc() {
-	if !phys_world.initialised do return;
+initialise_portal_handler :: proc() {
+	if !phys_world.initialised do os.exit(-1);
 
-	portals.pete_obj, _ = add_phys_object_aabb(
+	portal_handler.portals.x.obj = add_phys_object_aabb(
 		scale = Vec2 { 80.0, 20.0 },
-		flags = {.Trigger}, 
+		flags = {.Trigger, .Non_Kinematic}, 
 	);
-	portals.leth_obj, _ = add_phys_object_aabb(
-		scale = Vec2 { 80.0, 20.0 },
-		flags = {.Trigger}, 
+	portal_handler.portals.y.obj = add_phys_object_aabb(
+		scale = Vec2 { 90.0, 10.0 },
+		flags = {.Trigger, .Non_Kinematic}, 
 	);
 }
-free_portals :: proc() {}
-
-draw_portal :: proc(portal: Portal) {
-	colour: Colour;
-	switch portal {
-	case .Pete:
-		colour=Colour{0, 255, 0, 255};
-		draw_rectangle(portals.pete_obj.pos, portals.pete_obj.hitbox, rot=portals.pete_obj.rot, col=colour);
-	case .Leth:
-		colour=Colour{0, 0, 255, 255};
-		draw_rectangle(portals.pete_obj.pos, portals.pete_obj.hitbox, rot=portals.pete_obj.rot, col=colour);
-	}
-}
+free_portal_handler :: proc() {}
 
 draw_portals :: proc() {
-	if portals.active == {} {
-		return;
+	for &portal, i in portal_handler.portals {
+		obj := phys_obj(portal.obj);
+		colour: Colour;
+		switch i {
+			case 0: colour = Colour{0, 0, 255, 255};
+			case 1: colour = Colour{0, 255, 0, 255};
+			case: 	colour = Colour{255, 0, 0, 255};
+		}
+		if .Occupied in portal.state do colour.y -= 100;
+		draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
+}
 
-	if .Leth in portals.active do draw_portal(.Leth);
-	if .Pete in portals.active do draw_portal(.Pete);
+// TODO: make player a global?
+update_portals :: proc(player: ^Player) {
+	for &portal in portal_handler.portals {
+		_, collided := get_collision_between_objs_in_world(player.obj, portal.obj);
+		if collided {
+			portal.state += {.Occupied};
+		}
+		else {
+			portal.state -= {.Occupied};
+		}
+	}
 }
 
 main :: proc() {	
 	initialise_camera();
 
+	// TODO: make this not a global?
 	initialise_resources();
 	defer free_resources();
 
@@ -114,28 +127,28 @@ main :: proc() {
 	initialise_timers();
 	defer free_timers();
 
-	initialise_portals();
-	defer free_portals();
 
 	rl.InitWindow(window_width, window_height, "yeah");
 
-	five_w, ok := load_texture("5W.png");
-	if !ok do os.exit(1);
-	
 	test_map, tmap_ok := load_tilemap("second_map.tmx");
 	if !tmap_ok do os.exit(1);
 	generate_static_physics_for_tilemap(test_map, 0);
 
+	initialise_portal_handler();
+	defer free_portal_handler();
+
+	five_w, ok := load_texture("5W.png");
+	if !ok do os.exit(1);
+
 	player: Player;
-	player.obj, player.obj_id = add_phys_object_aabb(
+	player.obj = add_phys_object_aabb(
 		pos = get_screen_centre(), 
 		mass = kg(1.0), 
 		scale = Vec2 { 30.0, 30.0 },
 		flags = {.Drag_Exception}, 
 	);
-	fmt.println(calculate_terminal_velocity(EARTH_GRAVITY, player.obj.mass, ARBITRARY_DRAG_COEFFICIENT));
 
-	selected: ^Physics_Object;
+	selected: Physics_Object_Id = -1;
 	og_flags: bit_set[Physics_Object_Flag];
 
 	dragging: bool;
@@ -148,21 +161,32 @@ main :: proc() {
 	jumping: bool;
 	coyote_timer := get_temp_timer(0.25);
 
+	portal_handler.portals.x.state += {.Alive};
+	portal_handler.portals.y.state += {.Alive};
+
+	debug_timer := create_named_timer("debug", 1.0, flags={.Update_Automatically, .Repeating});
+
 	for !rl.WindowShouldClose() {
+		if is_timer_done(debug_timer) {
+			// debug printing here
+		}
+
 		dt := rl.GetFrameTime();
 		rl.BeginDrawing();
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR));
 
 		draw_tilemap(test_map, {0., 0.});
-		draw_hitbox_at(player.obj.pos, &player.obj.hitbox);
+		player_obj:=phys_obj(player.obj);
+		draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
+		for &obj in phys_world.objects {
+			draw_hitbox_at(obj.pos, &obj.hitbox);
+		}
 		draw_portals();
-		// for &obj in phys_world.objects {
-		// 	draw_hitbox_at(obj.pos, &obj.hitbox);
-		// }
 		// camera.pos += Vec2 {10.0, 10.0} * dt;
 		update_phys_world(dt);
+		update_portals(&player);
 		update_timers(dt);
-		camera.pos = player.obj.pos - get_screen_centre();
+		if !dragging && selected == -1 do camera.pos = player_obj.pos - get_screen_centre();
 
 		move: f32 = 0.0;
 		if rl.IsKeyDown(rl.KeyboardKey.D) {
@@ -180,7 +204,7 @@ main :: proc() {
 		}
 		if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
 			if jumping && !is_timer_done(jump_timer) {
-				player.obj.vel.y = -PLAYER_JUMP_STR * (1 - ease_out_expo(jump_timer.current));
+				player_obj.vel.y = -PLAYER_JUMP_STR * (1 - ease_out_expo(jump_timer.current));
 				update_timer(jump_timer, dt);
 			}
 		}
@@ -188,7 +212,7 @@ main :: proc() {
 			jumping = false;
 		}
 
-		if phys_obj_grounded(player.obj_id) {
+		if phys_obj_grounded(player.obj) {
 			in_air = false;
 			reset_timer(jump_timer);
 			reset_timer(coyote_timer);
@@ -224,10 +248,10 @@ main :: proc() {
 		// else if jump_timer >= 1.0 do jumping = false;
 
 		if move != 0.0 {
-			player.obj.acc.x = move * PLAYER_HORIZ_ACCEL;
+			player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
 		}
 		else {
-			player.obj.acc.x = 0.0;
+			player_obj.acc.x = 0.0;
 		}
 		// player.obj.vel += move * PLAYER_SPEED * dt;
 
@@ -236,29 +260,25 @@ main :: proc() {
 		}
 		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.1, 0.1});
 
+		selected_obj, any_selected := phys_obj(selected);
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
-			for &obj in phys_world.objects {
-				if rl.CheckCollisionPointRec(
-					transmute(rl.Vector2) get_world_mouse_pos(), 
-					transmute(rl.Rectangle) phys_obj_to_rect(&obj)
-				) {
-					og_flags = obj.flags;
-					obj.flags |= {.Non_Kinematic};
-					selected = &obj;
-					break; // if hovering multiple objects, tant pis
-				}
+			obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos(), count_triggers = true);
+			if ok {
+				og_flags = obj.flags;
+				obj.flags |= {.Non_Kinematic};
+				selected = obj_id;
 			}
 		}
-		if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && selected != nil {
-			selected.flags = og_flags;
+		if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
+			selected_obj.flags = og_flags;
 			// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
-			selected = nil;
+			selected = -1;
 		}
-		if selected != nil {
-			selected.pos = get_world_mouse_pos() - selected.hitbox / 2.0;
+		if any_selected {
+			selected_obj.pos = get_world_mouse_pos() - selected_obj.hitbox / 2.0;
 		}
 
-		if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && selected == nil && dragging == false {
+		if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
 			dragging = true;
 			drag_og = camera.pos + get_mouse_pos();
 		}
