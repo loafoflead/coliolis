@@ -9,10 +9,11 @@ Timer_Flags :: enum {
 
 NUM_UNNAMED_TIMERS :: 16;
 
-Timer_Handler :: struct {
+Timer_Handler :: struct #no_copy {
 	unnamed: [NUM_UNNAMED_TIMERS]Timer,
 	timer_index: int,
 	named: map[string]Timer,
+	initialised: bool,
 }
 
 Timer :: struct {
@@ -23,6 +24,7 @@ Timer :: struct {
 initialise_timers :: proc() {
 	timers.named = make(map[string]Timer);
 	timers.timer_index = 0;
+	timers.initialised = true;
 }
 
 free_timers :: proc() {
@@ -70,6 +72,10 @@ update_timer :: proc(timer: ^Timer, dt: f32) {
 	if is_timer_done(timer) do return;
 	timer.current += dt;
 	if timer.current >= timer.duration do timer.flags += {.Finished};
+}
+
+set_timer_done :: proc(timer: ^Timer) {
+	timer.flags += {.Finished};
 }
 
 drop_temp_timers :: proc() {

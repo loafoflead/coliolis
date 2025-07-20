@@ -8,6 +8,9 @@ EARTH_GRAVITY :: 5.0;
 // terminal velocity = sqrt((gravity * mass) / (drag coeff))
 ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 
+// TODO
+// Physics_Object_Id :: int; 
+
 Physics_Object :: struct {
 	using transform: World_Transform,
 	vel, acc: Vec2,
@@ -23,11 +26,12 @@ phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect {
 }
 
 Physics_Object_Flag :: enum u32 {
-	Non_Kinematic,
-	No_Velocity_Dampening,
-	No_Collisions,
-	No_Gravity,
-	Drag_Exception,
+	Non_Kinematic, 			// not updated by physics world
+	No_Velocity_Dampening, 	// unaffected by damping
+	No_Collisions, 			// doesn't collide
+	No_Gravity,				// unaffected by gravity
+	Drag_Exception, 		// use drag values for the player 
+	Trigger, 				// just used for checking collision
 }
 
 Hitbox :: [2]f32;
@@ -78,7 +82,7 @@ get_first_collision_in_world :: proc(obj_id: int, set_pos: Vec2 = MARKER_VEC2) -
 
 update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	obj := &phys_world.objects[obj_id];
-	if Physics_Object_Flag.Non_Kinematic in obj.flags {
+	if Physics_Object_Flag.Non_Kinematic in obj.flags || .Trigger in obj.flags {
 		return;
 	}
 	resistance: Vec2 = Vec2 {1.0, 1.0};
@@ -146,20 +150,23 @@ phys_obj_grounded :: proc(obj_id: int) -> bool {
 
 Physics_World :: struct #no_copy {
 	objects: [dynamic]Physics_Object,
+	initialised: bool,
 	// timestep: f32,
 }
 
 initialise_phys_world :: proc() {
 	phys_world.objects = make([dynamic]Physics_Object, 0, 10);
+	phys_world.initialised = true;
 }
 
 free_phys_world :: proc() {
 	delete(phys_world.objects);
+	phys_world.initialised = false;
 }
 
 add_phys_object_aabb :: proc(
-	mass:  f32,
-	scale: Vec2, 
+	mass:  f32 = 0,
+	scale: Vec2,
 	pos:   Vec2 = Vec2{},
 	vel:   Vec2 = Vec2{},
 	acc:   Vec2 = Vec2{},

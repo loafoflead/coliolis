@@ -13,12 +13,13 @@ camera 		: Camera2D;
 resources 	: Resources;
 phys_world  : Physics_World;
 timers  	: Timer_Handler;
+portals 	: Portal_Handler;
 
 window_width : i32 = 600;
 window_height : i32 = 400;
 // --------------   END   --------------
 
-BACKGROUND_COLOUR :: 0xFF00FFFF;// 0x181818;
+BACKGROUND_COLOUR :: 0x181818;
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
@@ -30,6 +31,7 @@ get_mouse_pos :: proc() -> Vec2 {
 
 Vec2 :: [2]f32;
 Rect :: [4]f32;
+Colour :: [4]u8;
 
 ZERO_VEC2 :: Vec2{0,0};
 MARKER_VEC2 :: Vec2 { math.F32_MAX, math.F32_MAX };
@@ -45,14 +47,59 @@ kg :: proc(num: f32) -> f32 {
 	return num * 1000.0;
 }
 
-draw_rectangle :: proc(pos, scale: Vec2) {
+draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colour) rl.RED) {
 	screen_pos := world_pos_to_screen_pos(camera, pos);
-	rl.DrawRectangle(
-		cast(i32) screen_pos.x,
-		cast(i32) screen_pos.y,
-		cast(i32) scale.x,
-		cast(i32) scale.y, rl.RED
+	rec := rl.Rectangle {
+		screen_pos.x, screen_pos.y,
+		scale.x, scale.y,
+	};
+	origin := rl.Vector2{};
+	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
+}
+
+Portal :: enum {
+	Pete,
+	Leth,
+}
+
+Portal_Handler :: struct {
+	pete_obj, leth_obj: ^Physics_Object,
+	active: bit_set[Portal],
+}
+
+initialise_portals :: proc() {
+	if !phys_world.initialised do return;
+
+	portals.pete_obj, _ = add_phys_object_aabb(
+		scale = Vec2 { 80.0, 20.0 },
+		flags = {.Trigger}, 
 	);
+	portals.leth_obj, _ = add_phys_object_aabb(
+		scale = Vec2 { 80.0, 20.0 },
+		flags = {.Trigger}, 
+	);
+}
+free_portals :: proc() {}
+
+draw_portal :: proc(portal: Portal) {
+	colour: Colour;
+	switch portal {
+	case .Pete:
+		colour=Colour{0, 255, 0, 255};
+		draw_rectangle(portals.pete_obj.pos, portals.pete_obj.hitbox, rot=portals.pete_obj.rot, col=colour);
+	case .Leth:
+		colour=Colour{0, 0, 255, 255};
+		draw_rectangle(portals.pete_obj.pos, portals.pete_obj.hitbox, rot=portals.pete_obj.rot, col=colour);
+	}
+}
+
+draw_portals :: proc() {
+	if portals.active == {} {
+		return;
+	}
+
+	if .Leth in portals.active do draw_portal(.Leth);
+	if .Pete in portals.active do draw_portal(.Pete);
 }
 
 main :: proc() {	
@@ -66,6 +113,9 @@ main :: proc() {
 
 	initialise_timers();
 	defer free_timers();
+
+	initialise_portals();
+	defer free_portals();
 
 	rl.InitWindow(window_width, window_height, "yeah");
 
@@ -84,13 +134,6 @@ main :: proc() {
 		flags = {.Drag_Exception}, 
 	);
 	fmt.println(calculate_terminal_velocity(EARTH_GRAVITY, player.obj.mass, ARBITRARY_DRAG_COEFFICIENT));
-
-	add_phys_object_aabb(
-		mass = 10.0,
-		scale = Vec2 {500.0, 50.0},
-		pos = get_screen_centre() + Vec2 { 0, 150 },
-		flags = {.Non_Kinematic},
-	);
 
 	selected: ^Physics_Object;
 	og_flags: bit_set[Physics_Object_Flag];
@@ -112,6 +155,7 @@ main :: proc() {
 
 		draw_tilemap(test_map, {0., 0.});
 		draw_hitbox_at(player.obj.pos, &player.obj.hitbox);
+		draw_portals();
 		// for &obj in phys_world.objects {
 		// 	draw_hitbox_at(obj.pos, &obj.hitbox);
 		// }
@@ -131,7 +175,7 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
 			if !in_air || !is_timer_done(coyote_timer) {
 				jumping = true;
-				if !is_timer_done(coyote_timer) do coyote_timer.current = 999;
+				if !is_timer_done(coyote_timer) do set_timer_done(coyote_timer);
 			}
 		}
 		if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
