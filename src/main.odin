@@ -71,6 +71,7 @@ Portal :: struct {
 
 Portal_Handler :: struct {
 	portals: [2]Portal,
+	edge_colliders: [2]Physics_Object_Id,
 }
 
 initialise_portal_handler :: proc() {
@@ -81,36 +82,54 @@ initialise_portal_handler :: proc() {
 		flags = {.Trigger, .Non_Kinematic}, 
 	);
 	portal_handler.portals.y.obj = add_phys_object_aabb(
-		scale = Vec2 { 90.0, 10.0 },
+		scale = Vec2 { 80.0, 10.0 },
 		flags = {.Trigger, .Non_Kinematic}, 
 	);
+	portal_handler.edge_colliders = {
+		add_phys_object_aabb(
+			scale = Vec2 { 20.0, 20.0 },
+			flags = {.Non_Kinematic, .No_Collisions}, 
+		),
+		add_phys_object_aabb(
+			scale = Vec2 { 20.0, 20.0 },
+			flags = {.Non_Kinematic, .No_Collisions}, 
+		),
+	}
 }
 free_portal_handler :: proc() {}
 
-draw_portals :: proc() {
+draw_portals :: proc(selected_portal: int) {
 	for &portal, i in portal_handler.portals {
-		obj := phys_obj(portal.obj);
-		colour: Colour;
+		value: f32;
+		hue := f32(1);
+		sat := f32(0.1);
 		switch i {
-			case 0: colour = Colour{0, 0, 255, 255};
-			case 1: colour = Colour{0, 255, 0, 255};
-			case: 	colour = Colour{255, 0, 0, 255};
+			case 0: value = 60;  // poiple
+			case 1: value = 240; // Grüne
+			case: 	value = 0;	 // röt
 		}
-		if .Occupied in portal.state do colour.y -= 100;
-		draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
+		if .Occupied in portal.state do sat = 0.5;
+		if selected_portal == i do sat = 1.0;
+		colour := transmute(Colour) rl.ColorFromHSV(hue, sat, value);
+		draw_phys_obj(portal.obj, colour);
+		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
 }
 
 // TODO: make player a global?
-update_portals :: proc(player: ^Player) {
+update_portals :: proc(collider: Physics_Object_Id) {
 	for &portal in portal_handler.portals {
-		_, collided := get_collision_between_objs_in_world(player.obj, portal.obj);
+		_, collided := get_collision_between_objs_in_world(collider, portal.obj);
 		if collided {
 			portal.state += {.Occupied};
 		}
 		else {
 			portal.state -= {.Occupied};
 		}
+
+		// if .Occupied in portal.state {
+
+		// }
 	}
 }
 
@@ -148,6 +167,13 @@ main :: proc() {
 		flags = {.Drag_Exception}, 
 	);
 
+	test_obj := add_phys_object_aabb(pos = get_screen_centre(), scale = Vec2{40, 40}, mass = kg(1)); 
+	// test object
+
+	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity, .Trigger});
+	papi := &phys_obj(a).local;
+	b := add_phys_object_aabb(pos=Vec2(50), scale=Vec2(40), parent=papi, flags= {.Non_Kinematic, .No_Gravity, .Trigger});
+
 	selected: Physics_Object_Id = -1;
 	og_flags: bit_set[Physics_Object_Flag];
 
@@ -163,6 +189,7 @@ main :: proc() {
 
 	portal_handler.portals.x.state += {.Alive};
 	portal_handler.portals.y.state += {.Alive};
+	selected_portal: int = 0;
 
 	debug_timer := create_named_timer("debug", 1.0, flags={.Update_Automatically, .Repeating});
 
@@ -170,6 +197,7 @@ main :: proc() {
 		if is_timer_done(debug_timer) {
 			// debug printing here
 		}
+
 
 		dt := rl.GetFrameTime();
 		rl.BeginDrawing();
@@ -179,12 +207,27 @@ main :: proc() {
 		player_obj:=phys_obj(player.obj);
 		draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
 		for &obj in phys_world.objects {
-			draw_hitbox_at(obj.pos, &obj.hitbox);
+			world_pos := transform_to_world(&obj).pos;
+			draw_hitbox_at(world_pos, &obj.hitbox);
 		}
-		draw_portals();
-		// camera.pos += Vec2 {10.0, 10.0} * dt;
+		draw_portals(selected_portal);
+
+		draw_phys_obj(a);
+		draw_phys_obj(b);
+
+		rotate: f32;
+		if rl.IsKeyDown(rl.KeyboardKey.LEFT) {
+			rotate = 3.14159 / 10;
+		}
+		else if rl.IsKeyDown(rl.KeyboardKey.RIGHT) {
+			rotate = -3.14159 / 10;
+		}
+		else do rotate = 0;
+		phys_obj(portal_handler.portals[selected_portal].obj).rot += rotate * dt;
+		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_ALT) do selected_portal = 1 - selected_portal;
+
 		update_phys_world(dt);
-		update_portals(&player);
+		update_portals(test_obj);
 		update_timers(dt);
 		if !dragging && selected == -1 do camera.pos = player_obj.pos - get_screen_centre();
 
@@ -258,7 +301,7 @@ main :: proc() {
 		if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
 			pointer = get_world_mouse_pos();
 		}
-		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.1, 0.1});
+		// draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.1, 0.1});
 
 		selected_obj, any_selected := phys_obj(selected);
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
