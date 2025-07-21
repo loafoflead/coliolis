@@ -5,6 +5,8 @@ import "core:math";
 import "core:fmt";
 import "core:mem";
 
+import "core:math/ease";
+
 import "core:os";
 
 import "tiled";
@@ -108,7 +110,7 @@ draw_portals :: proc(selected_portal: int) {
 			case 1: value = 240; // Grüne
 			case: 	value = 0;	 // röt
 		}
-		if .Occupied in portal.state do sat = 0.5;
+		if .Occupied in portal.state do hue = 0.5;
 		if selected_portal == i do sat = 1.0;
 		colour := transmute(Colour) rl.ColorFromHSV(hue, sat, value);
 		draw_phys_obj(portal.obj, colour);
@@ -206,24 +208,26 @@ main :: proc() {
 		draw_tilemap(test_map, {0., 0.});
 		player_obj:=phys_obj(player.obj);
 		draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
-		for &obj in phys_world.objects {
-			world_pos := transform_to_world(&obj).pos;
-			draw_hitbox_at(world_pos, &obj.hitbox);
-		}
+		// for &obj in phys_world.objects {
+		// 	world_pos := transform_to_world(&obj).pos;
+		// 	draw_hitbox_at(world_pos, &obj.hitbox);
+		// }
 		draw_portals(selected_portal);
 
 		draw_phys_obj(a);
 		draw_phys_obj(b);
+		draw_phys_obj(test_obj);
+		phys_obj(a).rot += 1 * dt;
 
 		rotate: f32;
-		if rl.IsKeyDown(rl.KeyboardKey.LEFT) {
-			rotate = 3.14159 / 10;
+		if rl.IsKeyPressed(rl.KeyboardKey.LEFT) {
+			rotate = 1;
 		}
-		else if rl.IsKeyDown(rl.KeyboardKey.RIGHT) {
-			rotate = -3.14159 / 10;
+		else if rl.IsKeyPressed(rl.KeyboardKey.RIGHT) {
+			rotate = -1;
 		}
 		else do rotate = 0;
-		phys_obj(portal_handler.portals[selected_portal].obj).rot += rotate * dt;
+		phys_obj(portal_handler.portals[selected_portal].obj).rot += rotate * math.PI/2;
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_ALT) do selected_portal = 1 - selected_portal;
 
 		update_phys_world(dt);
@@ -247,7 +251,7 @@ main :: proc() {
 		}
 		if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
 			if jumping && !is_timer_done(jump_timer) {
-				player_obj.vel.y = -PLAYER_JUMP_STR * (1 - ease_out_expo(jump_timer.current));
+				player_obj.vel.y = -PLAYER_JUMP_STR * (1 - ease.exponential_out(jump_timer.current));
 				update_timer(jump_timer, dt);
 			}
 		}

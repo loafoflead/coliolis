@@ -8,6 +8,7 @@ EARTH_GRAVITY :: 5.0;
 // terminal velocity = sqrt((gravity * mass) / (drag coeff))
 ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 
+// TODO: distinct
 Physics_Object_Id :: int; 
 
 Physics_Object :: struct {
@@ -53,13 +54,14 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 	obj := phys_obj(obj_id);
 	dcolour: Colour;
 	if colour == {} {
-		val := hlsl.fmod_float(cast(f32)obj_id * 1000, 360.0); // holy shit this is cool
+		val := hlsl.fmod_float(cast(f32)obj_id * 1000 - cast(f32)obj_id * 109100 + 1023952094, 360.0); // holy shit this is cool
 		dcolour = transmute(Colour) rl.ColorFromHSV(1.0, 0.1, val);
 	}
 	else {
 		dcolour = colour;
 	}
 	world := transform_to_world(obj);
+	rl.DrawPoly()
 	draw_rectangle(world.pos, cast(Vec2) obj.hitbox, rot=linalg.to_degrees(world.rot), col=dcolour);
 }
 
