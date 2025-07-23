@@ -41,18 +41,18 @@ get_world_mouse_pos :: proc() -> Vec2 {
 
 // if drawn_portion is zero, the whole picture is used
 draw_texture :: proc(
-	texture_id: int, 
+	texture_id: TextureId, 
 	pos: Vec2, 
 	drawn_portion: Rect = MARKER_RECT,
 	scale: Vec2 = MARKER_VEC2,
 	pixel_scale: Vec2 = MARKER_VEC2,
 ) {
-	if texture_id >= len(resources.textures) {
+	if int(texture_id) >= len(resources.textures) {
 		unimplemented("Tried to draw nonexistent texture");
 	}
 	screen_pos := world_pos_to_screen_pos(camera, pos);
 	rotation := f32(0.0);
-	tex := resources.textures[texture_id];
+	tex := resources.textures[int(texture_id)];
 
 	n_patch_info: rl.NPatchInfo;
 	dest: Rect;

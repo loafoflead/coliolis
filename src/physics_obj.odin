@@ -1,5 +1,6 @@
 package main;
 import rl "thirdparty/raylib";
+import rlgl "thirdparty/raylib/rlgl";
 import "core:math/linalg/hlsl";
 import "core:math/linalg";
 
@@ -10,6 +11,8 @@ ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 
 // TODO: distinct
 Physics_Object_Id :: int; 
+
+Hitbox :: [2]f32;
 
 Physics_Object :: struct {
 	using local: Transform,
@@ -33,6 +36,14 @@ phys_obj_to_world_rect :: proc(obj: ^Physics_Object) -> Rect {
 	};
 }
 
+phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect {
+	return Rect {
+		0, 0, obj.hitbox.x, obj.hitbox.y,
+	};
+}
+
+
+
 Physics_Object_Flag :: enum u32 {
 	Non_Kinematic, 			// not updated by physics world
 	No_Velocity_Dampening, 	// unaffected by damping
@@ -42,7 +53,6 @@ Physics_Object_Flag :: enum u32 {
 	Trigger, 				// just used for checking collision
 }
 
-Hitbox :: [2]f32;
 
 draw_hitbox_at :: proc(pos: Vec2, box: ^Hitbox) {
 	hue := hlsl.fmod_float(linalg.length(box^), 360.0); // holy shit this is cool
@@ -61,8 +71,8 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 		dcolour = colour;
 	}
 	world := transform_to_world(obj);
-	rl.DrawPoly()
-	draw_rectangle(world.pos, cast(Vec2) obj.hitbox, rot=linalg.to_degrees(world.rot), col=dcolour);
+	draw_rectangle_transform(&world, phys_obj_to_rect(obj), dcolour);
+	// draw_rectangle(world.pos, cast(Vec2) obj.hitbox, rot=linalg.to_degrees(world.rot), col=dcolour);
 }
 
 point_collides_in_world :: proc(point: Vec2, count_triggers: bool = false) -> (

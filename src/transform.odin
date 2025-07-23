@@ -14,12 +14,6 @@ Transform :: struct {
 	using pos: Vec2,
 	rot: f32, // facing
 	parent: ^Transform,
-	children: [dynamic]^Transform,
-}
-
-Global_Transform :: struct {
-	pos: Vec2,
-	rot: f32,
 }
 
 world_pos_to_local :: proc(transform: ^Transform, pos: Vec2) -> Vec2 {
@@ -32,6 +26,12 @@ world_pos_to_local :: proc(transform: ^Transform, pos: Vec2) -> Vec2 {
 		npos := transform.parent.pos - mag*smth;
 		return npos;
 	}
+}
+
+transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {
+	mat := transform_to_matrix(transform);
+	res := mat * Vec3 { point.x, point.y, 1 };
+	return res.xy;
 }
 
 transform_rect :: proc(transform: ^Transform, rect: Rect) -> Rect {
@@ -54,15 +54,16 @@ transform_to_matrix :: proc(transform: ^Transform) -> Mat3x3 {
 	};
 }
 
-transform_to_world :: proc(transform: ^Transform) -> Global_Transform {
+transform_to_world :: proc(transform: ^Transform) -> Transform {
 	if transform.parent == nil {
-		return Global_Transform { 
+		return Transform { 
 			pos = transform.pos,
 			rot = transform.rot,
 		};
 	}
 	else {
-		parent_mat := transform_to_matrix(transform.parent);
+		parent := transform_to_world(transform.parent);
+		parent_mat := transform_to_matrix(&parent);
 		mat := transform_to_matrix(transform);
 		res := parent_mat * mat;
 
@@ -70,9 +71,9 @@ transform_to_world :: proc(transform: ^Transform) -> Global_Transform {
 		// mag := linalg.length(transform.pos);
 		// smth := Vec2 { math.cos(transform.parent.rot - transform.rot), math.sin(transform.parent.rot - transform.rot) };
 		// pos := transform.parent.pos + mag*smth;
-		return Global_Transform { 
+		return Transform { 
 			pos = res[2].xy,
-			rot = transform.rot + transform.parent.rot,
+			rot = transform.rot + parent.rot,
 		};
 	}
 }

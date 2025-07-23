@@ -151,15 +151,15 @@ main :: proc() {
 
 	rl.InitWindow(window_width, window_height, "yeah");
 
+	five_w, ok := load_texture("5W.png");
+	if !ok do os.exit(1);
+
 	test_map, tmap_ok := load_tilemap("second_map.tmx");
 	if !tmap_ok do os.exit(1);
 	generate_static_physics_for_tilemap(test_map, 0);
 
 	initialise_portal_handler();
 	defer free_portal_handler();
-
-	five_w, ok := load_texture("5W.png");
-	if !ok do os.exit(1);
 
 	player: Player;
 	player.obj = add_phys_object_aabb(
@@ -200,18 +200,20 @@ main :: proc() {
 			// debug printing here
 		}
 
+		draw_rectangle_transform(phys_obj(a), Rect{});
+
 
 		dt := rl.GetFrameTime();
 		rl.BeginDrawing();
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR));
 
-		draw_tilemap(test_map, {0., 0.});
+		// draw_tilemap(test_map, {0., 0.});
 		player_obj:=phys_obj(player.obj);
-		draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
-		// for &obj in phys_world.objects {
-		// 	world_pos := transform_to_world(&obj).pos;
-		// 	draw_hitbox_at(world_pos, &obj.hitbox);
-		// }
+		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
+		for &obj in phys_world.objects {
+			world_pos := transform_to_world(&obj).pos;
+			draw_hitbox_at(world_pos, &obj.hitbox);
+		}
 		draw_portals(selected_portal);
 
 		draw_phys_obj(a);
@@ -322,6 +324,7 @@ main :: proc() {
 			selected = -1;
 		}
 		if any_selected {
+			// FIXME: doesn't work with parent transforms
 			selected_obj.pos = get_world_mouse_pos() - selected_obj.hitbox / 2.0;
 		}
 
