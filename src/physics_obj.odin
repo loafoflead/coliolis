@@ -12,14 +12,22 @@ ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 // TODO: distinct
 Physics_Object_Id :: int; 
 
-Hitbox :: [2]f32;
+AABB :: [2]f32;
+
+CollisionType :: enum {
+	AABB,
+}
 
 Physics_Object :: struct {
 	using local: Transform,
 	vel, acc: Vec2,
 	mass: f32,
 	flags: bit_set[Physics_Object_Flag],
-	hitbox: Hitbox,
+	collider: Collider,
+}
+
+Collider :: union {
+	AABB,
 }
 
 phys_obj :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
@@ -29,20 +37,47 @@ phys_obj :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok 
 	return obj, true;
 }
 
+phys_obj_world_pos :: proc(obj: ^Physics_Object) -> Vec2 {
+	return transform_to_world(obj).pos;
+}
+
+phys_obj_collider_ty :: proc(obj: ^Physics_Object) -> CollisionType {
+	switch _t in obj.collider {
+	case AABB:
+		return CollisionType.AABB;
+	}
+	unreachable();
+}
+
+phys_obj_id_collider_ty :: proc(obj_id: Physics_Object_Id) -> CollisionType {
+	obj := phys_obj(obj_id);
+	return phys_obj_collider_ty(obj);
+}
+
 phys_obj_to_world_rect :: proc(obj: ^Physics_Object) -> Rect {
 	pos := transform_to_world(obj).pos;
-	return Rect {
-		pos.x, pos.y, obj.hitbox.x, obj.hitbox.y,
-	};
+	switch collider in obj.collider {
+	case AABB:
+		return Rect {
+			pos.x, pos.y, collider.x, collider.y,
+		};
+	case:
+		unreachable();
+		// unimplemented("implement colliders other than AABB");
+	}
 }
 
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect {
-	return Rect {
-		0, 0, obj.hitbox.x, obj.hitbox.y,
-	};
+	switch collider in obj.collider {
+	case AABB:
+		return Rect {
+			0, 0, collider.x, collider.y,
+		};
+	case:
+		unreachable();
+		// unimplemented("implement colliders other than AABB");
+	}	
 }
-
-
 
 Physics_Object_Flag :: enum u32 {
 	Non_Kinematic, 			// not updated by physics world
@@ -54,7 +89,7 @@ Physics_Object_Flag :: enum u32 {
 }
 
 
-draw_hitbox_at :: proc(pos: Vec2, box: ^Hitbox) {
+draw_hitbox_at :: proc(pos: Vec2, box: ^AABB) {
 	hue := hlsl.fmod_float(linalg.length(box^), 360.0); // holy shit this is cool
 	colour := rl.ColorFromHSV(hue, 1.0, 1.0);
 	draw_rectangle(pos, cast(Vec2) box^);
@@ -64,29 +99,82 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 	obj := phys_obj(obj_id);
 	dcolour: Colour;
 	if colour == {} {
-		val := hlsl.fmod_float(cast(f32)obj_id * 1000 - cast(f32)obj_id * 109100 + 1023952094, 360.0); // holy shit this is cool
+		val := hlsl.fmod_float(cast(f32)obj_id * 1049209430 - cast(f32)obj_id * 109100 + 1023952094, 360.0); // holy shit this is cool
 		dcolour = transmute(Colour) rl.ColorFromHSV(1.0, 0.1, val);
 	}
 	else {
 		dcolour = colour;
 	}
 	world := transform_to_world(obj);
-	draw_rectangle_transform(&world, phys_obj_to_rect(obj), dcolour);
+	draw_rectangle_transform(&world, phys_obj_to_rect(obj));
 	// draw_rectangle(world.pos, cast(Vec2) obj.hitbox, rot=linalg.to_degrees(world.rot), col=dcolour);
+}
+
+phys_obj_centre :: proc(obj: ^Physics_Object) -> Vec2 {
+	pos := phys_obj_world_pos(obj);
+	switch collider in obj.collider {
+	case AABB:
+		return pos - collider / 2;
+	}
+	unreachable();
+}
+
+// TODO: use a pointer to an object not an index
+phys_obj_bounding_box :: proc(obj: ^Physics_Object) -> Rect {
+	pos := phys_obj_world_pos(obj);
+	switch collider in obj.collider {
+	case AABB:
+		return phys_obj_to_rect(obj);
+	}
+	unreachable();
+}
+
+rects_collision_check :: proc(a, b: Rect) -> bool {
+	return rl.CheckCollisionRecs(transmute(rl.Rectangle) a, transmute(rl.Rectangle) b);
+}
+
+check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id) -> bool {
+	obj1 := phys_obj(obj1id);
+	obj2 := phys_obj(obj2id);
+	ty1 := phys_obj_collider_ty(obj1);
+	ty2 := phys_obj_collider_ty(obj2);
+	if ty1 == ty2 {
+		switch ty1 {
+		case .AABB:
+			return rects_collision_check(phys_obj_to_world_rect(obj1), phys_obj_to_world_rect(obj2));
+		}
+	}
+	else {
+		unimplemented("diff colliding objects");
+	}
+	unreachable();
+}
+
+check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2) -> bool {
+	obj := phys_obj(obj_id);
+	if .No_Collisions in obj.flags do return false;
+	ty := phys_obj_collider_ty(obj);
+	switch ty {
+	case .AABB:
+		return rl.CheckCollisionPointRec(transmute(rl.Vector2) point, transmute(rl.Rectangle) phys_obj_to_world_rect(obj))
+	}
+
+	unreachable();
 }
 
 point_collides_in_world :: proc(point: Vec2, count_triggers: bool = false) -> (
 	collided_with: ^Physics_Object = nil, 
 	collided_with_id: Physics_Object_Id = -1,
 	success: bool = false
-) 
+)
 {
-	for &other_obj, i in phys_world.objects {
-		if Physics_Object_Flag.No_Collisions in other_obj.flags do continue;
-		if !count_triggers && .Trigger in other_obj.flags do continue;
+	for i in 0..<len(phys_world.objects) {
+		obj := phys_obj(i);
+		if Physics_Object_Flag.No_Collisions in obj.flags do continue;
+		if !count_triggers && .Trigger in obj.flags do continue;
 
-		if rl.CheckCollisionPointRec(transmute(rl.Vector2) point, transmute(rl.Rectangle) phys_obj_to_world_rect(&other_obj)) {
-			collided_with = &other_obj;
+		if check_phys_object_point_collide(i, point) {
+			collided_with = obj;
 			collided_with_id = i;
 			success = true;
 			return;
@@ -95,9 +183,9 @@ point_collides_in_world :: proc(point: Vec2, count_triggers: bool = false) -> (
 	return;
 }
 
-get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = MARKER_VEC2, count_triggers: bool = false) -> (rl.Rectangle, ^Physics_Object, bool) {
+get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = MARKER_VEC2, count_triggers: bool = false) -> (rl.Rectangle, ^Physics_Object, Physics_Object_Id, bool) {
 	obj := phys_obj(obj_id);
-	if .No_Collisions in obj.flags do return rl.Rectangle{}, nil, false;
+	if .No_Collisions in obj.flags do return rl.Rectangle{}, nil, -1, false;
 	for &other_obj, i in phys_world.objects {
 		if 
 			i == obj_id || Physics_Object_Flag.No_Collisions in other_obj.flags
@@ -107,14 +195,16 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 		pos: Vec2;
 		if set_pos == MARKER_VEC2 do pos = transform_to_world(obj).pos;
 		else do pos = set_pos;
-		r1 := transmute(rl.Rectangle) Rect { pos.x, pos.y, obj.hitbox.x, obj.hitbox.y };
+		obj_rect := phys_obj_to_rect(obj);
+		obj_rect.xy = pos.xy;
+		r1 := transmute(rl.Rectangle) obj_rect;
 		r2 := transmute(rl.Rectangle) phys_obj_to_world_rect(&other_obj);
-		if rl.CheckCollisionRecs(r1, r2) {
+		if check_phys_objects_collide(obj_id, i) {
 			collision_rect := rl.GetCollisionRec(r1, r2);
-			return collision_rect, &other_obj, true;
+			return collision_rect, &other_obj, i, true;
 		}
 	}
-	return rl.Rectangle{}, nil, false;
+	return rl.Rectangle{}, nil, -1, false;
 }
 
 get_collision_between_objs_in_world :: proc(obj_id: Physics_Object_Id, other_obj_id: Physics_Object_Id) -> (rl.Rectangle, bool) {
@@ -125,7 +215,7 @@ get_collision_between_objs_in_world :: proc(obj_id: Physics_Object_Id, other_obj
 	if .No_Collisions in other_obj.flags 	do return rl.Rectangle{}, false;
 	r1 := transmute(rl.Rectangle) phys_obj_to_world_rect(obj);
 	r2 := transmute(rl.Rectangle) phys_obj_to_world_rect(other_obj);
-	if rl.CheckCollisionRecs(r1, r2) {
+	if check_phys_objects_collide(obj_id, other_obj_id) {
 		collision_rect := rl.GetCollisionRec(r1, r2);
 		return collision_rect, true;
 	}
@@ -159,11 +249,13 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	}
 
 	if Physics_Object_Flag.No_Collisions not_in obj.flags {
-		collision_rect, other_obj, ok := get_first_collision_in_world(obj_id, set_pos = next_pos);
+		collision_rect, other_obj, other_id, ok := get_first_collision_in_world(obj_id, set_pos = next_pos);
 		if ok {
 			other_pos := transform_to_world(other_obj).pos;
 			// use obj.pos instead of next_pos so we know where we came from
-			move_back := linalg.normalize((pos + obj.hitbox / 2.0) - (other_pos + other_obj.hitbox / 2.0));
+			obj_centre := phys_obj_centre(obj);
+			other_obj_centre := phys_obj_centre(other_obj);
+			move_back := linalg.normalize(obj_centre - other_obj_centre);
 			// choose the smallest of the two coordinates to move back by
 			if collision_rect.width > collision_rect.height {
 				sign := -1.0 if move_back.y < 0.0 else f32(1.0);
@@ -191,14 +283,12 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	obj.vel = next_vel;
 }
 
-// TODO: naïve assumption that an object is grounded if it touches something...
 phys_obj_grounded :: proc(obj_id: int) -> bool {
 	ok: bool;
 	obj := phys_obj(obj_id);
 	pos := transform_to_world(obj).pos;
-	// man this is amazing, i didn't even mean for this to be possible
-	centre := pos + obj.hitbox / 2;
-	centre.y += obj.hitbox.y;
+	centre := phys_obj_centre(obj);
+	centre.y += phys_obj_bounding_box(obj).y;
 	_, _, ok = point_collides_in_world(centre);
 	return ok;
 }
@@ -237,8 +327,9 @@ add_phys_object_aabb :: proc(
 			parent = parent,			
 		},
 		mass = mass, 
-		flags = flags, 
-		hitbox = cast(Hitbox) scale,
+		flags = flags,
+		collider = cast(AABB) scale, 
+		// hitbox = cast(Hitbox) scale,
 	};
 
 	id = len(phys_world.objects);

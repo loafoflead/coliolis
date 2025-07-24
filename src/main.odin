@@ -169,12 +169,24 @@ main :: proc() {
 		flags = {.Drag_Exception}, 
 	);
 
+	portal_handler.portals.x.state += {.Alive};
+	portal_handler.portals.y.state += {.Alive};
+
+	in_air: bool;
+	jump_timer := get_temp_timer(0.2);
+	jumping: bool;
+	coyote_timer := get_temp_timer(0.25);
+
+	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
+
 	test_obj := add_phys_object_aabb(pos = get_screen_centre(), scale = Vec2{40, 40}, mass = kg(1)); 
 	// test object
 
 	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity, .Trigger});
 	papi := &phys_obj(a).local;
 	b := add_phys_object_aabb(pos=Vec2(50), scale=Vec2(40), parent=papi, flags= {.Non_Kinematic, .No_Gravity, .Trigger});
+
+	follow_player: bool = true;
 
 	selected: Physics_Object_Id = -1;
 	og_flags: bit_set[Physics_Object_Flag];
@@ -184,16 +196,11 @@ main :: proc() {
 
 	pointer : Vec2;
 
-	in_air: bool;
-	jump_timer := get_temp_timer(0.2);
-	jumping: bool;
-	coyote_timer := get_temp_timer(0.25);
-
-	portal_handler.portals.x.state += {.Alive};
-	portal_handler.portals.y.state += {.Alive};
 	selected_portal: int = 0;
 
 	debug_timer := create_named_timer("debug", 1.0, flags={.Update_Automatically, .Repeating});
+
+	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
 	for !rl.WindowShouldClose() {
 		if is_timer_done(debug_timer) {
@@ -210,9 +217,8 @@ main :: proc() {
 		// draw_tilemap(test_map, {0., 0.});
 		player_obj:=phys_obj(player.obj);
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
-		for &obj in phys_world.objects {
-			world_pos := transform_to_world(&obj).pos;
-			draw_hitbox_at(world_pos, &obj.hitbox);
+		for i in 0..<len(phys_world.objects) {
+			draw_phys_obj(i);
 		}
 		draw_portals(selected_portal);
 
@@ -233,9 +239,12 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_ALT) do selected_portal = 1 - selected_portal;
 
 		update_phys_world(dt);
-		update_portals(test_obj);
+		// update_portals(test_obj);
 		update_timers(dt);
-		if !dragging && selected == -1 do camera.pos = player_obj.pos - get_screen_centre();
+
+		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
+
+		if !dragging && selected == -1 && follow_player do camera.pos = player_obj.pos - get_screen_centre();
 
 		move: f32 = 0.0;
 		if rl.IsKeyDown(rl.KeyboardKey.D) {
@@ -270,31 +279,7 @@ main :: proc() {
 			update_timer(coyote_timer, dt);
 			in_air = true;
 		}
-		// if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-		// 	if !jumping && jump_timer == 0.0 do jumping = true;
-		// }
 
-		// if rl.IsKeyReleased(rl.KeyboardKey.SPACE) && jumping {
-		// 	jumping = false;
-		// }
-
-		// if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
-		// 	if jumping {
-		// 		player.obj.acc.y = -PLAYER_JUMP_STR * (1 - ease_out_expo(jump_timer));
-		// 		fmt.println((1 - ease_out_expo(jump_timer)));
-		// 		jump_timer += dt;
-		// 	}
-		// 	if jump_timer >= 1.0 do wants_to_jump = true;
-		// }
-		// else {
-		// 	wants_to_jump = false;
-		// }
-
-		// if jump_timer >= 0.0 &&  {
-		// 	jump_timer = 0;
-		// 	if wants_to_jump do jumping = true;
-		// }
-		// else if jump_timer >= 1.0 do jumping = false;
 
 		if move != 0.0 {
 			player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
@@ -307,7 +292,7 @@ main :: proc() {
 		if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
 			pointer = get_world_mouse_pos();
 		}
-		// draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.1, 0.1});
+		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.1, 0.1});
 
 		selected_obj, any_selected := phys_obj(selected);
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
@@ -325,12 +310,13 @@ main :: proc() {
 		}
 		if any_selected {
 			// FIXME: doesn't work with parent transforms
-			selected_obj.pos = get_world_mouse_pos() - selected_obj.hitbox / 2.0;
+			selected_obj.pos = get_world_mouse_pos() - phys_obj_bounding_box(selected_obj).zw / 2;
 		}
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
 			dragging = true;
 			drag_og = camera.pos + get_mouse_pos();
+			follow_player = false;
 		}
 		if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
 			dragging = false;

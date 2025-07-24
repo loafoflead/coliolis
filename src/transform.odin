@@ -21,10 +21,7 @@ world_pos_to_local :: proc(transform: ^Transform, pos: Vec2) -> Vec2 {
 		return pos;
 	}
 	else {
-		mag := linalg.length(pos);
-		smth := Vec2 { math.cos(transform.parent.rot + transform.rot), math.sin(transform.parent.rot + transform.rot) };
-		npos := transform.parent.pos - mag*smth;
-		return npos;
+		unimplemented("todo world_pos_to_local");
 	}
 }
 
