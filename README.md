@@ -10,5 +10,5 @@ A simple platformer made with [Raylib](https://www.raylib.com) (<3) to test out 
 
 # Credits:
 
-- Tileset (level_tileset.png): https://foozlecc.itch.io/sci-fi-lab-tileset-decor-traps
-- Tilemap generation software (Tiled): http://www.mapeditor.org/2025/01/28/tiled-1-11-2-released.html
+- Tileset (assets/level_tileset.png), created by [aimen23b](https://www.fiverr.com/aimen23b), distributed by (i guess owned by?) [foozle](www.foozle.io): https://foozlecc.itch.io/sci-fi-lab-tileset-decor-traps
+- Tilemap generation software ([Tiled](http://www.mapeditor.org/)), the edition used: http://www.mapeditor.org/2025/01/28/tiled-1-11-2-released.html
