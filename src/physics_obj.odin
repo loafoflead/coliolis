@@ -10,6 +10,11 @@ EARTH_GRAVITY :: 5.0;
 // terminal velocity = sqrt((gravity * mass) / (drag coeff))
 ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 
+// terrible name, basically how much should two rectangles be overlapping 
+// in order for the collision to trip over into slowing down the collider
+// this exists to make moving along surfaces smoother
+COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD :: Vec2 { 0.01, 0.1 };
+
 // TODO: distinct
 Physics_Object_Id :: int; 
 
@@ -88,6 +93,7 @@ Physics_Object_Flag :: enum u32 {
 	No_Gravity,				// unaffected by gravity
 	Drag_Exception, 		// use drag values for the player 
 	Trigger, 				// just used for checking collision
+	Fixed,					// used outside of the physics world to mark objects as no-touch
 }
 
 draw_hitbox_at :: proc(pos: Vec2, box: ^AABB) {
@@ -223,9 +229,9 @@ point_collides_in_world :: proc(point: Vec2, count_triggers: bool = false) -> (
 	return;
 }
 
-get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = MARKER_VEC2, count_triggers: bool = false) -> (rl.Rectangle, ^Physics_Object, Physics_Object_Id, bool) {
+get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = MARKER_VEC2, count_triggers: bool = false) -> (rl.Rectangle, ^Physics_Object, bool) {
 	obj := phys_obj(obj_id);
-	if .No_Collisions in obj.flags do return rl.Rectangle{}, nil, -1, false;
+	if .No_Collisions in obj.flags do return rl.Rectangle{}, nil, false;
 	for &other_obj, i in phys_world.objects {
 		if 
 			i == obj_id || Physics_Object_Flag.No_Collisions in other_obj.flags
@@ -234,17 +240,20 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 
 		pos: Vec2;
 		if set_pos == MARKER_VEC2 do pos = transform_to_world(obj).pos;
-		else do pos = set_pos;
-		obj_rect := phys_obj_to_rect(obj);
-		obj_rect.xy = pos.xy;
+		else {
+			pos = set_pos;
+		}
+		obj_rect := aabb_obj_to_world_rect(obj);
+		obj_rect.xy = pos;
+
 		r1 := transmute(rl.Rectangle) obj_rect;
 		r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(&other_obj);
 		if check_phys_objects_collide(obj_id, i) {
 			collision_rect := rl.GetCollisionRec(r1, r2);
-			return collision_rect, &other_obj, i, true;
+			return collision_rect, &other_obj, true;
 		}
 	}
-	return rl.Rectangle{}, nil, -1, false;
+	return rl.Rectangle{}, nil, false;
 }
 
 update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
@@ -274,7 +283,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	}
 
 	if Physics_Object_Flag.No_Collisions not_in obj.flags {
-		collision_rect, other_obj, other_id, ok := get_first_collision_in_world(obj_id, set_pos = next_pos);
+		collision_rect, other_obj, ok := get_first_collision_in_world(obj_id, set_pos = next_pos);
 		if ok {
 			other_pos := transform_to_world(other_obj).pos;
 			// use obj.pos instead of next_pos so we know where we came from
@@ -285,14 +294,20 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 			if collision_rect.width > collision_rect.height {
 				sign := -1.0 if move_back.y < 0.0 else f32(1.0);
 				move_back.y = collision_rect.height * sign;
-				next_vel.y = -next_vel.y;
+				if collision_rect.height > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.y {
+					other_obj.vel.y = ( next_vel.y * obj.mass ) / other_obj.mass;
+					next_vel.y = 0; //-next_vel.y;
+				}
 
 				move_back.x = 0.0;
 			}
 			else {
 				sign := -1.0 if move_back.x < 0.0 else f32(1.0);
 				move_back.x = collision_rect.width * sign;
-				next_vel.x = -next_vel.x;
+				if collision_rect.width > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.x {
+					other_obj.vel.x = ( next_vel.x * obj.mass ) / other_obj.mass;
+					next_vel.x = 0; //-next_vel.x;
+				}
 
 				move_back.y = 0.0;
 			}
@@ -300,11 +315,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		}
 	}
 
-	delta := next_pos - pos;
 	obj.pos = world_pos_to_local(obj, next_pos);
-	// for &child in obj.transform.children {
-	// 	child.pos += delta;
-	// }
 	obj.vel = next_vel;
 }
 

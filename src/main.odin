@@ -210,21 +210,35 @@ main :: proc() {
 		}
 
 		dt := rl.GetFrameTime();
+
 		rl.BeginDrawing();
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR));
 
-		draw_tilemap(test_map, {0., 0.});
 		player_obj:=phys_obj(player.obj);
+
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
 		// for i in 0..<len(phys_world.objects) {
 		// 	draw_phys_obj(i);
 		// }
+
+		// ------------ DRAWING ------------
+		draw_tilemap(test_map, {0., 0.});
 		draw_portals(selected_portal);
 		draw_player(&player);
 
 		draw_phys_obj(a);
 		draw_phys_obj(b);
 		draw_phys_obj(test_obj);
+		// ------------   END   ------------
+
+		// ------------ UPDATING ------------
+		update_phys_world(dt);
+		update_portals(test_obj);
+		update_timers(dt);
+		// ------------    END   ------------
+
+		// vvvvvv <- random testing stuff ahead
+
 		phys_obj(a).rot += 1 * dt;
 
 		rotate: f32;
@@ -237,10 +251,6 @@ main :: proc() {
 		else do rotate = 0;
 		phys_obj(portal_handler.portals[selected_portal].obj).rot += rotate * math.PI/2;
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_ALT) do selected_portal = 1 - selected_portal;
-
-		update_phys_world(dt);
-		update_portals(test_obj);
-		update_timers(dt);
 
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
 
@@ -297,9 +307,9 @@ main :: proc() {
 		selected_obj, any_selected := phys_obj(selected);
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
 			obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos(), count_triggers = true);
-			if ok {
+			if ok && .Fixed not_in obj.flags {
 				og_flags = obj.flags;
-				obj.flags |= {.Non_Kinematic};
+				obj.flags |= {.Non_Kinematic, .Fixed};
 				selected = obj_id;
 			}
 		}

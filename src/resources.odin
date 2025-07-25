@@ -41,9 +41,13 @@ load_tilemap :: proc(path: string) -> (index: int, err: bool = true) {
 	tilemap := tiled.parse_tilemap(fullpath, path_prefix = ASSETS_PATH) or_return;
 	
 	texture_id := load_texture(tilemap.tileset.source) or_return;
+	tmap := Tilemap { tilemap = tilemap, texture_id = texture_id };
+
+	// TODO: generate raylib RenderTexture to avoid redrawing tile by tile for 
+	// static layers
 
 	index = len(resources.tilemaps);
-	append(&resources.tilemaps, Tilemap { tilemap = tilemap, texture_id = texture_id });
+	append(&resources.tilemaps, tmap);
 
 	return;
 }

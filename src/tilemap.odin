@@ -5,6 +5,7 @@ import "tiled";
 Tilemap :: struct {
 	using tilemap: tiled.Tilemap,
 	texture_id: Texture_Id,
+	render_texture: rl.RenderTexture2D,
 }
 
 
@@ -26,10 +27,14 @@ generate_static_physics_for_tilemap :: proc(tilemap: int, layer: int) {
 					cast(f32) tileset.tilewidth, 
 					cast(f32) tileset.tileheight 
 				},
-				flags = {.Non_Kinematic, .No_Gravity},
+				flags = {.Non_Kinematic, .No_Gravity, .Fixed},
 			);
 		}
 	}
+}
+
+generate_texture_for_tilemap :: proc(tilemap: ^Tilemap) -> bool {
+	unimplemented();
 }
 
 draw_tilemap :: proc(index: int, pos: Vec2) {
