@@ -15,7 +15,11 @@ Physics_Object_Id :: int;
 
 AABB :: [2]f32;
 
-CollisionType :: enum {
+ColliderType :: enum {
+	AABB,
+}
+
+Collider :: union {
 	AABB,
 }
 
@@ -27,9 +31,6 @@ Physics_Object :: struct {
 	collider: Collider,
 }
 
-Collider :: union {
-	AABB,
-}
 
 phys_obj :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
 	if len(phys_world.objects) < cast(int) id || cast(int) id == -1 do return nil, false;
@@ -42,15 +43,15 @@ phys_obj_world_pos :: proc(obj: ^Physics_Object) -> Vec2 {
 	return transform_to_world(obj).pos;
 }
 
-phys_obj_collider_ty :: proc(obj: ^Physics_Object) -> CollisionType {
+phys_obj_collider_ty :: proc(obj: ^Physics_Object) -> ColliderType {
 	switch _t in obj.collider {
 	case AABB:
-		return CollisionType.AABB;
+		return ColliderType.AABB;
 	}
 	unreachable();
 }
 
-phys_obj_id_collider_ty :: proc(obj_id: Physics_Object_Id) -> CollisionType {
+phys_obj_id_collider_ty :: proc(obj_id: Physics_Object_Id) -> ColliderType {
 	obj := phys_obj(obj_id);
 	return phys_obj_collider_ty(obj);
 }
@@ -244,21 +245,6 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 		}
 	}
 	return rl.Rectangle{}, nil, -1, false;
-}
-
-get_collision_between_objs_in_world :: proc(obj_id: Physics_Object_Id, other_obj_id: Physics_Object_Id) -> (rl.Rectangle, bool) {
-	obj := phys_obj(obj_id);
-	other_obj := phys_obj(other_obj_id);
-
-	if .No_Collisions in obj.flags 			do return rl.Rectangle{}, false;
-	if .No_Collisions in other_obj.flags 	do return rl.Rectangle{}, false;
-	r1 := transmute(rl.Rectangle) aabb_obj_to_world_rect(obj);
-	r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(other_obj);
-	if check_phys_objects_collide(obj_id, other_obj_id) {
-		collision_rect := rl.GetCollisionRec(r1, r2);
-		return collision_rect, true;
-	}
-	else do return rl.Rectangle{}, false;
 }
 
 update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {

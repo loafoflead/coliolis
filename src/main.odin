@@ -104,14 +104,14 @@ draw_portals :: proc(selected_portal: int) {
 	for &portal, i in portal_handler.portals {
 		value: f32;
 		hue := f32(1);
-		sat := f32(0.1);
+		sat := f32(1);
 		switch i {
 			case 0: value = 60;  // poiple
 			case 1: value = 240; // Grüne
 			case: 	value = 0;	 // röt
 		}
-		if .Occupied in portal.state do hue = 0.5;
-		if selected_portal == i do sat = 1.0;
+		if .Occupied in portal.state do sat = 0.01;
+		// if selected_portal == i do sat = 1.0;
 		colour := transmute(Colour) rl.ColorFromHSV(hue, sat, value);
 		draw_phys_obj(portal.obj, colour);
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
@@ -121,7 +121,7 @@ draw_portals :: proc(selected_portal: int) {
 // TODO: make player a global?
 update_portals :: proc(collider: Physics_Object_Id) {
 	for &portal in portal_handler.portals {
-		_, collided := get_collision_between_objs_in_world(collider, portal.obj);
+		collided := check_phys_objects_collide(collider, portal.obj);
 		if collided {
 			portal.state += {.Occupied};
 		}
@@ -209,9 +209,6 @@ main :: proc() {
 			// debug printing here
 		}
 
-		draw_rectangle_transform(phys_obj(a), Rect{});
-
-
 		dt := rl.GetFrameTime();
 		rl.BeginDrawing();
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR));
@@ -242,7 +239,7 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_ALT) do selected_portal = 1 - selected_portal;
 
 		update_phys_world(dt);
-		// update_portals(test_obj);
+		update_portals(test_obj);
 		update_timers(dt);
 
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
