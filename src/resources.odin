@@ -6,7 +6,7 @@ import "core:fmt";
 
 ASSETS_PATH :: "./assets";
 
-TextureId :: distinct int;
+Texture_Id :: distinct int;
 
 Resources :: struct #no_copy {
 	textures: [dynamic]rl.Texture2D,
@@ -24,7 +24,7 @@ free_resources :: proc() {
 	delete(resources.tilemaps);
 }
 
-load_texture :: proc(path: string) -> (TextureId, bool) {
+load_texture :: proc(path: string) -> (Texture_Id, bool) {
 	fullpath := fmt.tprintf("%s/%s", ASSETS_PATH, path);
 	cpath := strings.clone_to_cstring(fullpath);
 	tex := rl.LoadTexture(cpath);
@@ -33,7 +33,7 @@ load_texture :: proc(path: string) -> (TextureId, bool) {
 	if success {
 		append(&resources.textures, tex);
 	}
-	return TextureId(index), success;
+	return Texture_Id(index), success;
 }
 
 load_tilemap :: proc(path: string) -> (index: int, err: bool = true) {

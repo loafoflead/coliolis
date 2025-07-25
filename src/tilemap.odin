@@ -4,7 +4,7 @@ import "tiled";
 
 Tilemap :: struct {
 	using tilemap: tiled.Tilemap,
-	texture_id: TextureId,
+	texture_id: Texture_Id,
 }
 
 

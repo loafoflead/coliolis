@@ -41,7 +41,7 @@ get_world_mouse_pos :: proc() -> Vec2 {
 
 // if drawn_portion is zero, the whole picture is used
 draw_texture :: proc(
-	texture_id: TextureId, 
+	texture_id: Texture_Id, 
 	pos: Vec2, 
 	drawn_portion: Rect = MARKER_RECT,
 	scale: Vec2 = MARKER_VEC2,

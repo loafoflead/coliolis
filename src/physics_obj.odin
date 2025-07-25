@@ -3,6 +3,7 @@ import rl "thirdparty/raylib";
 import rlgl "thirdparty/raylib/rlgl";
 import "core:math/linalg/hlsl";
 import "core:math/linalg";
+import "core:math";
 
 
 EARTH_GRAVITY :: 5.0;
@@ -54,13 +55,14 @@ phys_obj_id_collider_ty :: proc(obj_id: Physics_Object_Id) -> CollisionType {
 	return phys_obj_collider_ty(obj);
 }
 
-phys_obj_to_world_rect :: proc(obj: ^Physics_Object) -> Rect {
+aabb_obj_to_world_rect :: proc(obj: ^Physics_Object) -> Rect {
 	pos := transform_to_world(obj).pos;
 	switch collider in obj.collider {
 	case AABB:
-		return Rect {
-			pos.x, pos.y, collider.x, collider.y,
-		};
+		world := transform_to_world(obj);
+		box := phys_obj_bounding_box(obj);
+		box.xy += world.pos;
+		return box;
 	case:
 		unreachable();
 		// unimplemented("implement colliders other than AABB");
@@ -70,13 +72,12 @@ phys_obj_to_world_rect :: proc(obj: ^Physics_Object) -> Rect {
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect {
 	switch collider in obj.collider {
 	case AABB:
-		return Rect {
-			0, 0, collider.x, collider.y,
-		};
+		rect := Rect {0,0, collider.x, collider.y};
+		return rect;
 	case:
 		unreachable();
 		// unimplemented("implement colliders other than AABB");
-	}	
+	}
 }
 
 Physics_Object_Flag :: enum u32 {
@@ -87,7 +88,6 @@ Physics_Object_Flag :: enum u32 {
 	Drag_Exception, 		// use drag values for the player 
 	Trigger, 				// just used for checking collision
 }
-
 
 draw_hitbox_at :: proc(pos: Vec2, box: ^AABB) {
 	hue := hlsl.fmod_float(linalg.length(box^), 360.0); // holy shit this is cool
@@ -105,28 +105,67 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 	else {
 		dcolour = colour;
 	}
-	world := transform_to_world(obj);
-	draw_rectangle_transform(&world, phys_obj_to_rect(obj));
-	// draw_rectangle(world.pos, cast(Vec2) obj.hitbox, rot=linalg.to_degrees(world.rot), col=dcolour);
+	switch _ in obj.collider {
+	case AABB:
+		world := transform_to_world(obj);
+		box := phys_obj_bounding_box(obj);
+		draw_rectangle(world.pos + box.xy, box.zw, col=dcolour);
+		// draw_rectangle_transform(&world, phys_obj_to_rect(obj));
+		// draw_rectangle(world.pos, cast(Vec2) obj.hitbox, rot=linalg.to_degrees(world.rot), col=dcolour);
+	}
+}
+
+phys_obj_local_centre :: proc(obj: ^Physics_Object) -> Vec2 {
+	// pos := phys_obj_world_pos(obj);
+	switch collider in obj.collider {
+	case AABB:
+		bb := phys_obj_bounding_box(obj);
+		return bb.xy + bb.zw / 2;
+	}
+	unreachable();
 }
 
 phys_obj_centre :: proc(obj: ^Physics_Object) -> Vec2 {
-	pos := phys_obj_world_pos(obj);
+	// pos := phys_obj_world_pos(obj);
 	switch collider in obj.collider {
 	case AABB:
-		return pos - collider / 2;
+		bb := aabb_obj_to_world_rect(obj);
+		return bb.xy + bb.zw / 2;
 	}
 	unreachable();
 }
 
-// TODO: use a pointer to an object not an index
-phys_obj_bounding_box :: proc(obj: ^Physics_Object) -> Rect {
-	pos := phys_obj_world_pos(obj);
+phys_obj_to_vertices :: proc(obj: ^Physics_Object) -> []Vec2 {
 	switch collider in obj.collider {
 	case AABB:
-		return phys_obj_to_rect(obj);
+		slice := make([]Vec2, 4);
+		local_transform := transform_to_world(obj);
+		local_transform.pos = Vec2{};
+		rect := Rect {0, 0, collider.x, collider.y};
+		rect = transform_rect(&local_transform, rect);
+		array := rect_to_points(rect);
+		for item,i in array do slice[i] = item;
+		return slice;
 	}
 	unreachable();
+}
+
+// TODO: make this a field of physics_object that updates automatically
+// when collider gets changed
+phys_obj_bounding_box :: proc(obj: ^Physics_Object) -> Rect {
+	verts := phys_obj_to_vertices(obj);
+	defer delete(verts);
+	min_x, min_y, max_x, max_y: f32;
+	for vert in verts {
+		min_x = math.min(vert.x, min_x);
+		min_y = math.min(vert.y, min_y);
+		max_x = math.max(vert.x, max_x);
+		max_y = math.max(vert.y, max_y);
+	}
+	return Rect {
+		min_x, min_y, 
+		max_x - min_x, max_y - min_y,
+	}
 }
 
 rects_collision_check :: proc(a, b: Rect) -> bool {
@@ -141,7 +180,7 @@ check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id) -> bool {
 	if ty1 == ty2 {
 		switch ty1 {
 		case .AABB:
-			return rects_collision_check(phys_obj_to_world_rect(obj1), phys_obj_to_world_rect(obj2));
+			return rects_collision_check(aabb_obj_to_world_rect(obj1), aabb_obj_to_world_rect(obj2));
 		}
 	}
 	else {
@@ -156,7 +195,7 @@ check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2) 
 	ty := phys_obj_collider_ty(obj);
 	switch ty {
 	case .AABB:
-		return rl.CheckCollisionPointRec(transmute(rl.Vector2) point, transmute(rl.Rectangle) phys_obj_to_world_rect(obj))
+		return rl.CheckCollisionPointRec(transmute(rl.Vector2) point, transmute(rl.Rectangle) aabb_obj_to_world_rect(obj))
 	}
 
 	unreachable();
@@ -198,7 +237,7 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 		obj_rect := phys_obj_to_rect(obj);
 		obj_rect.xy = pos.xy;
 		r1 := transmute(rl.Rectangle) obj_rect;
-		r2 := transmute(rl.Rectangle) phys_obj_to_world_rect(&other_obj);
+		r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(&other_obj);
 		if check_phys_objects_collide(obj_id, i) {
 			collision_rect := rl.GetCollisionRec(r1, r2);
 			return collision_rect, &other_obj, i, true;
@@ -213,8 +252,8 @@ get_collision_between_objs_in_world :: proc(obj_id: Physics_Object_Id, other_obj
 
 	if .No_Collisions in obj.flags 			do return rl.Rectangle{}, false;
 	if .No_Collisions in other_obj.flags 	do return rl.Rectangle{}, false;
-	r1 := transmute(rl.Rectangle) phys_obj_to_world_rect(obj);
-	r2 := transmute(rl.Rectangle) phys_obj_to_world_rect(other_obj);
+	r1 := transmute(rl.Rectangle) aabb_obj_to_world_rect(obj);
+	r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(other_obj);
 	if check_phys_objects_collide(obj_id, other_obj_id) {
 		collision_rect := rl.GetCollisionRec(r1, r2);
 		return collision_rect, true;
@@ -286,9 +325,9 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 phys_obj_grounded :: proc(obj_id: int) -> bool {
 	ok: bool;
 	obj := phys_obj(obj_id);
-	pos := transform_to_world(obj).pos;
 	centre := phys_obj_centre(obj);
-	centre.y += phys_obj_bounding_box(obj).y;
+	centre.y += phys_obj_bounding_box(obj).w;
+	// draw_rectangle(centre, Vec2(10), col=Colour{0, 255, 255, 255});
 	_, _, ok = point_collides_in_world(centre);
 	return ok;
 }

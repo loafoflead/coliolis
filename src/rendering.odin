@@ -26,7 +26,7 @@ draw_rectangle_transform :: proc(
 		transform: ^Transform, 
 		rect: Rect, 
 		colour: Colour = Colour(255),
-		texture_id: TextureId = -1,
+		texture_id: Texture_Id = -1,
 		uv: [4]Vec2 = UV_FULL_IMAGE,
 ) {
 	vertices := rect_to_points(rect);

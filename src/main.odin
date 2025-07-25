@@ -135,6 +135,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 	}
 }
 
+
 main :: proc() {	
 	initialise_camera();
 
@@ -168,6 +169,7 @@ main :: proc() {
 		scale = Vec2 { 30.0, 30.0 },
 		flags = {.Drag_Exception}, 
 	);
+	player.texture = five_w;
 
 	portal_handler.portals.x.state += {.Alive};
 	portal_handler.portals.y.state += {.Alive};
@@ -214,13 +216,14 @@ main :: proc() {
 		rl.BeginDrawing();
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR));
 
-		// draw_tilemap(test_map, {0., 0.});
+		draw_tilemap(test_map, {0., 0.});
 		player_obj:=phys_obj(player.obj);
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
-		for i in 0..<len(phys_world.objects) {
-			draw_phys_obj(i);
-		}
+		// for i in 0..<len(phys_world.objects) {
+		// 	draw_phys_obj(i);
+		// }
 		draw_portals(selected_portal);
+		draw_player(&player);
 
 		draw_phys_obj(a);
 		draw_phys_obj(b);
@@ -292,7 +295,7 @@ main :: proc() {
 		if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
 			pointer = get_world_mouse_pos();
 		}
-		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.1, 0.1});
+		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.05, 0.05});
 
 		selected_obj, any_selected := phys_obj(selected);
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
@@ -310,7 +313,7 @@ main :: proc() {
 		}
 		if any_selected {
 			// FIXME: doesn't work with parent transforms
-			selected_obj.pos = get_world_mouse_pos() - phys_obj_bounding_box(selected_obj).zw / 2;
+			selected_obj.pos = get_world_mouse_pos() - phys_obj_local_centre(selected_obj);
 		}
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {

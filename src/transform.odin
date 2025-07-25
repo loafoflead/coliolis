@@ -32,13 +32,13 @@ transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {
 }
 
 transform_rect :: proc(transform: ^Transform, rect: Rect) -> Rect {
-	mat := transform_to_matrix(transform);
-	top_left := Vec3 { rect.x, rect.y, 0};
-	bottom_right := top_left + Vec3 { rect.z, rect.w, 0};
-	top_left = mat * top_left;
-	bottom_right = mat * bottom_right;
+	tleft := Vec2{rect.x, rect.y};
+	bright := tleft + Vec2{rect.z, rect.w};
+	tleft = transform_point(transform, tleft);	
+	bright = transform_point(transform, bright);	
 	return Rect {
-		top_left.x, top_left.y, bottom_right.x, bottom_right.y,
+		tleft.x, tleft.y,
+		bright.x, bright.y,
 	}
 }
 
