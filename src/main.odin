@@ -63,12 +63,12 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 Portal_State :: enum {
 	Connected,
 	Alive,
-	Occupied,
 }
 
 Portal :: struct {
 	obj: Physics_Object_Id,
 	state: bit_set[Portal_State],
+	occupant: Maybe(Physics_Object_Id),
 }
 
 Portal_Handler :: struct {
@@ -110,7 +110,8 @@ draw_portals :: proc(selected_portal: int) {
 			case 1: value = 240; // Grüne
 			case: 	value = 0;	 // röt
 		}
-		if .Occupied in portal.state do sat = 0.01;
+		_, occupied := portal.occupant.?;
+		if occupied do sat = 0.01;
 		// if selected_portal == i do sat = 1.0;
 		colour := transmute(Colour) rl.ColorFromHSV(hue, sat, value);
 		draw_phys_obj(portal.obj, colour);
@@ -123,15 +124,17 @@ update_portals :: proc(collider: Physics_Object_Id) {
 	for &portal in portal_handler.portals {
 		collided := check_phys_objects_collide(collider, portal.obj);
 		if collided {
-			portal.state += {.Occupied};
+			portal.occupant = collider;
 		}
 		else {
-			portal.state -= {.Occupied};
+			portal.occupant = nil;
 		}
 
-		// if .Occupied in portal.state {
-
-		// }
+		occupant_id, ok := portal.occupant.?;
+		if ok {
+			obj := phys_obj(occupant_id);
+			obj.flags += {.No_Collisions};
+		}
 	}
 }
 
