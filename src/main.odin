@@ -69,6 +69,7 @@ Portal :: struct {
 	obj: Physics_Object_Id,
 	state: bit_set[Portal_State],
 	occupant: Maybe(Physics_Object_Id),
+	occupant_layers: bit_set[Collision_Layer],
 	occupant_last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
 }
 
@@ -113,14 +114,17 @@ draw_portals :: proc(selected_portal: int) {
 	for &portal, i in portal_handler.portals {
 		value: f32;
 		hue := f32(1);
-		sat := f32(1);
+		sat := f32(0.5);
 		switch i {
 			case 0: value = 60;  // poiple
 			case 1: value = 240; // Grüne
 			case: 	value = 0;	 // röt
 		}
 		_, occupied := portal.occupant.?;
-		if occupied do sat = 0.01;
+		if occupied {
+			if portal.occupant_last_side < 0 do sat = 1;
+			else do sat = 0.01;
+		}
 		// if selected_portal == i do sat = 1.0;
 		colour := transmute(Colour) rl.ColorFromHSV(hue, sat, value);
 		draw_phys_obj(portal.obj, colour);
@@ -138,25 +142,33 @@ import "core:math/linalg";
 // TODO: make player a global?
 update_portals :: proc(collider: Physics_Object_Id) {
 	for &portal in portal_handler.portals {
+		occupant_id, occupied := portal.occupant.?;
+
 		collided := check_phys_objects_collide(portal.obj, collider);
-		if collided {
+		if collided && !occupied {
 			portal.occupant = collider;
+			obj := phys_obj(collider);
+			portal.occupant_layers = obj.collide_with_layers;
+			obj.collide_with_layers = {.L0};
 		}
 		else {
-			portal.occupant = nil;
+			if occupied && !collided {
+				obj := phys_obj(occupant_id);
+				obj.collide_with_layers = portal.occupant_layers;
+				portal.occupant = nil;
+			}
 		}
 
-		occupant_id, ok := portal.occupant.?;
-		if !ok do continue;
-
-		phys_obj(portal_handler.edge_colliders[0]).parent = phys_obj(portal.obj);
-		phys_obj(portal_handler.edge_colliders[1]).parent = phys_obj(portal.obj);
+		if !occupied do continue;
 
 		obj := phys_obj(occupant_id);
-		obj.collide_with_layers = {.L0};
+		portal_obj := phys_obj(portal.obj);
 
+		phys_obj(portal_handler.edge_colliders[0]).parent = portal_obj;
+		phys_obj(portal_handler.edge_colliders[1]).parent = portal_obj;
 
-			// linalg.vector_dot
+		to_occupant_centre := obj.pos - portal_obj.pos;
+		portal.occupant_last_side = linalg.dot(to_occupant_centre, -transform_forward(portal_obj));
 	}
 }
 
@@ -215,6 +227,7 @@ main :: proc() {
 
 	follow_player: bool = true;
 
+	mouse_last_pos: Vec2;
 	selected: Physics_Object_Id = -1;
 	og_flags: bit_set[Physics_Object_Flag];
 
@@ -340,12 +353,14 @@ main :: proc() {
 		}
 		if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
 			selected_obj.flags = og_flags;
+			selected_obj.vel = (get_world_mouse_pos() - mouse_last_pos) * 100;
 			// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
 			selected = -1;
 		}
 		if any_selected {
 			// FIXME: doesn't work with parent transforms
 			selected_obj.pos = get_world_mouse_pos() - phys_obj_local_centre(selected_obj);
+			mouse_last_pos = get_world_mouse_pos();
 		}
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {

@@ -12,7 +12,8 @@ Vec3 :: linalg.Vector3f32;
 
 Transform :: struct {
 	using pos: Vec2,
-	rot: f32, // facing
+	rot: f32,
+	// TODO: this pointer is invalidated if the parent is updated... :(
 	parent: ^Transform,
 }
 
