@@ -327,7 +327,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		}
 	}
 
-	obj.pos = world_pos_to_local(obj, next_pos);
+	obj.pos = next_pos; // TODO: doesn't work if parented
 	obj.vel = next_vel;
 }
 

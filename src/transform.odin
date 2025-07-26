@@ -7,7 +7,8 @@ import "core:math";
 	import "core:fmt";
 // }
 
-Mat3x3 :: matrix[3, 3]f32;
+Mat3x3 :: linalg.Matrix3f32;
+Mat2x2 :: linalg.Matrix2f32;
 Vec3 :: linalg.Vector3f32;
 
 Transform :: struct {
@@ -17,13 +18,23 @@ Transform :: struct {
 	parent: ^Transform,
 }
 
-world_pos_to_local :: proc(transform: ^Transform, pos: Vec2) -> Vec2 {
-	if transform.parent == nil {
-		return pos;
-	}
-	else {
-		unimplemented("todo world_pos_to_local");
-	}
+// // stole from: https://math.stackexchange.com/questions/525082/reflection-across-a-line
+// matrix_reflect :: proc(mat: Mat2x2, line: Vec2) -> Mat2x2 {
+// 	// y = mx
+// 	m := line.y / line.x;
+// 	factor := 1 / (1 + m*m);
+// 	mat := Mat2x2 {
+// 		1 - m*m, 2*m,
+// 		2*m, m*m - 1,
+// 	};
+// 	return factor * mat;
+// }
+
+transform_reparent :: proc(new_parent: ^Transform, transform: ^Transform) -> Transform {
+	mat := linalg.matrix3_inverse(transform_to_matrix(new_parent));
+	res := mat * transform_to_matrix(transform);
+
+	return transform_from_matrix(res);
 }
 
 transform_forward :: proc(transform: ^Transform) -> Vec2 {
@@ -63,6 +74,16 @@ transform_to_matrix :: proc(transform: ^Transform) -> Mat3x3 {
 		rot_mat[1, 0], rot_mat[1, 1], transform.y,
 		0, 0, 1
 	};
+}
+
+transform_from_matrix :: proc(mat: Mat3x3) -> Transform {
+	rotation := math.atan2(mat[1, 0], mat[0, 0]);
+	position := mat[2].xy;
+
+	return Transform {
+		pos = position,
+		rot = rotation,
+	}
 }
 
 transform_to_world :: proc(transform: ^Transform) -> Transform {

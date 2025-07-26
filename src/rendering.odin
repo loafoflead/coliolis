@@ -47,7 +47,7 @@ draw_rectangle_transform :: proc(
 
         for i in 0..<len(vertices) {
         	rlgl.TexCoord2f(uv[i].x, uv[i].y);
-        	rlgl.Vertex2f(vertices[i].x, vertices[i].y);
+        	rlgl.Vertex2f(vertices[i].x - rect.x/2, vertices[i].y - rect.y/2);
         }
     rlgl.End();
 }

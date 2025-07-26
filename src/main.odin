@@ -71,6 +71,7 @@ Portal :: struct {
 	occupant: Maybe(Physics_Object_Id),
 	occupant_layers: bit_set[Collision_Layer],
 	occupant_last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
+	was_just_teleported_to: bool,
 }
 
 Portal_Handler :: struct {
@@ -141,11 +142,11 @@ import "core:math/linalg";
 
 // TODO: make player a global?
 update_portals :: proc(collider: Physics_Object_Id) {
-	for &portal in portal_handler.portals {
+	for &portal, i in portal_handler.portals {
 		occupant_id, occupied := portal.occupant.?;
 
 		collided := check_phys_objects_collide(portal.obj, collider);
-		if collided && !occupied {
+		if collided && !occupied && !portal.was_just_teleported_to {
 			portal.occupant = collider;
 			obj := phys_obj(collider);
 			portal.occupant_layers = obj.collide_with_layers;
@@ -156,10 +157,11 @@ update_portals :: proc(collider: Physics_Object_Id) {
 				obj := phys_obj(occupant_id);
 				obj.collide_with_layers = portal.occupant_layers;
 				portal.occupant = nil;
+				// portal.was_just_teleported_to = false;
 			}
 		}
 
-		if !occupied do continue;
+		if !occupied || portal.was_just_teleported_to do continue;
 
 		obj := phys_obj(occupant_id);
 		portal_obj := phys_obj(portal.obj);
@@ -167,8 +169,63 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		phys_obj(portal_handler.edge_colliders[0]).parent = portal_obj;
 		phys_obj(portal_handler.edge_colliders[1]).parent = portal_obj;
 
-		to_occupant_centre := obj.pos - portal_obj.pos;
-		portal.occupant_last_side = linalg.dot(to_occupant_centre, -transform_forward(portal_obj));
+		to_occupant_centre := obj.pos - phys_obj_centre(portal_obj);
+		side := linalg.dot(to_occupant_centre, -transform_forward(portal_obj));
+		if side < 0 && portal.occupant_last_side >= 0 {
+			// other_portal := portal_handler.portals[1 if i == 0 else 0];
+			// other_portal_obj := phys_obj(other_portal.obj);
+			// other_portal.was_just_teleported_to = true;
+			// other_portal.occupant = occupant_id;
+
+			// portal.occupant = nil;
+
+			
+			// obj.local = transform_reparent(other_portal_obj, obj);
+			// obj.pos = other_portal_obj.pos;
+			// obj.rot = other_portal_obj.rot;
+			// obj.vel = transform_point(other_portal_obj, obj.vel);
+		}
+		else {
+			portal.occupant_last_side = side;
+		}
+			other_portal := portal_handler.portals[1 if i == 0 else 0];
+			other_portal_obj := phys_obj(other_portal.obj);
+
+		using linalg;
+		oportal_mat := transform_to_matrix(other_portal_obj);
+		portal_mat := transform_to_matrix(portal_obj);
+		obj_mat := transform_to_matrix(obj);
+
+		two_d := matrix2_rotate(f32(π));
+		want := Mat3x3 {
+			two_d[0, 0], two_d[0, 1], 0,
+			two_d[1, 0], two_d[1, 1], 0,
+			0, 0, 1
+		};
+		// one_eighty := Mat3x3 {
+		// 	two_d[0,0], 0, two_d[1, 0],
+		// 	0, 1, 0,
+		// 	two_d[0,1], 0, two_d[1, 1],
+		// };
+		// mirror := Mat3x3 {
+		// 	-1, 0, 0,
+		// 	0, 1, 	0,
+		// 	0, 0, 	0,
+		// }
+
+		// apply second portal transform to 
+		// 	 inverse application of the first portal's transform to
+		// 	   the object
+		// object -> local coords -> second portal offset
+		obj_local := matrix3_inverse(portal_mat) * obj_mat;
+		relative_to_other_portal := oportal_mat * obj_local;
+		// n := want * (matrix3_inverse(portal_mat) * obj_mat); 
+
+		// n[2].xy = (mirror * n)[2].xy;
+		// mat = oportal_mat * n;
+
+		ntr := transform_from_matrix(relative_to_other_portal);
+		draw_rectangle_transform(&ntr, phys_obj_to_rect(obj));
 	}
 }
 
@@ -186,6 +243,14 @@ main :: proc() {
 	initialise_timers();
 	defer free_timers();
 
+	t1 := Transform{pos = Vec2(0)};
+	t2 := Transform{pos = Vec2(10)};
+	t3 := Transform{pos = Vec2(50)};
+	t1mat := transform_to_matrix(&t1);
+	t2mat := transform_to_matrix(&t2);
+	t3mat := transform_to_matrix(&t3);
+	// assert(transform_reparent(&t1, &t2) == t2);
+	fmt.println(transform_from_matrix(t1mat * t2mat * t3mat));
 
 	rl.InitWindow(window_width, window_height, "yeah");
 
@@ -218,7 +283,7 @@ main :: proc() {
 
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
-	test_obj := add_phys_object_aabb(pos = get_screen_centre(), scale = Vec2{40, 40}, mass = kg(1)); 
+	test_obj := add_phys_object_aabb(pos = get_screen_centre(), scale = Vec2{40, 40}, mass = kg(1), flags={.No_Gravity}); 
 	// test object
 
 	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity}, collision_layers = {.Trigger});
