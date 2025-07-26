@@ -25,6 +25,19 @@ world_pos_to_local :: proc(transform: ^Transform, pos: Vec2) -> Vec2 {
 	}
 }
 
+transform_forward :: proc(transform: ^Transform) -> Vec2 {
+	return Vec2 {
+		math.cos(transform.rot),
+		math.sin(transform.rot),
+	}
+}
+
+transform_right :: proc(transform: ^Transform) -> Vec2 {
+	fwd := transform_forward(transform);
+	right_mat := linalg.matrix2_rotate_f32(linalg.π/2);
+	return (right_mat * fwd).xy;
+}
+
 transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {
 	mat := transform_to_matrix(transform);
 	res := mat * Vec3 { point.x, point.y, 1 };

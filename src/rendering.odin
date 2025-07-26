@@ -122,3 +122,10 @@ draw_texture :: proc(
 		rl.WHITE
 	);
 }
+
+draw_line :: proc(start, end: Vec2, colour: Colour = Colour{255, 0,0,255}) {
+	screen_start := world_pos_to_screen_pos(camera, start);
+	screen_end := world_pos_to_screen_pos(camera, end);
+
+	rl.DrawLineV(transmute(rl.Vector2) screen_start, transmute(rl.Vector2) screen_end, transmute(rl.Color) colour);
+}

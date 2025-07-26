@@ -17,6 +17,7 @@ COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD :: Vec2 { 0.01, 0.1 };
 
 // TODO: distinct
 Physics_Object_Id :: int; 
+Collision_Layer :: distinct int;
 
 AABB :: [2]f32;
 
@@ -34,6 +35,7 @@ Physics_Object :: struct {
 	mass: f32,
 	flags: bit_set[Physics_Object_Flag],
 	collider: Collider,
+	collision_layer: Collision_Layer,
 }
 
 
@@ -119,6 +121,13 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 		draw_rectangle(world.pos + box.xy, box.zw, col=dcolour);
 		// draw_rectangle_transform(&world, phys_obj_to_rect(obj));
 		// draw_rectangle(world.pos, cast(Vec2) obj.hitbox, rot=linalg.to_degrees(world.rot), col=dcolour);
+		// fwd arrow
+		centre := phys_obj_centre(obj);
+		end := centre + transform_forward(&world) * 50;
+		draw_line(centre, end);
+		// right arrow
+		end = centre + transform_right(&world) * 50;
+		draw_line(centre, end, colour=Colour{0, 255, 0, 255});
 	}
 }
 

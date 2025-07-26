@@ -69,6 +69,7 @@ Portal :: struct {
 	obj: Physics_Object_Id,
 	state: bit_set[Portal_State],
 	occupant: Maybe(Physics_Object_Id),
+	occupant_last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
 }
 
 Portal_Handler :: struct {
@@ -80,11 +81,11 @@ initialise_portal_handler :: proc() {
 	if !phys_world.initialised do os.exit(-1);
 
 	portal_handler.portals.x.obj = add_phys_object_aabb(
-		scale = Vec2 { 80.0, 20.0 },
+		scale = Vec2 { 20.0, 80.0 },
 		flags = {.Trigger, .Non_Kinematic}, 
 	);
 	portal_handler.portals.y.obj = add_phys_object_aabb(
-		scale = Vec2 { 80.0, 10.0 },
+		scale = Vec2 { 20.0, 80.0 },
 		flags = {.Trigger, .Non_Kinematic}, 
 	);
 	portal_handler.edge_colliders = {
@@ -119,6 +120,8 @@ draw_portals :: proc(selected_portal: int) {
 	}
 }
 
+import "core:math/linalg";
+
 // TODO: make player a global?
 update_portals :: proc(collider: Physics_Object_Id) {
 	for &portal in portal_handler.portals {
@@ -134,6 +137,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		if ok {
 			obj := phys_obj(occupant_id);
 			obj.flags += {.No_Collisions};
+			// linalg.vector_dot
 		}
 	}
 }
