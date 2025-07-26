@@ -82,20 +82,28 @@ initialise_portal_handler :: proc() {
 
 	portal_handler.portals.x.obj = add_phys_object_aabb(
 		scale = Vec2 { 20.0, 80.0 },
-		flags = {.Trigger, .Non_Kinematic}, 
+		flags = {.Non_Kinematic},
+		collision_layers = {.Trigger},
+		collide_with = COLLISION_LAYERS_ALL,
 	);
 	portal_handler.portals.y.obj = add_phys_object_aabb(
 		scale = Vec2 { 20.0, 80.0 },
-		flags = {.Trigger, .Non_Kinematic}, 
+		flags = {.Non_Kinematic},
+		collision_layers = {.Trigger},
+		collide_with = COLLISION_LAYERS_ALL,
 	);
 	portal_handler.edge_colliders = {
 		add_phys_object_aabb(
+			pos = {0, -20},
 			scale = Vec2 { 20.0, 20.0 },
-			flags = {.Non_Kinematic, .No_Collisions}, 
+			flags = {.Non_Kinematic}, 
+			collision_layers = {.L0},
 		),
 		add_phys_object_aabb(
+			pos = {0, 80},
 			scale = Vec2 { 20.0, 20.0 },
-			flags = {.Non_Kinematic, .No_Collisions}, 
+			flags = {.Non_Kinematic}, 
+			collision_layers = {.L0},
 		),
 	}
 }
@@ -118,6 +126,11 @@ draw_portals :: proc(selected_portal: int) {
 		draw_phys_obj(portal.obj, colour);
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
+	for edge in portal_handler.edge_colliders {
+		colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
+
+		draw_phys_obj(edge, colour);
+	}
 }
 
 import "core:math/linalg";
@@ -125,7 +138,7 @@ import "core:math/linalg";
 // TODO: make player a global?
 update_portals :: proc(collider: Physics_Object_Id) {
 	for &portal in portal_handler.portals {
-		collided := check_phys_objects_collide(collider, portal.obj);
+		collided := check_phys_objects_collide(portal.obj, collider);
 		if collided {
 			portal.occupant = collider;
 		}
@@ -134,11 +147,16 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		}
 
 		occupant_id, ok := portal.occupant.?;
-		if ok {
-			obj := phys_obj(occupant_id);
-			obj.flags += {.No_Collisions};
+		if !ok do continue;
+
+		phys_obj(portal_handler.edge_colliders[0]).parent = phys_obj(portal.obj);
+		phys_obj(portal_handler.edge_colliders[1]).parent = phys_obj(portal.obj);
+
+		obj := phys_obj(occupant_id);
+		obj.collide_with_layers = {.L0};
+
+
 			// linalg.vector_dot
-		}
 	}
 }
 
@@ -191,9 +209,9 @@ main :: proc() {
 	test_obj := add_phys_object_aabb(pos = get_screen_centre(), scale = Vec2{40, 40}, mass = kg(1)); 
 	// test object
 
-	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity, .Trigger});
+	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity}, collision_layers = {.Trigger});
 	papi := &phys_obj(a).local;
-	b := add_phys_object_aabb(pos=Vec2(50), scale=Vec2(40), parent=papi, flags= {.Non_Kinematic, .No_Gravity, .Trigger});
+	b := add_phys_object_aabb(pos=Vec2(50), scale=Vec2(40), parent=papi, flags= {.Non_Kinematic, .No_Gravity}, collision_layers = {.Trigger});
 
 	follow_player: bool = true;
 
@@ -224,9 +242,9 @@ main :: proc() {
 		player_obj:=phys_obj(player.obj);
 
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
-		// for i in 0..<len(phys_world.objects) {
-		// 	draw_phys_obj(i);
-		// }
+		for i in 0..<len(phys_world.objects) {
+			draw_phys_obj(i);
+		}
 
 		// ------------ DRAWING ------------
 		draw_tilemap(test_map, {0., 0.});
@@ -313,7 +331,7 @@ main :: proc() {
 
 		selected_obj, any_selected := phys_obj(selected);
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
-			obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos(), count_triggers = true);
+			obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos());
 			if ok && .Fixed not_in obj.flags {
 				og_flags = obj.flags;
 				obj.flags |= {.Non_Kinematic, .Fixed};

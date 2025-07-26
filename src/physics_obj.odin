@@ -5,6 +5,8 @@ import "core:math/linalg/hlsl";
 import "core:math/linalg";
 import "core:math";
 
+import "core:fmt";
+
 
 EARTH_GRAVITY :: 5.0;
 // terminal velocity = sqrt((gravity * mass) / (drag coeff))
@@ -17,7 +19,10 @@ COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD :: Vec2 { 0.01, 0.1 };
 
 // TODO: distinct
 Physics_Object_Id :: int; 
-Collision_Layer :: distinct int;
+Collision_Layer :: enum {
+	Default, Trigger, L0, L1,
+}
+COLLISION_LAYERS_ALL: bit_set[Collision_Layer] : {.Default, .Trigger, .L0, .L1};
 
 AABB :: [2]f32;
 
@@ -35,7 +40,8 @@ Physics_Object :: struct {
 	mass: f32,
 	flags: bit_set[Physics_Object_Flag],
 	collider: Collider,
-	collision_layer: Collision_Layer,
+	collision_layers: bit_set[Collision_Layer],
+	collide_with_layers: bit_set[Collision_Layer],
 }
 
 
@@ -94,7 +100,6 @@ Physics_Object_Flag :: enum u32 {
 	No_Collisions, 			// doesn't collide
 	No_Gravity,				// unaffected by gravity
 	Drag_Exception, 		// use drag values for the player 
-	Trigger, 				// just used for checking collision
 	Fixed,					// used outside of the physics world to mark objects as no-touch
 }
 
@@ -191,6 +196,7 @@ rects_collision_check :: proc(a, b: Rect) -> bool {
 check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id) -> bool {
 	obj1 := phys_obj(obj1id);
 	obj2 := phys_obj(obj2id);
+	if obj1.collide_with_layers & obj2.collision_layers == {} do return false;
 	ty1 := phys_obj_collider_ty(obj1);
 	ty2 := phys_obj_collider_ty(obj2);
 	if ty1 == ty2 {
@@ -205,9 +211,10 @@ check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id) -> bool {
 	unreachable();
 }
 
-check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2) -> bool {
+check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL) -> bool {
 	obj := phys_obj(obj_id);
 	if .No_Collisions in obj.flags do return false;
+	if layers & obj.collision_layers == {} do return false;
 	ty := phys_obj_collider_ty(obj);
 	switch ty {
 	case .AABB:
@@ -217,19 +224,15 @@ check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2) 
 	unreachable();
 }
 
-point_collides_in_world :: proc(point: Vec2, count_triggers: bool = false) -> (
+point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL) -> (
 	collided_with: ^Physics_Object = nil, 
 	collided_with_id: Physics_Object_Id = -1,
 	success: bool = false
 )
 {
 	for i in 0..<len(phys_world.objects) {
-		obj := phys_obj(i);
-		if Physics_Object_Flag.No_Collisions in obj.flags do continue;
-		if !count_triggers && .Trigger in obj.flags do continue;
-
-		if check_phys_object_point_collide(i, point) {
-			collided_with = obj;
+		if check_phys_object_point_collide(i, point, layers) {
+			collided_with = phys_obj(i);
 			collided_with_id = i;
 			success = true;
 			return;
@@ -238,14 +241,14 @@ point_collides_in_world :: proc(point: Vec2, count_triggers: bool = false) -> (
 	return;
 }
 
-get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = MARKER_VEC2, count_triggers: bool = false) -> (rl.Rectangle, ^Physics_Object, bool) {
+get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = MARKER_VEC2) -> (rl.Rectangle, ^Physics_Object, bool) {
 	obj := phys_obj(obj_id);
 	if .No_Collisions in obj.flags do return rl.Rectangle{}, nil, false;
 	for &other_obj, i in phys_world.objects {
 		if 
 			i == obj_id || Physics_Object_Flag.No_Collisions in other_obj.flags
 		{ continue; }
-		if !count_triggers && .Trigger in other_obj.flags do continue;
+		if obj.collide_with_layers & other_obj.collision_layers == {} do continue;
 
 		pos: Vec2;
 		if set_pos == MARKER_VEC2 do pos = transform_to_world(obj).pos;
@@ -268,7 +271,7 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	obj := phys_obj(obj_id);
 	pos := transform_to_world(obj).pos;
-	if Physics_Object_Flag.Non_Kinematic in obj.flags || .Trigger in obj.flags {
+	if Physics_Object_Flag.Non_Kinematic in obj.flags || .Trigger in obj.collision_layers {
 		return;
 	}
 	resistance: Vec2 = Vec2 {1.0, 1.0};
@@ -293,7 +296,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 
 	if Physics_Object_Flag.No_Collisions not_in obj.flags {
 		collision_rect, other_obj, ok := get_first_collision_in_world(obj_id, set_pos = next_pos);
-		if ok {
+		if ok && .Trigger not_in other_obj.collision_layers {
 			other_pos := transform_to_world(other_obj).pos;
 			// use obj.pos instead of next_pos so we know where we came from
 			obj_centre := phys_obj_centre(obj);
@@ -334,7 +337,7 @@ phys_obj_grounded :: proc(obj_id: int) -> bool {
 	centre := phys_obj_centre(obj);
 	centre.y += phys_obj_bounding_box(obj).w;
 	// draw_rectangle(centre, Vec2(10), col=Colour{0, 255, 255, 255});
-	_, _, ok = point_collides_in_world(centre);
+	_, _, ok = point_collides_in_world(centre, layers = {.Default} );
 	return ok;
 }
 
@@ -361,7 +364,9 @@ add_phys_object_aabb :: proc(
 	vel:   Vec2 = Vec2{},
 	acc:   Vec2 = Vec2{},
 	parent: ^Transform = nil,
-	flags: bit_set[Physics_Object_Flag] = {}
+	flags: bit_set[Physics_Object_Flag] = {},
+	collision_layers: bit_set[Collision_Layer] = {.Default},
+	collide_with: bit_set[Collision_Layer] = {.Default, .Trigger},
 ) -> (id: Physics_Object_Id)
 {
 	obj := Physics_Object {
@@ -373,8 +378,9 @@ add_phys_object_aabb :: proc(
 		},
 		mass = mass, 
 		flags = flags,
-		collider = cast(AABB) scale, 
-		// hitbox = cast(Hitbox) scale,
+		collider = cast(AABB) scale,
+		collision_layers = collision_layers,
+		collide_with_layers = collide_with,
 	};
 
 	id = len(phys_world.objects);
