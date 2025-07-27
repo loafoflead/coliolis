@@ -33,7 +33,7 @@ transform_new :: proc(pos: Vec2, rot: f32) -> Transform {
 }
 
 rotate :: proc(transform: ^Transform, radians: f32) {
-	transform.mat = linalg.matrix4_rotate_f32(radians, Z_AXIS) * transform.mat;
+	transform.mat = transform.mat * linalg.matrix4_rotate_f32(radians, Z_AXIS);
 	transform_update(transform);
 }
 

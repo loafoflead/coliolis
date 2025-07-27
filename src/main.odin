@@ -333,20 +333,20 @@ main :: proc() {
 
 		phys_obj(a).rot += 1 * dt;
 
-		rotate: f32;
+		rotate_dir: f32;
 		portal_obj := phys_obj(portal_handler.portals[selected_portal].obj);
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT) {
-			rotate = 1;
+			rotate_dir = 1;
 		}
 		else if rl.IsKeyPressed(rl.KeyboardKey.RIGHT) {
-			rotate = -1;
+			rotate_dir = -1;
 		}
-		else do rotate = 0;
+		else do rotate_dir = 0;
 
 		if rl.IsKeyPressed(rl.KeyboardKey.F) {
 			portal_obj.local = transform_flip(portal_obj);
 		}
-		portal_obj.rot += rotate * math.PI/2;
+		rotate(portal_obj, rotate_dir * math.PI/2);
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_ALT) do selected_portal = 1 - selected_portal;
 
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
