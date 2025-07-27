@@ -56,7 +56,7 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 		screen_pos.x, screen_pos.y,
 		scale.x, scale.y,
 	};
-	origin := rl.Vector2{};
+	origin := transmute(rl.Vector2) Vec2{};// scale / 2;
 	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
 }
 
@@ -96,13 +96,13 @@ initialise_portal_handler :: proc() {
 	);
 	portal_handler.edge_colliders = {
 		add_phys_object_aabb(
-			pos = {0, -20},
+			pos = {0, -50},
 			scale = Vec2 { 20.0, 20.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
 		),
 		add_phys_object_aabb(
-			pos = {0, 80},
+			pos = {0, 50},
 			scale = Vec2 { 20.0, 20.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
@@ -207,25 +207,28 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		// 	0, 1, 0,
 		// 	two_d[0,1], 0, two_d[1, 1],
 		// };
-		// mirror := Mat3x3 {
-		// 	-1, 0, 0,
-		// 	0, 1, 	0,
-		// 	0, 0, 	0,
-		// }
+		mirror := Mat3x3 {
+			-1, 0, 0,
+			0, 1, 	0,
+			0, 0, 	0,
+		}
 
 		// apply second portal transform to 
 		// 	 inverse application of the first portal's transform to
 		// 	   the object
 		// object -> local coords -> second portal offset
 		obj_local := matrix3_inverse(portal_mat) * obj_mat;
-		relative_to_other_portal := oportal_mat * obj_local;
+		relative_to_other_portal := mirror * obj_local;
 		// n := want * (matrix3_inverse(portal_mat) * obj_mat); 
 
 		// n[2].xy = (mirror * n)[2].xy;
 		// mat = oportal_mat * n;
+		fmat := oportal_mat * relative_to_other_portal;
 
-		ntr := transform_from_matrix(relative_to_other_portal);
+		ntr := transform_from_matrix(fmat);
+		ntr.pos += other_portal_obj.pos;
 		draw_rectangle_transform(&ntr, phys_obj_to_rect(obj));
+		draw_rectangle(fmat[2].xy, {10, 10});
 	}
 }
 
@@ -242,15 +245,6 @@ main :: proc() {
 
 	initialise_timers();
 	defer free_timers();
-
-	t1 := Transform{pos = Vec2(0)};
-	t2 := Transform{pos = Vec2(10)};
-	t3 := Transform{pos = Vec2(50)};
-	t1mat := transform_to_matrix(&t1);
-	t2mat := transform_to_matrix(&t2);
-	t3mat := transform_to_matrix(&t3);
-	// assert(transform_reparent(&t1, &t2) == t2);
-	fmt.println(transform_from_matrix(t1mat * t2mat * t3mat));
 
 	rl.InitWindow(window_width, window_height, "yeah");
 
@@ -283,7 +277,12 @@ main :: proc() {
 
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
-	test_obj := add_phys_object_aabb(pos = get_screen_centre(), scale = Vec2{40, 40}, mass = kg(1), flags={.No_Gravity}); 
+	test_obj := add_phys_object_aabb(
+		pos = get_screen_centre(), 
+		scale = Vec2{40, 40}, 
+		mass = kg(1), 
+		flags={.No_Gravity}
+	); 
 	// test object
 
 	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity}, collision_layers = {.Trigger});
@@ -320,9 +319,14 @@ main :: proc() {
 		player_obj:=phys_obj(player.obj);
 
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
-		for i in 0..<len(phys_world.objects) {
-			draw_phys_obj(i);
-		}
+		// for i in 0..<len(phys_world.objects) {
+		// 	draw_phys_obj(i);
+		// }
+
+		// an_obj := phys_obj(a);
+		// bb := phys_obj_bounding_box(an_obj);
+		// draw_rectangle(bb.xy, bb.zw, col=Colour{100, 0, 0, 255});
+		// draw_rectangle_transform(an_obj, phys_obj_to_rect(an_obj));
 
 		// ------------ DRAWING ------------
 		draw_tilemap(test_map, {0., 0.});
@@ -424,7 +428,7 @@ main :: proc() {
 		}
 		if any_selected {
 			// FIXME: doesn't work with parent transforms
-			selected_obj.pos = get_world_mouse_pos() - phys_obj_local_centre(selected_obj);
+			selected_obj.pos = get_world_mouse_pos();
 			mouse_last_pos = get_world_mouse_pos();
 		}
 

@@ -32,6 +32,7 @@ draw_rectangle_transform :: proc(
 ) {
 	vertices := rect_to_points(rect);
 	for &vert in vertices {
+		vert -= rect.zw / 2;
 		vert = transform_point(transform, vert);
 		vert = world_pos_to_screen_pos(camera, vert);
 	}
@@ -117,7 +118,7 @@ draw_texture :: proc(
 		tex, 
 		n_patch_info, 
 		transmute(rl.Rectangle) dest, // destination
-		transmute(rl.Vector2) -screen_pos, 
+		transmute(rl.Vector2) -screen_pos + dest.zw / 2, 
 		rotation,
 		rl.WHITE
 	);

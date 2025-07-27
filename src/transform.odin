@@ -56,17 +56,6 @@ transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {
 	return res.xy;
 }
 
-transform_rect :: proc(transform: ^Transform, rect: Rect) -> Rect {
-	tleft := Vec2{rect.x, rect.y};
-	bright := tleft + Vec2{rect.z, rect.w};
-	tleft = transform_point(transform, tleft);	
-	bright = transform_point(transform, bright);	
-	return Rect {
-		tleft.x, tleft.y,
-		bright.x, bright.y,
-	}
-}
-
 transform_to_matrix :: proc(transform: ^Transform) -> Mat3x3 {
 	rot_mat := linalg.matrix2_rotate_f32(transform.rot);
 	return Mat3x3 {

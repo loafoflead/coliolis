@@ -113,7 +113,7 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 	obj := phys_obj(obj_id);
 	dcolour: Colour;
 	if colour == {} {
-		val := hlsl.fmod_float(cast(f32)obj_id * 1049209430 - cast(f32)obj_id * 109100 + 1023952094, 360.0); // holy shit this is cool
+		val := hlsl.fmod_float(f32(obj_id) * 10, 360.0); // holy shit this is cool
 		dcolour = transmute(Colour) rl.ColorFromHSV(1.0, 0.1, val);
 	}
 	else {
@@ -121,9 +121,11 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 	}
 	switch _ in obj.collider {
 	case AABB:
+		w_rect := aabb_obj_to_world_rect(obj);
+		draw_rectangle(w_rect.xy, w_rect.zw, col=dcolour);
 		world := transform_to_world(obj);
-		box := phys_obj_bounding_box(obj);
-		draw_rectangle(world.pos + box.xy, box.zw, col=dcolour);
+		// box := phys_obj_bounding_box(obj);
+		// draw_rectangle(world.pos - box.zw / 2, box.zw, col=dcolour);
 		// draw_rectangle_transform(&world, phys_obj_to_rect(obj));
 		// draw_rectangle(world.pos, cast(Vec2) obj.hitbox, rot=linalg.to_degrees(world.rot), col=dcolour);
 		// fwd arrow
@@ -137,23 +139,12 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 }
 
 phys_obj_local_centre :: proc(obj: ^Physics_Object) -> Vec2 {
-	// pos := phys_obj_world_pos(obj);
-	switch collider in obj.collider {
-	case AABB:
-		bb := phys_obj_bounding_box(obj);
-		return bb.xy + bb.zw / 2;
-	}
-	unreachable();
+	return obj.pos;
 }
 
 phys_obj_centre :: proc(obj: ^Physics_Object) -> Vec2 {
-	// pos := phys_obj_world_pos(obj);
-	switch collider in obj.collider {
-	case AABB:
-		bb := aabb_obj_to_world_rect(obj);
-		return bb.xy + bb.zw / 2;
-	}
-	unreachable();
+	pos := phys_obj_world_pos(obj);
+	return pos;
 }
 
 phys_obj_to_vertices :: proc(obj: ^Physics_Object) -> []Vec2 {
@@ -163,9 +154,12 @@ phys_obj_to_vertices :: proc(obj: ^Physics_Object) -> []Vec2 {
 		local_transform := transform_to_world(obj);
 		local_transform.pos = Vec2{};
 		rect := Rect {0, 0, collider.x, collider.y};
-		rect = transform_rect(&local_transform, rect);
-		array := rect_to_points(rect);
-		for item,i in array do slice[i] = item;
+		vertices := rect_to_points(rect);
+		for &vert in vertices {
+			vert -= rect.zw / 2;
+			vert = transform_point(&local_transform, vert);
+		}
+		for item,i in vertices do slice[i] = item;
 		return slice;
 	}
 	unreachable();
@@ -218,7 +212,10 @@ check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2, 
 	ty := phys_obj_collider_ty(obj);
 	switch ty {
 	case .AABB:
-		return rl.CheckCollisionPointRec(transmute(rl.Vector2) point, transmute(rl.Rectangle) aabb_obj_to_world_rect(obj))
+		return rl.CheckCollisionPointRec(
+			transmute(rl.Vector2) point, 
+			transmute(rl.Rectangle) aabb_obj_to_world_rect(obj)
+		);
 	}
 
 	unreachable();
@@ -256,7 +253,7 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 			pos = set_pos;
 		}
 		obj_rect := aabb_obj_to_world_rect(obj);
-		obj_rect.xy = pos;
+		obj_rect.xy = pos - obj_rect.zw / 2;
 
 		r1 := transmute(rl.Rectangle) obj_rect;
 		r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(&other_obj);
