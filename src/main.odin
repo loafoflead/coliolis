@@ -60,6 +60,8 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
 }
 
+PORTAL_EXIT_SPEED_BOOST :: 10;
+
 Portal_State :: enum {
 	Connected,
 	Alive,
@@ -71,6 +73,7 @@ Portal :: struct {
 	occupant: Maybe(Physics_Object_Id),
 	occupant_layers: bit_set[Collision_Layer],
 	occupant_last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
+	occupant_last_new_pos: Vec2, // TODO: explain (to get vel)
 	was_just_teleported_to: bool,
 }
 
@@ -115,19 +118,21 @@ draw_portals :: proc(selected_portal: int) {
 	for &portal, i in portal_handler.portals {
 		value: f32;
 		hue := f32(1);
-		sat := f32(0.5);
+		sat := f32(1);
 		switch i {
 			case 0: value = 60;  // poiple
-			case 1: value = 240; // Grüne
+			case 1: value = 115; // Grüne
 			case: 	value = 0;	 // röt
 		}
 		_, occupied := portal.occupant.?;
 		if occupied {
-			if portal.occupant_last_side < 0 do sat = 1;
-			else do sat = 0.01;
+			// positive = behind
+			if portal.occupant_last_side > 0 do value = 0;
+			else do value = 115;
 		}
-		// if selected_portal == i do sat = 1.0;
-		colour := transmute(Colour) rl.ColorFromHSV(hue, sat, value);
+		if portal.was_just_teleported_to do sat = 0;
+		// TODO: messed up HSV pls fix it l8r
+		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
 		draw_phys_obj(portal.obj, colour);
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
@@ -157,7 +162,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 				obj := phys_obj(occupant_id);
 				obj.collide_with_layers = portal.occupant_layers;
 				portal.occupant = nil;
-				// portal.was_just_teleported_to = false;
+				portal.was_just_teleported_to = false;
 			}
 		}
 
@@ -171,64 +176,43 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 		to_occupant_centre := obj.pos - phys_obj_centre(portal_obj);
 		side := linalg.dot(to_occupant_centre, -transform_forward(portal_obj));
-		if side < 0 && portal.occupant_last_side >= 0 {
-			// other_portal := portal_handler.portals[1 if i == 0 else 0];
-			// other_portal_obj := phys_obj(other_portal.obj);
-			// other_portal.was_just_teleported_to = true;
-			// other_portal.occupant = occupant_id;
 
-			// portal.occupant = nil;
-
-			
-			// obj.local = transform_reparent(other_portal_obj, obj);
-			// obj.pos = other_portal_obj.pos;
-			// obj.rot = other_portal_obj.rot;
-			// obj.vel = transform_point(other_portal_obj, obj.vel);
-		}
-		else {
-			portal.occupant_last_side = side;
-		}
-			other_portal := portal_handler.portals[1 if i == 0 else 0];
-			other_portal_obj := phys_obj(other_portal.obj);
+		other_portal := &portal_handler.portals[1 if i == 0 else 0];
+		other_portal_obj := phys_obj(other_portal.obj);
 
 		using linalg;
 		oportal_mat := transform_to_matrix(other_portal_obj);
 		portal_mat := transform_to_matrix(portal_obj);
 		obj_mat := transform_to_matrix(obj);
 
-		two_d := matrix2_rotate(f32(π));
-		want := Mat3x3 {
-			two_d[0, 0], two_d[0, 1], 0,
-			two_d[1, 0], two_d[1, 1], 0,
-			0, 0, 1
-		};
-		// one_eighty := Mat3x3 {
-		// 	two_d[0,0], 0, two_d[1, 0],
-		// 	0, 1, 0,
-		// 	two_d[0,1], 0, two_d[1, 1],
-		// };
 		mirror := Mat3x3 {
-			-1, 0, 0,
+			-1, 0,  0,
 			0, 1, 	0,
-			0, 0, 	0,
+			0, 0, 	1,
 		}
 
-		// apply second portal transform to 
-		// 	 inverse application of the first portal's transform to
-		// 	   the object
-		// object -> local coords -> second portal offset
 		obj_local := matrix3_inverse(portal_mat) * obj_mat;
 		relative_to_other_portal := mirror * obj_local;
-		// n := want * (matrix3_inverse(portal_mat) * obj_mat); 
 
-		// n[2].xy = (mirror * n)[2].xy;
-		// mat = oportal_mat * n;
 		fmat := oportal_mat * relative_to_other_portal;
 
 		ntr := transform_from_matrix(fmat);
-		ntr.pos += other_portal_obj.pos;
-		draw_rectangle_transform(&ntr, phys_obj_to_rect(obj));
-		draw_rectangle(fmat[2].xy, {10, 10});
+		// ntr.pos += other_portal_obj.pos;
+
+		if side >= 0 && portal.occupant_last_side < 0 {
+			other_portal.was_just_teleported_to = true;
+			other_portal.occupant = occupant_id;
+			other_portal.occupant_layers = portal.occupant_layers;
+
+			obj.vel = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.vel) + PORTAL_EXIT_SPEED_BOOST);
+			// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
+			obj.local = ntr;
+
+			obj.collide_with_layers = portal.occupant_layers;
+			portal.occupant = nil;
+		}
+		portal.occupant_last_new_pos = ntr.pos;
+		portal.occupant_last_side = side;
 	}
 }
 
@@ -333,14 +317,14 @@ main :: proc() {
 		draw_portals(selected_portal);
 		draw_player(&player);
 
-		draw_phys_obj(a);
-		draw_phys_obj(b);
+		// draw_phys_obj(a);
+		// draw_phys_obj(b);
 		draw_phys_obj(test_obj);
 		// ------------   END   ------------
 
 		// ------------ UPDATING ------------
 		update_phys_world(dt);
-		update_portals(test_obj);
+		update_portals(player.obj);
 		update_timers(dt);
 		// ------------    END   ------------
 
@@ -349,6 +333,7 @@ main :: proc() {
 		phys_obj(a).rot += 1 * dt;
 
 		rotate: f32;
+		portal_obj := phys_obj(portal_handler.portals[selected_portal].obj);
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT) {
 			rotate = 1;
 		}
@@ -356,7 +341,11 @@ main :: proc() {
 			rotate = -1;
 		}
 		else do rotate = 0;
-		phys_obj(portal_handler.portals[selected_portal].obj).rot += rotate * math.PI/2;
+
+		if rl.IsKeyPressed(rl.KeyboardKey.F) {
+			portal_obj.local = transform_flip(portal_obj);
+		}
+		portal_obj.rot += rotate * math.PI/2;
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_ALT) do selected_portal = 1 - selected_portal;
 
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;

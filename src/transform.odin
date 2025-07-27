@@ -30,11 +30,14 @@ Transform :: struct {
 // 	return factor * mat;
 // }
 
-transform_reparent :: proc(new_parent: ^Transform, transform: ^Transform) -> Transform {
-	mat := linalg.matrix3_inverse(transform_to_matrix(new_parent));
-	res := mat * transform_to_matrix(transform);
-
-	return transform_from_matrix(res);
+transform_flip :: proc(transform: ^Transform) -> Transform {
+	mirror := Mat3x3 {
+		-1, 0, 0,
+		0, 1, 	0,
+		0, 0, 	1,
+	}
+	mat := transform_to_matrix(transform);
+	return transform_from_matrix(mat * mirror);
 }
 
 transform_forward :: proc(transform: ^Transform) -> Vec2 {
@@ -47,7 +50,7 @@ transform_forward :: proc(transform: ^Transform) -> Vec2 {
 transform_right :: proc(transform: ^Transform) -> Vec2 {
 	fwd := transform_forward(transform);
 	right_mat := linalg.matrix2_rotate_f32(linalg.π/2);
-	return (right_mat * fwd).xy;
+	return (fwd * right_mat).xy;
 }
 
 transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {
