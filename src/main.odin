@@ -171,8 +171,8 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		obj := phys_obj(occupant_id);
 		portal_obj := phys_obj(portal.obj);
 
-		phys_obj(portal_handler.edge_colliders[0]).parent = portal_obj;
-		phys_obj(portal_handler.edge_colliders[1]).parent = portal_obj;
+		// phys_obj(portal_handler.edge_colliders[0]).parent = portal_obj;
+		// phys_obj(portal_handler.edge_colliders[1]).parent = portal_obj;
 
 		to_occupant_centre := obj.pos - phys_obj_centre(portal_obj);
 		side := linalg.dot(to_occupant_centre, -transform_forward(portal_obj));
@@ -181,17 +181,18 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		other_portal_obj := phys_obj(other_portal.obj);
 
 		using linalg;
-		oportal_mat := transform_to_matrix(other_portal_obj);
-		portal_mat := transform_to_matrix(portal_obj);
-		obj_mat := transform_to_matrix(obj);
+		oportal_mat := other_portal_obj.mat;
+		portal_mat := portal_obj.mat;
+		obj_mat := obj.mat;
 
-		mirror := Mat3x3 {
-			-1, 0,  0,
-			0, 1, 	0,
-			0, 0, 	1,
+		mirror := Mat4x4 {
+			-1, 0,  0, 0,
+			0, 1, 	0, 0,
+			0, 0, 	1, 0,
+			0, 0, 0, 1,
 		}
 
-		obj_local := matrix3_inverse(portal_mat) * obj_mat;
+		obj_local := matrix4_inverse(portal_mat) * obj_mat;
 		relative_to_other_portal := mirror * obj_local;
 
 		fmat := oportal_mat * relative_to_other_portal;
@@ -417,7 +418,7 @@ main :: proc() {
 		}
 		if any_selected {
 			// FIXME: doesn't work with parent transforms
-			selected_obj.pos = get_world_mouse_pos();
+			setpos(selected_obj, get_world_mouse_pos());
 			mouse_last_pos = get_world_mouse_pos();
 		}
 

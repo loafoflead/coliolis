@@ -70,7 +70,6 @@ phys_obj_id_collider_ty :: proc(obj_id: Physics_Object_Id) -> ColliderType {
 }
 
 aabb_obj_to_world_rect :: proc(obj: ^Physics_Object) -> Rect {
-	pos := transform_to_world(obj).pos;
 	switch collider in obj.collider {
 	case AABB:
 		world := transform_to_world(obj);
@@ -119,11 +118,12 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 	else {
 		dcolour = colour;
 	}
-	switch _ in obj.collider {
+	switch co in obj.collider {
 	case AABB:
 		w_rect := aabb_obj_to_world_rect(obj);
 		draw_rectangle(w_rect.xy, w_rect.zw, col=dcolour);
 		world := transform_to_world(obj);
+		// draw_rectangle(obj.pos - co/2, co);
 		// box := phys_obj_bounding_box(obj);
 		// draw_rectangle(world.pos - box.zw / 2, box.zw, col=dcolour);
 		// draw_rectangle_transform(&world, phys_obj_to_rect(obj));
@@ -152,7 +152,7 @@ phys_obj_to_vertices :: proc(obj: ^Physics_Object) -> []Vec2 {
 	case AABB:
 		slice := make([]Vec2, 4);
 		local_transform := transform_to_world(obj);
-		local_transform.pos = Vec2{};
+		setpos(&local_transform, Vec2{});
 		rect := Rect {0, 0, collider.x, collider.y};
 		vertices := rect_to_points(rect);
 		for &vert in vertices {
@@ -324,7 +324,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		}
 	}
 
-	obj.pos = next_pos; // TODO: doesn't work if parented
+	setpos(obj, next_pos); // TODO: doesn't work if parented
 	obj.vel = next_vel;
 }
 
@@ -371,7 +371,8 @@ add_phys_object_aabb :: proc(
 		acc = acc, 
 		local = {
 			pos = pos,
-			parent = parent,			
+			parent = parent,
+			mat = linalg.MATRIX4F32_IDENTITY,
 		},
 		mass = mass, 
 		flags = flags,
