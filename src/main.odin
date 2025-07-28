@@ -6,6 +6,7 @@ import "core:fmt";
 import "core:mem";
 
 import "core:math/ease";
+import "core:math/linalg";
 
 import "core:os";
 
@@ -132,10 +133,6 @@ main :: proc() {
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
 	for !rl.WindowShouldClose() {
-		if is_timer_done(debug_timer) {
-			// debug printing here
-		}
-
 		dt := rl.GetFrameTime();
 
 		rl.BeginDrawing();
@@ -143,6 +140,10 @@ main :: proc() {
 
 		player_obj:=phys_obj(player.obj);
 
+		if is_timer_done(debug_timer) {
+			fmt.println(player_obj.rot);
+			// debug printing here
+		}
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
 		// for i in 0..<len(phys_world.objects) {
 		// 	draw_phys_obj(i);
@@ -262,6 +263,29 @@ main :: proc() {
 		if !is_timer_done(player_step_timer) {
 			player_obj.pos = player_step_origin + (player_step_target - player_step_origin) * ease.ease(ease.Ease.Circular_In, timer_fraction(player_step_timer)); 
 			update_timer(player_step_timer, dt);
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.G) {
+			rotate(player_obj, 0.01);
+		}
+		else if rl.IsKeyDown(rl.KeyboardKey.H) {
+			rotate(player_obj, -0.01);
+		}
+		else {
+			if math.abs(player_obj.rot) > 0.3 {
+				// rotate(player_obj, player_obj.rot * 0.01);
+				rotate(player_obj, player_obj.rot * (-0.05 if player_obj.rot < 0 else -0.05));
+			}
+			else {
+				player_obj.local = transform_new(player_obj.pos, 0);
+				// setrot(player_obj, 0);
+			}
+			// if player_obj.rot < 0 && player_obj.rot > -linalg.PI {
+			// 	rotate(player_obj, player_obj.rot * 0.01);
+			// }
+			// else if player_obj.rot > 0 && player_obj.rot < linalg.PI {
+			// 	rotate(player_obj, -player_obj.rot * 0.01);
+			// }
 		}
 		// player.obj.vel += move * PLAYER_SPEED * dt;
 

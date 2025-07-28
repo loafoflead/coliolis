@@ -33,7 +33,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 draw_player :: proc(player: ^Player) {
 	obj:=phys_obj(player.obj);
 	r := phys_obj_to_rect(obj).zw;
-	// draw_rectangle_transform(obj, phys_obj_to_rect(obj));
+	draw_rectangle_transform(obj, phys_obj_to_rect(obj));
 	// draw_texture(player.texture, obj.pos, pixel_scale=phys_obj_to_rect(obj).zw);	
-	draw_rectangle(obj.pos - r/2, r);	
+	// draw_rectangle(obj.pos - r/2, r);	
 }

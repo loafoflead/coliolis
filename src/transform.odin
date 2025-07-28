@@ -36,6 +36,11 @@ transform_new :: proc(pos: Vec2, rot: f32, parent: ^Transform = nil) -> Transfor
 	return new;
 }
 
+transform_reset_rotation_plane :: proc(transform: ^Transform) {
+	new := transform_new(transform.pos, transform.rot);
+	transform^ = new;
+}
+
 rotate :: proc(transform: ^Transform, radians: f32) {
 	transform.mat = transform.mat * linalg.matrix4_rotate_f32(radians, Z_AXIS);
 	transform_update(transform);
@@ -51,6 +56,12 @@ setpos :: proc(transform: ^Transform, pos: Vec2) {
 	transform_update(transform);
 }
 
+setrot :: proc(transform: ^Transform, radians: f32) {
+	unimplemented();
+	// new := transform_new(transform.pos, radians);
+	// transform^ = new;
+}
+
 @private
 transform_update :: proc(transform: ^Transform) {
 	transform.pos = pos(transform);
@@ -58,7 +69,7 @@ transform_update :: proc(transform: ^Transform) {
 }
 
 rot :: proc(transform: ^Transform) -> f32 {
-	return math.atan2(transform.mat[1][0], transform.mat[1][0]);
+	return math.atan2(transform.mat[0][1], transform.mat[0][0]);
 }
 
 pos :: proc(transform: ^Transform) -> Vec2 {

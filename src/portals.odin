@@ -155,7 +155,9 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 			obj.vel = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.vel) + PORTAL_EXIT_SPEED_BOOST);
 			// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
+			transform_reset_rotation_plane(&ntr);
 			obj.local = ntr;
+			// setpos(obj, ntr.pos);
 
 			// obj.collide_with_layers = portal.occupant_layers;
 			portal.occupant = nil;
