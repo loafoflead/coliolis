@@ -221,6 +221,33 @@ check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2, 
 	unreachable();
 }
 
+cast_ray_in_world :: proc(og, dir: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL) -> (rl.RayCollision, bool) {
+	closest: rl.RayCollision;
+	closest.distance = math.F32_MAX;
+	for i in 0..<len(phys_world.objects) {
+		obj := phys_obj(i);
+		if layers & obj.collision_layers == {} do continue;
+		switch _ in obj.collider {
+		case AABB:
+			box := phys_obj_bounding_box(obj);
+			box.xy += phys_obj_world_pos(obj);
+			min := Vec3{ box.x, box.y, 0};
+			max := min + Vec3 { box.z, box.w, 10};
+			bb := rl.BoundingBox {
+				min = min,
+				max = max,
+			}
+			ray := rl.Ray { 
+				position = rl.Vector3 { og.x, og.y, 5 }, 
+				direction = rl.Vector3 { dir.x, dir.y, 0 }, 
+			};
+			col := rl.GetRayCollisionBox(ray, bb);
+			if col.hit && col.distance < closest.distance do closest = col;
+		}
+	}
+	return closest, closest.hit;
+}
+
 point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL) -> (
 	collided_with: ^Physics_Object = nil, 
 	collided_with_id: Physics_Object_Id = -1,
@@ -366,14 +393,11 @@ add_phys_object_aabb :: proc(
 	collide_with: bit_set[Collision_Layer] = {.Default, .Trigger},
 ) -> (id: Physics_Object_Id)
 {
+	local := transform_new(pos, rot=0, parent=parent);
 	obj := Physics_Object {
 		vel = vel, 
 		acc = acc, 
-		local = {
-			pos = pos,
-			parent = parent,
-			mat = linalg.MATRIX4F32_IDENTITY,
-		},
+		local = local,
 		mass = mass, 
 		flags = flags,
 		collider = cast(AABB) scale,

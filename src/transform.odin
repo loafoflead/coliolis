@@ -28,8 +28,12 @@ Transform :: struct {
 	parent: ^Transform,
 }
 
-transform_new :: proc(pos: Vec2, rot: f32) -> Transform {
-	unimplemented("creating transform from pos and rot");
+transform_new :: proc(pos: Vec2, rot: f32, parent: ^Transform = nil) -> Transform {
+	new := transform_from_matrix(linalg.MATRIX4F32_IDENTITY);
+	rotate(&new, rot);
+	setpos(&new, pos);
+	new.parent = parent;
+	return new;
 }
 
 rotate :: proc(transform: ^Transform, radians: f32) {
@@ -88,9 +92,9 @@ transform_forward :: proc(transform: ^Transform) -> Vec2 {
 }
 
 transform_right :: proc(transform: ^Transform) -> Vec2 {
-	fwd := transform_forward(transform);
+	// fwd := linalg.normalize(transform.mat[0]);
 	right_mat := linalg.matrix4_rotate_f32(linalg.π/2, Z_AXIS);
-	return (Vec4 { fwd.x, fwd.y, 0, 1 } * right_mat).xy;
+	return (transform.mat * right_mat)[0].xy;
 }
 
 transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {

@@ -66,6 +66,11 @@ get_temp_timer :: proc(duration: f32, current: f32 = 0, flags: bit_set[Timer_Fla
 	return &timers.unnamed[timers.timer_index];
 }
 
+// from 0..=1
+timer_fraction :: proc(timer: ^Timer) -> f32 {
+	return timer.current / timer.duration;
+}
+
 reset_timer :: proc(timer: ^Timer) {
 	timer.current = 0;
 	timer.flags -= {.Finished};

@@ -60,164 +60,6 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
 }
 
-PORTAL_EXIT_SPEED_BOOST :: 10;
-
-Portal_State :: enum {
-	Connected,
-	Alive,
-}
-
-Portal :: struct {
-	obj: Physics_Object_Id,
-	state: bit_set[Portal_State],
-	occupant: Maybe(Physics_Object_Id),
-	occupant_layers: bit_set[Collision_Layer],
-	occupant_last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
-	occupant_last_new_pos: Vec2, // TODO: explain (to get vel)
-	was_just_teleported_to: bool,
-}
-
-Portal_Handler :: struct {
-	portals: [2]Portal,
-	edge_colliders: [2]Physics_Object_Id,
-}
-
-initialise_portal_handler :: proc() {
-	if !phys_world.initialised do os.exit(-1);
-
-	portal_handler.portals.x.obj = add_phys_object_aabb(
-		scale = Vec2 { 20.0, 80.0 },
-		flags = {.Non_Kinematic},
-		collision_layers = {.Trigger},
-		collide_with = COLLISION_LAYERS_ALL,
-	);
-	portal_handler.portals.y.obj = add_phys_object_aabb(
-		scale = Vec2 { 20.0, 80.0 },
-		flags = {.Non_Kinematic},
-		collision_layers = {.Trigger},
-		collide_with = COLLISION_LAYERS_ALL,
-	);
-	portal_handler.edge_colliders = {
-		add_phys_object_aabb(
-			pos = {0, -50},
-			scale = Vec2 { 20.0, 20.0 },
-			flags = {.Non_Kinematic}, 
-			collision_layers = {.L0},
-		),
-		add_phys_object_aabb(
-			pos = {0, 50},
-			scale = Vec2 { 20.0, 20.0 },
-			flags = {.Non_Kinematic}, 
-			collision_layers = {.L0},
-		),
-	}
-}
-free_portal_handler :: proc() {}
-
-draw_portals :: proc(selected_portal: int) {
-	for &portal, i in portal_handler.portals {
-		value: f32;
-		hue := f32(1);
-		sat := f32(1);
-		switch i {
-			case 0: value = 60;  // poiple
-			case 1: value = 115; // Grüne
-			case: 	value = 0;	 // röt
-		}
-		_, occupied := portal.occupant.?;
-		if occupied {
-			// positive = behind
-			if portal.occupant_last_side > 0 do value = 0;
-			else do value = 115;
-		}
-		if portal.was_just_teleported_to do sat = 0;
-		// TODO: messed up HSV pls fix it l8r
-		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
-		draw_phys_obj(portal.obj, colour);
-		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
-	}
-	for edge in portal_handler.edge_colliders {
-		colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
-
-		draw_phys_obj(edge, colour);
-	}
-}
-
-import "core:math/linalg";
-
-// TODO: make player a global?
-update_portals :: proc(collider: Physics_Object_Id) {
-	for &portal, i in portal_handler.portals {
-		occupant_id, occupied := portal.occupant.?;
-
-		collided := check_phys_objects_collide(portal.obj, collider);
-		if collided && !occupied && !portal.was_just_teleported_to {
-			portal.occupant = collider;
-			obj := phys_obj(collider);
-			portal.occupant_layers = obj.collide_with_layers;
-			obj.collide_with_layers = {.L0};
-		}
-		else {
-			if occupied && !collided {
-				obj := phys_obj(occupant_id);
-				obj.collide_with_layers = portal.occupant_layers;
-				portal.occupant = nil;
-				portal.was_just_teleported_to = false;
-			}
-		}
-
-		if !occupied || portal.was_just_teleported_to do continue;
-
-		obj := phys_obj(occupant_id);
-		portal_obj := phys_obj(portal.obj);
-
-		// phys_obj(portal_handler.edge_colliders[0]).parent = portal_obj;
-		// phys_obj(portal_handler.edge_colliders[1]).parent = portal_obj;
-
-		to_occupant_centre := obj.pos - phys_obj_centre(portal_obj);
-		side := linalg.dot(to_occupant_centre, -transform_forward(portal_obj));
-
-		other_portal := &portal_handler.portals[1 if i == 0 else 0];
-		other_portal_obj := phys_obj(other_portal.obj);
-
-		using linalg;
-		oportal_mat := other_portal_obj.mat;
-		portal_mat := portal_obj.mat;
-		obj_mat := obj.mat;
-
-		mirror := Mat4x4 {
-			-1, 0,  0, 0,
-			0, 1, 	0, 0,
-			0, 0, 	1, 0,
-			0, 0, 0, 1,
-		}
-
-		obj_local := matrix4_inverse(portal_mat) * obj_mat;
-		relative_to_other_portal := mirror * obj_local;
-
-		fmat := oportal_mat * relative_to_other_portal;
-
-		ntr := transform_from_matrix(fmat);
-		// ntr.pos += other_portal_obj.pos;
-
-		if side >= 0 && portal.occupant_last_side < 0 {
-			other_portal.was_just_teleported_to = true;
-			other_portal.occupant = occupant_id;
-			other_portal.occupant_layers = portal.occupant_layers;
-
-			obj.vel = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.vel) + PORTAL_EXIT_SPEED_BOOST);
-			// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
-			obj.local = ntr;
-
-			obj.collide_with_layers = portal.occupant_layers;
-			portal.occupant = nil;
-		}
-		portal.occupant_last_new_pos = ntr.pos;
-		portal.occupant_last_side = side;
-	}
-}
-
-
 main :: proc() {	
 	initialise_camera();
 
@@ -243,14 +85,7 @@ main :: proc() {
 	initialise_portal_handler();
 	defer free_portal_handler();
 
-	player: Player;
-	player.obj = add_phys_object_aabb(
-		pos = get_screen_centre(), 
-		mass = kg(1.0), 
-		scale = Vec2 { 30.0, 30.0 },
-		flags = {.Drag_Exception}, 
-	);
-	player.texture = five_w;
+	player: Player = player_new(five_w);
 
 	portal_handler.portals.x.state += {.Alive};
 	portal_handler.portals.y.state += {.Alive};
@@ -259,6 +94,11 @@ main :: proc() {
 	jump_timer := get_temp_timer(0.2);
 	jumping: bool;
 	coyote_timer := get_temp_timer(0.25);
+
+	player_step_target: Vec2;
+	player_step_origin: Vec2;
+	player_step_timer := get_temp_timer(0.2);
+	set_timer_done(player_step_timer);
 
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
@@ -325,6 +165,7 @@ main :: proc() {
 
 		// ------------ UPDATING ------------
 		update_phys_world(dt);
+		// update_portals(test_obj);
 		update_portals(player.obj);
 		update_timers(dt);
 		// ------------    END   ------------
@@ -351,7 +192,9 @@ main :: proc() {
 
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
 
-		if !dragging && selected == -1 && follow_player do camera.pos = player_obj.pos - get_screen_centre();
+		if !dragging && selected == -1 && follow_player {
+			camera.pos += 0.1 * ((player_obj.pos - get_screen_centre()) - camera.pos);
+		}
 
 		move: f32 = 0.0;
 		if rl.IsKeyDown(rl.KeyboardKey.D) {
@@ -388,11 +231,37 @@ main :: proc() {
 		}
 
 
-		if move != 0.0 {
+		if move != 0.0 && is_timer_done(player_step_timer) {
+			dir := Vec2 { move, 0 };
+			ahead_of_feet := player_feet(&player) + dir * 20;
+			ahead_of_knees := player_feet(&player) + -Y_AXIS.xy * PLAYER_STEP_UP_HEIGHT + dir * 20;
+			draw_line(player_feet(&player), ahead_of_feet, Colour{255, 0, 0, 255});
+			draw_line(player_feet(&player), ahead_of_knees, Colour{0, 0, 255, 255});
+			_, _, hit_feet := point_collides_in_world(ahead_of_feet, layers = {.Default, .L0});
+			_, _, too_high := point_collides_in_world(ahead_of_knees, layers = {.Default, .L0});
+			if hit_feet && !too_high {
+				// og := player_obj.pos + dir * 20;
+				draw_line(player_obj.pos, ahead_of_knees, Colour{0, 255, 0, 255});
+
+				col, hit := cast_ray_in_world(ahead_of_knees, Y_AXIS.xy);
+				if hit && col.distance > 1 {
+					reset_timer(player_step_timer);
+					player_step_origin = player_obj.pos;
+					player_step_target = (transmute(Vec3) col.point).xy - Vec2{0, phys_obj_to_rect(player_obj).w/2};
+				}
+			}
+		}
+
+		if move != 0.0 && is_timer_done(player_step_timer) {
 			player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
 		}
 		else {
-			player_obj.acc.x = 0.0;
+			player_obj.acc.x = 0.0;	
+		}
+
+		if !is_timer_done(player_step_timer) {
+			player_obj.pos = player_step_origin + (player_step_target - player_step_origin) * ease.ease(ease.Ease.Circular_In, timer_fraction(player_step_timer)); 
+			update_timer(player_step_timer, dt);
 		}
 		// player.obj.vel += move * PLAYER_SPEED * dt;
 
