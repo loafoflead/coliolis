@@ -141,9 +141,9 @@ main :: proc() {
 		player_obj:=phys_obj(player.obj);
 
 		if is_timer_done(debug_timer) {
-			fmt.println(player_obj.rot);
 			// debug printing here
 		}
+
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
 		// for i in 0..<len(phys_world.objects) {
 		// 	draw_phys_obj(i);
@@ -194,7 +194,7 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
 
 		if !dragging && selected == -1 && follow_player {
-			camera.pos += 0.1 * ((player_obj.pos - get_screen_centre()) - camera.pos);
+			camera.pos += 0.01 * ((player_obj.pos - get_screen_centre()) - camera.pos);
 		}
 
 		move: f32 = 0.0;
@@ -274,7 +274,7 @@ main :: proc() {
 		else {
 			if math.abs(player_obj.rot) > 0.3 {
 				// rotate(player_obj, player_obj.rot * 0.01);
-				rotate(player_obj, player_obj.rot * (-0.05 if player_obj.rot < 0 else -0.05));
+				rotate(player_obj, player_obj.rot * -0.05);
 			}
 			else {
 				player_obj.local = transform_new(player_obj.pos, 0);
