@@ -62,3 +62,12 @@ Good luck!
 
 - Tileset (assets/level_tileset.png), created by [aimen23b](https://www.fiverr.com/aimen23b), distributed by (i guess owned by?) [foozle](www.foozle.io): https://foozlecc.itch.io/sci-fi-lab-tileset-decor-traps
 - Tilemap generation software ([Tiled](http://www.mapeditor.org/)), the edition used: http://www.mapeditor.org/2025/01/28/tiled-1-11-2-released.html
+
+
+# TODO:
+
+- [] fix player collision sometimes freezing against flat surfaces
+- [] add diagonal colliders (non AABB)
+- [] change player movement speed, jump str, and gravity to better suit movement through portals
+- [] fix just_teleported_to variable, make it a delay instead of a lock? or a percent of collision instead of complete non-intersection
+- [] notion of 'Rendered' object, so that portal can render half of a thing through itself
