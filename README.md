@@ -58,6 +58,34 @@ Good luck!
 1. ```update_phys_obj``` procedure showcases Odin's excellent swizzling, maths, fixed array programming stuff, and it's brilliant.
 1. ```main``` procedure illustrates how to very simply use Raylib in Odin.
 
+# How to play
+
+The game itself is currently unfinished, any controls or gameplay listed below could be out of date or no longer exist.
+
+## Gameplay keybinds
+
+- A, D (WASD)	: movement from left to right for the player
+- SPACE			: jump for the player (hold = longer jump)
+- LCONTROL 		: focus camera on player position
+
+## Debug/testing keybinds
+
+- LALT 			: switch selected portal
+- F 			: flip facing direction of selected portal
+- LEFT, RIGHT 	: rotate selected portal by 90 degrees in either direction
+- G, H 			: rotate player object in the left or right direction while held
+
+## Mouse
+
+- LEFT			: pick up a physics object under the cursor (TODO: make this the top one...) that can be dragged around the screen. If you chuck it (release while moving fast) velocity is added to the object so you can throw it.
+- RIGHT			: pan the camera
+- MIDDLE		: spawn an object displaying the world position of the cursor
+
+## Gameplay
+
+You can move around as the player, jumping and going left/right, as well as travel through portals. Panning the camera unlocks it from following the player, re-centre on the player by pressing *LEFT CONTROL*.
+Pick up and move the portals using *LEFT CLICK* on the mouse, rotate them with the arrow keys and select them by pressing *LEFT ALT* to toggle which portal you have selected.
+
 # Credits:
 
 - Tileset (assets/level_tileset.png), created by [aimen23b](https://www.fiverr.com/aimen23b), distributed by (i guess owned by?) [foozle](www.foozle.io): https://foozlecc.itch.io/sci-fi-lab-tileset-decor-traps
