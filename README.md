@@ -10,7 +10,23 @@ So if it runs on any other platforms you can attribute that to Raylib and Odin m
 
 You will need the [Odin compiler](https://odin-lang.org/docs/install/) in your PATH (or Path if you're on Windows), ideally you would also have [Make](https://www.gnu.org/software/make/), but I just use it for convenience.
 
-The game uses Odin's vendored Raylib bindings, which are in the 'thirdparty/raylib' folder, when I get the time I may make it an actual Git thirdparty dependency, for now it makes things easier to build.
+## Prerequisites:
+
+- You need clang to compile Odin on Linux, on Debian that's: ```apt install clang```, but I imagine it's much the same for different package maangers.
+- The game uses Odin's vendored Raylib bindings, which are expected to be in the ```src/thirdparty/raylib``` folder. In order to build the project you need to copy the vendored raylib from your installation of Odin to this folder, like so (on Linux, on Windows you may prefer to use the file manager):
+
+```
+$ pwd
+/path/to/this/coliolis
+$ mkdir src/thirdparty
+$ cp -r $ODIN_ROOT/vendor/raylib ./src/thirdparty
+$ ls 
+<source files...> main.odin thirdparty
+$ ls src/thirdparty
+raylib
+```
+
+- Finally, create a file called ```bin``` in the root directory of the project, if you're using Make.
 
 ## With Make:
 

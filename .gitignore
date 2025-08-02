@@ -1,5 +1,6 @@
-raylib/
 .git
+src/thirdparty/
+
 coliolis
 test.tiled-*
-bin/
+bin/*
