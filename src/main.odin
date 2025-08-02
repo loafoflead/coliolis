@@ -75,6 +75,7 @@ main :: proc() {
 	defer free_timers();
 
 	rl.InitWindow(window_width, window_height, "yeah");
+	rl.SetTargetFPS(60);
 
 	five_w, ok := load_texture("5W.png");
 	if !ok do os.exit(1);
@@ -106,7 +107,7 @@ main :: proc() {
 	test_obj := add_phys_object_aabb(
 		pos = get_screen_centre(), 
 		scale = Vec2{40, 40}, 
-		mass = kg(1), 
+		mass = kg(10), 
 		flags={.No_Gravity}
 	); 
 	// test object
@@ -137,6 +138,7 @@ main :: proc() {
 
 		rl.BeginDrawing();
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR));
+		rl.DrawFPS(0, 0);
 
 		player_obj:=phys_obj(player.obj);
 
@@ -247,6 +249,7 @@ main :: proc() {
 				col, hit := cast_ray_in_world(ahead_of_knees, Y_AXIS.xy);
 				if hit && col.distance > 1 {
 					reset_timer(player_step_timer);
+					player_obj.flags += {.Non_Kinematic, .No_Collisions}
 					player_step_origin = player_obj.pos;
 					player_step_target = (transmute(Vec3) col.point).xy - Vec2{0, phys_obj_to_rect(player_obj).w/2};
 				}
@@ -257,12 +260,17 @@ main :: proc() {
 			player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
 		}
 		else {
-			player_obj.acc.x = 0.0;	
+			player_obj.acc.x = 0.0;
 		}
 
 		if !is_timer_done(player_step_timer) {
 			player_obj.pos = player_step_origin + (player_step_target - player_step_origin) * ease.ease(ease.Ease.Circular_In, timer_fraction(player_step_timer)); 
 			update_timer(player_step_timer, dt);
+		}
+
+		if is_timer_just_done(player_step_timer) {
+			player_obj.flags -= {.Non_Kinematic, .No_Collisions}
+			update_timer(player_step_timer, dt);			
 		}
 
 		if rl.IsKeyDown(rl.KeyboardKey.G) {

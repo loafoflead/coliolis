@@ -1,10 +1,12 @@
 package main;
 
-PLAYER_HORIZ_ACCEL :: 2000.0; // pixels per second
-PLAYER_JUMP_STR :: 500.0; // idk
+PLAYER_HORIZ_ACCEL :: 8000.0; // pixels per second
+PLAYER_JUMP_STR :: 100.0; // idk
 
 PLAYER_WIDTH :: 32;
 PLAYER_HEIGHT :: 64;
+
+PLAYER_WEIGHT_KG :: 10;
 
 PLAYER_STEP_UP_HEIGHT :: 20;
 
@@ -22,7 +24,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	player: Player;
 	player.obj = add_phys_object_aabb(
 		pos = get_screen_centre(), 
-		mass = kg(1.0), 
+		mass = kg(PLAYER_WEIGHT_KG), 
 		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
 		flags = {.Drag_Exception}, 
 	);

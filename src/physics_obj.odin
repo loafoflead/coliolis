@@ -8,7 +8,8 @@ import "core:math";
 import "core:fmt";
 
 
-EARTH_GRAVITY :: 5.0;
+EARTH_GRAVITY :: 1.0;
+MIN_SPEED :: 0.05;
 // terminal velocity = sqrt((gravity * mass) / (drag coeff))
 ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 
@@ -16,6 +17,8 @@ ARBITRARY_DRAG_COEFFICIENT :: 0.01;
 // in order for the collision to trip over into slowing down the collider
 // this exists to make moving along surfaces smoother
 COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD :: Vec2 { 0.01, 0.1 };
+// how big a collision has to be to move the boy back
+MIN_COLLISION_MOVE_BACK :: 0.0001;
 
 // TODO: distinct
 Physics_Object_Id :: int; 
@@ -44,6 +47,14 @@ Physics_Object :: struct {
 	collide_with_layers: bit_set[Collision_Layer],
 }
 
+Physics_Object_Flag :: enum u32 {
+	Non_Kinematic, 			// not updated by physics world
+	No_Velocity_Dampening, 	// unaffected by damping
+	No_Collisions, 			// doesn't collide
+	No_Gravity,				// unaffected by gravity
+	Drag_Exception, 		// use drag values for the player 
+	Fixed,					// used outside of the physics world to mark objects as no-touch
+}
 
 phys_obj :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
 	if len(phys_world.objects) < cast(int) id || cast(int) id == -1 do return nil, false;
@@ -93,14 +104,6 @@ phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect {
 	}
 }
 
-Physics_Object_Flag :: enum u32 {
-	Non_Kinematic, 			// not updated by physics world
-	No_Velocity_Dampening, 	// unaffected by damping
-	No_Collisions, 			// doesn't collide
-	No_Gravity,				// unaffected by gravity
-	Drag_Exception, 		// use drag values for the player 
-	Fixed,					// used outside of the physics world to mark objects as no-touch
-}
 
 draw_hitbox_at :: proc(pos: Vec2, box: ^AABB) {
 	hue := hlsl.fmod_float(linalg.length(box^), 360.0); // holy shit this is cool
@@ -312,7 +315,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 
 	next_pos := pos + obj.vel * dt;
 
-	next_vel := (obj.vel + obj.acc * dt) * resistance;
+	next_vel := (obj.vel + obj.acc * dt*dt) * resistance;
 
 	if Physics_Object_Flag.No_Gravity not_in obj.flags {
 		obj.acc = {0, EARTH_GRAVITY} * obj.mass;
@@ -331,8 +334,13 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				sign := -1.0 if move_back.y < 0.0 else f32(1.0);
 				move_back.y = collision_rect.height * sign;
 				if collision_rect.height > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.y {
-					other_obj.vel.y = ( next_vel.y * obj.mass ) / other_obj.mass;
+					if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.y) > MIN_SPEED {
+						other_obj.vel.y = ( next_vel.y * obj.mass ) / other_obj.mass;
+					}
 					next_vel.y = 0; //-next_vel.y;
+				}
+				if math.abs(move_back.y) < MIN_COLLISION_MOVE_BACK {
+					move_back.y = 0;
 				}
 
 				move_back.x = 0.0;
@@ -341,8 +349,13 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				sign := -1.0 if move_back.x < 0.0 else f32(1.0);
 				move_back.x = collision_rect.width * sign;
 				if collision_rect.width > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.x {
-					other_obj.vel.x = ( next_vel.x * obj.mass ) / other_obj.mass;
+					if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.x) > MIN_SPEED {
+						other_obj.vel.x = ( next_vel.x * obj.mass ) / other_obj.mass;
+					}
 					next_vel.x = 0; //-next_vel.x;
+				}
+				if math.abs(move_back.x) < MIN_COLLISION_MOVE_BACK {
+					move_back.x = 0;
 				}
 
 				move_back.y = 0.0;

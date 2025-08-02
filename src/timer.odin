@@ -6,6 +6,7 @@ Timer_Flags :: enum {
 	Update_Automatically,
 	Finished,
 	Repeating,
+	Just_Finished,
 }
 
 NUM_UNNAMED_TIMERS :: 16;
@@ -73,17 +74,24 @@ timer_fraction :: proc(timer: ^Timer) -> f32 {
 
 reset_timer :: proc(timer: ^Timer) {
 	timer.current = 0;
-	timer.flags -= {.Finished};
+	timer.flags -= {.Finished, .Just_Finished};
 }
 
 is_timer_done :: proc(timer: ^Timer) -> bool {
-	return .Finished in timer.flags || timer.current >= timer.duration;
+	return .Finished in timer.flags || .Just_Finished in timer.flags;
+}
+
+is_timer_just_done :: proc(timer: ^Timer) -> bool {
+	return .Just_Finished in timer.flags;
 }
 
 update_timer :: proc(timer: ^Timer, dt: f32) {
-	if is_timer_done(timer) do return;
+	if is_timer_done(timer) {
+		if .Just_Finished in timer.flags do timer.flags -= {.Just_Finished};
+		return;
+	}
 	timer.current += dt;
-	if timer.current >= timer.duration do timer.flags += {.Finished};
+	if timer.current >= timer.duration do timer.flags += {.Finished, .Just_Finished};
 }
 
 set_timer_done :: proc(timer: ^Timer) {
