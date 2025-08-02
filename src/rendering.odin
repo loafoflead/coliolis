@@ -42,13 +42,16 @@ draw_rectangle_transform :: proc(
 	}
 	else do rlgl.SetTexture(rlgl.GetTextureIdDefault());
 
+	cam_scaled_rect := rect;
+	cam_scaled_rect.xy *= camera.zoom; // TODO: make this a proc in the camera file
+
     rlgl.Begin(rlgl.QUADS);
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
         rlgl.Normal3f(0, 0, 1); // TODO: find out what this does
 
         for i in 0..<len(vertices) {
         	rlgl.TexCoord2f(uv[i].x, uv[i].y);
-        	rlgl.Vertex2f(vertices[i].x - rect.x/2, vertices[i].y - rect.y/2);
+        	rlgl.Vertex2f(vertices[i].x - cam_scaled_rect.x/2, vertices[i].y - cam_scaled_rect.y/2);
         }
     rlgl.End();
 }
@@ -113,6 +116,8 @@ draw_texture :: proc(
 	else {
 		unreachable();
 	}
+
+	dest.zw *= camera.zoom; // TODO: make this a proc in the camera file
 	
 	rl.DrawTextureNPatch(
 		tex, 

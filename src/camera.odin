@@ -10,10 +10,12 @@ import rl "thirdparty/raylib";
 Camera2D :: struct {
 	pos: Vec2,
 	scale: Vec2,
+	zoom: f32,
 }
 
 initialise_camera :: proc() {
 	camera.scale = {f32(window_width), f32(window_height)};
+	camera.zoom = 1;
 }
 
 camera_rect :: proc(camera: Camera2D) -> rl.Rectangle {
@@ -32,9 +34,13 @@ is_rect_visible_to_camera :: proc(camera: Camera2D, rect: Rect) -> bool {
 }
 
 world_pos_to_screen_pos :: proc(camera: Camera2D, pos: Vec2) -> Vec2 {
-	return pos - camera.pos;
+	return (pos - camera.pos) * camera.zoom;
+}
+
+get_world_screen_centre :: proc() -> Vec2 {
+	return camera.pos + get_screen_centre() / camera.zoom
 }
 
 get_world_mouse_pos :: proc() -> Vec2 {
-	return camera.pos + get_mouse_pos();
+	return (camera.pos + get_mouse_pos() / camera.zoom);
 }

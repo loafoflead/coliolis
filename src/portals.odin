@@ -19,17 +19,18 @@ Portal :: struct {
 	occupant: Maybe(Physics_Object_Id),
 	occupant_layers: bit_set[Collision_Layer],
 	occupant_last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
-	occupant_last_new_pos: Vec2, // TODO: explain (to get vel)
-	was_just_teleported_to: bool,
+	occupant_last_new_pos: Vec2,
 }
 
 Portal_Handler :: struct {
 	portals: [2]Portal,
 	edge_colliders: [2]Physics_Object_Id,
+	teleported_timer: ^Timer,
 }
 
 initialise_portal_handler :: proc() {
-	if !phys_world.initialised do os.exit(-1);
+	if !phys_world.initialised do panic("Must initialise physics world before initialising portals");
+	if !timers.initialised do panic("Must initialise timers before initialising portals");
 
 	portal_handler.portals.x.obj = add_phys_object_aabb(
 		scale = Vec2 { 20.0, 100.0 },
@@ -56,7 +57,10 @@ initialise_portal_handler :: proc() {
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
 		),
-	}
+	};
+
+	portal_handler.teleported_timer = 
+		create_named_timer("portal_tp", 1.0, flags={.Update_Automatically});
 }
 free_portal_handler :: proc() {}
 
@@ -76,7 +80,7 @@ draw_portals :: proc(selected_portal: int) {
 			if portal.occupant_last_side > 0 do value = 0;
 			else do value = 115;
 		}
-		if portal.was_just_teleported_to do sat = 0;
+		if !is_timer_done("portal_tp") do sat = 0;
 		// TODO: messed up HSV pls fix it l8r
 		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
 		draw_phys_obj(portal.obj, colour);
@@ -96,7 +100,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		occupant_id, occupied := portal.occupant.?;
 
 		collided := check_phys_objects_collide(portal.obj, collider);
-		if collided && !occupied && !portal.was_just_teleported_to {
+		if collided && !occupied && is_timer_done("portal_tp") {
 			portal.occupant = collider;
 			obj := phys_obj(collider);
 			portal.occupant_layers = obj.collide_with_layers;
@@ -107,7 +111,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 				obj := phys_obj(occupant_id);
 				obj.collide_with_layers = portal.occupant_layers;
 				portal.occupant = nil;
-				portal.was_just_teleported_to = false;
+				set_timer_done("portal_tp");
 			}
 		}
 
@@ -118,7 +122,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		phys_obj(portal_handler.edge_colliders[0]).parent = portal_obj;
 		phys_obj(portal_handler.edge_colliders[1]).parent = portal_obj;
 
-		if portal.was_just_teleported_to do continue;
+		if !is_timer_done("portal_tp") do continue;
 
 		obj := phys_obj(occupant_id);
 
@@ -149,7 +153,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		// ntr.pos += other_portal_obj.pos;
 
 		if side >= 0 && portal.occupant_last_side < 0 {
-			other_portal.was_just_teleported_to = true;
+			reset_timer("portal_tp");
 			other_portal.occupant = occupant_id;
 			other_portal.occupant_layers = portal.occupant_layers;
 

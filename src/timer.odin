@@ -50,6 +50,12 @@ update_timers :: proc(dt: f32) {
 	}
 }
 
+get_named_timer :: proc(name: string) -> ^Timer {
+	if name not_in timers.named do panic("a named timer was not found");
+
+	return &timers.named[name];
+}
+
 create_named_timer :: proc(name: string, duration: f32, current: f32 = 0, flags: bit_set[Timer_Flags] = {}) -> ^Timer {
 	if name in timers.named do return &timers.named[name];
 
@@ -68,24 +74,32 @@ get_temp_timer :: proc(duration: f32, current: f32 = 0, flags: bit_set[Timer_Fla
 }
 
 // from 0..=1
-timer_fraction :: proc(timer: ^Timer) -> f32 {
+ref_timer_fraction :: proc(timer: ^Timer) -> f32 {
 	return timer.current / timer.duration;
 }
 
-reset_timer :: proc(timer: ^Timer) {
+named_timer_fraction :: proc(name: string) -> f32 {
+	if name not_in timers.named do panic("a named timer was not found");
+
+	return ref_timer_fraction(&timers.named[name])
+}
+
+timer_fraction :: proc{ref_timer_fraction, named_timer_fraction};
+
+ref_reset_timer :: proc(timer: ^Timer) {
 	timer.current = 0;
 	timer.flags -= {.Finished, .Just_Finished};
 }
 
-is_timer_done :: proc(timer: ^Timer) -> bool {
+ref_is_timer_done :: proc(timer: ^Timer) -> bool {
 	return .Finished in timer.flags || .Just_Finished in timer.flags;
 }
 
-is_timer_just_done :: proc(timer: ^Timer) -> bool {
+ref_is_timer_just_done :: proc(timer: ^Timer) -> bool {
 	return .Just_Finished in timer.flags;
 }
 
-update_timer :: proc(timer: ^Timer, dt: f32) {
+ref_update_timer :: proc(timer: ^Timer, dt: f32) {
 	if is_timer_done(timer) {
 		if .Just_Finished in timer.flags do timer.flags -= {.Just_Finished};
 		return;
@@ -94,9 +108,41 @@ update_timer :: proc(timer: ^Timer, dt: f32) {
 	if timer.current >= timer.duration do timer.flags += {.Finished, .Just_Finished};
 }
 
-set_timer_done :: proc(timer: ^Timer) {
+ref_set_timer_done :: proc(timer: ^Timer) {
 	timer.flags += {.Finished};
 }
+
+named_reset_timer :: proc(name: string) {
+	if name not_in timers.named do panic("a named timer was not found");
+
+	ref_reset_timer(&timers.named[name])
+}
+named_is_timer_done :: proc(name: string) -> bool {
+	if name not_in timers.named do panic("a named timer was not found");
+
+	return ref_is_timer_done(&timers.named[name])
+}
+named_is_timer_just_done :: proc(name: string) -> bool {
+	if name not_in timers.named do panic("a named timer was not found");
+
+	return ref_is_timer_just_done(&timers.named[name])
+}
+named_update_timer :: proc(name: string, dt: f32) {
+	if name not_in timers.named do panic("a named timer was not found");
+
+	ref_update_timer(&timers.named[name], dt)
+}
+named_set_timer_done :: proc(name: string) {
+	if name not_in timers.named do panic("a named timer was not found");
+
+	ref_set_timer_done(&timers.named[name])
+}
+
+reset_timer :: proc{ref_reset_timer, named_reset_timer};
+is_timer_done :: proc{ref_is_timer_done, named_is_timer_done};
+is_timer_just_done :: proc{ref_is_timer_just_done, named_is_timer_just_done};
+update_timer :: proc{ref_update_timer, named_update_timer};
+set_timer_done :: proc{ref_set_timer_done, named_set_timer_done};
 
 drop_temp_timers :: proc() {
 	timers.timer_index = 0;

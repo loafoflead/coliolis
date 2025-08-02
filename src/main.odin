@@ -55,7 +55,7 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 	screen_pos := world_pos_to_screen_pos(camera, pos);
 	rec := rl.Rectangle {
 		screen_pos.x, screen_pos.y,
-		scale.x, scale.y,
+		scale.x * camera.zoom, scale.y * camera.zoom,
 	};
 	origin := transmute(rl.Vector2) Vec2{};// scale / 2;
 	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
@@ -196,7 +196,8 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
 
 		if !dragging && selected == -1 && follow_player {
-			camera.pos += 0.01 * ((player_obj.pos - get_screen_centre()) - camera.pos);
+			delta := 0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos)
+			camera.pos += 0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos);
 		}
 
 		move: f32 = 0.0;
@@ -300,6 +301,7 @@ main :: proc() {
 		if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
 			pointer = get_world_mouse_pos();
 		}
+		else if rl.IsKeyPressed(rl.KeyboardKey.C) do pointer = get_world_screen_centre();
 		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.05, 0.05});
 
 		selected_obj, any_selected := phys_obj(selected);
@@ -333,6 +335,11 @@ main :: proc() {
 		}
 		if dragging {
 			camera.pos = drag_og - get_mouse_pos();
+		}
+
+		mouse_move := rl.GetMouseWheelMove();
+		if mouse_move != 0 {
+			camera.zoom += mouse_move * 0.1;
 		}
 		
 		rl.EndDrawing();
