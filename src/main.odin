@@ -241,9 +241,10 @@ main :: proc() {
 			ahead_of_knees := player_feet(&player) + -Y_AXIS.xy * PLAYER_STEP_UP_HEIGHT + dir * 20;
 			draw_line(player_feet(&player), ahead_of_feet, Colour{255, 0, 0, 255});
 			draw_line(player_feet(&player), ahead_of_knees, Colour{0, 0, 255, 255});
+			_, _, hit_inside_body := point_collides_in_world(player_feet(&player), layers = {.Default, .L0}, exclude = {player.obj});
 			_, _, hit_feet := point_collides_in_world(ahead_of_feet, layers = {.Default, .L0});
 			_, _, too_high := point_collides_in_world(ahead_of_knees, layers = {.Default, .L0});
-			if hit_feet && !too_high {
+			if !hit_inside_body && hit_feet && !too_high {
 				// og := player_obj.pos + dir * 20;
 				draw_line(player_obj.pos, ahead_of_knees, Colour{0, 255, 0, 255});
 

@@ -1,12 +1,12 @@
 package main;
 
-PLAYER_HORIZ_ACCEL :: 8000.0; // pixels per second
+PLAYER_HORIZ_ACCEL :: 10_000.0; // pixels per second
 PLAYER_JUMP_STR :: 100.0; // idk
 
 PLAYER_WIDTH :: 32;
-PLAYER_HEIGHT :: 64;
+PLAYER_HEIGHT :: 32;
 
-PLAYER_WEIGHT_KG :: 10;
+PLAYER_WEIGHT_KG :: 5;
 
 PLAYER_STEP_UP_HEIGHT :: 20;
 
@@ -33,9 +33,10 @@ player_new :: proc(texture: Texture_Id) -> Player {
 }
 
 draw_player :: proc(player: ^Player) {
-	obj:=phys_obj(player.obj);
-	r := phys_obj_to_rect(obj).zw;
-	draw_rectangle_transform(obj, phys_obj_to_rect(obj));
+	draw_phys_obj(player.obj);
+	// obj:=phys_obj(player.obj);
+	// r := phys_obj_to_rect(obj).zw;
+	// draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);
 	// draw_texture(player.texture, obj.pos, pixel_scale=phys_obj_to_rect(obj).zw);	
 	// draw_rectangle(obj.pos - r/2, r);	
 }
