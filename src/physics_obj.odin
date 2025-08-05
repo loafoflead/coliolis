@@ -23,7 +23,7 @@ COLLISION_MOMENTUM_DAMPING :: 0.8;
 // this exists to make moving along surfaces smoother
 COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD :: Vec2 { 0.5, 0.1 };
 // how big a collision has to be to move the boy back
-MIN_COLLISION_MOVE_BACK :: 0.1;
+MIN_COLLISION_MOVE_BACK :: 0.001;
 
 // TODO: distinct
 Physics_Object_Id :: int; 
@@ -60,6 +60,18 @@ Physics_Object_Flag :: enum u32 {
 	Drag_Exception, 		// use drag values for the player 
 	Fixed,					// used outside of the physics world to mark objects as no-touch
 }
+
+// ----- STUFF THAT SHOULD GO IN ANOTHER PACKAGE -----
+
+rl_rectangle_to_rect :: proc(rl: rl.Rectangle) -> Rect {
+	return transmute(Rect) rl
+}
+
+rect_diagonal :: proc(r: Rect) -> f32 {
+	return linalg.length(r.wz)
+}
+
+// ---------------------------------------------------
 
 phys_obj :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
 	if len(phys_world.objects) < cast(int) id || cast(int) id == -1 do return nil, false;
@@ -116,7 +128,7 @@ draw_hitbox_at :: proc(pos: Vec2, box: ^AABB) {
 	draw_rectangle(pos, cast(Vec2) box^);
 }
 
-draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
+draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}, texture := TEXTURE_INVALID) {
 	obj := phys_obj(obj_id);
 	dcolour: Colour;
 	if colour == {} {
@@ -130,7 +142,10 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 	switch co in obj.collider {
 	case AABB:
 		w_rect := aabb_obj_to_world_rect(obj);
-		draw_rectangle(w_rect.xy, w_rect.zw, col=dcolour);
+		if texture == TEXTURE_INVALID do draw_rectangle(w_rect.xy, w_rect.zw, col=dcolour);
+		else {
+			draw_rectangle_transform(obj, phys_obj_to_rect(obj), colour=dcolour, texture_id=texture)
+		}
 		world := transform_to_world(obj);
 		// draw_rectangle(obj.pos - co/2, co);
 		// box := phys_obj_bounding_box(obj);
@@ -143,7 +158,7 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}) {
 		draw_line(centre, end);
 		// right arrow
 		end = centre + transform_right(&world) * 50;
-		draw_line(centre, end, colour=Colour{0, 255, 0, 255});
+		draw_line(centre, end, colour=Colour{0, 0, 255, 255});
 	}
 }
 
@@ -309,6 +324,59 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 	return rl.Rectangle{}, nil, false;
 }
 
+get_all_collisions_in_world :: proc(
+	obj_id: Physics_Object_Id, 
+	set_pos := MARKER_VEC2, 
+	allocator := context.temp_allocator,
+	layers := COLLISION_LAYERS_ALL,
+) -> (
+	rects: [dynamic]Rect,
+	objs: [dynamic]^Physics_Object,
+	any_hits: bool = false
+) {
+	obj := phys_obj(obj_id)
+	if .No_Collisions in obj.flags do return
+
+	EXPECTED_COLLISIONS :: 5
+
+	rects = make([dynamic]Rect, len=0, cap = EXPECTED_COLLISIONS, allocator=allocator)
+	objs = make([dynamic]^Physics_Object, len=0, cap = EXPECTED_COLLISIONS, allocator=allocator)
+
+	for &other_obj, i in phys_world.objects {
+		if 
+			i == obj_id || .No_Collisions in other_obj.flags
+		{ continue }
+		if obj.collide_with_layers & other_obj.collision_layers == {} do continue
+
+		if layers & other_obj.collision_layers == {} do continue
+		// the shortest length of a line such that these objects may be touching
+		// (i think... am too tired to properly work this out (tracing a line from centre to 'furthest' corner))
+		min_dist := rect_diagonal(phys_obj_bounding_box(obj))/2 + rect_diagonal(phys_obj_bounding_box(&other_obj))/2
+		
+		if linalg.length(phys_obj_world_pos(obj) - phys_obj_world_pos(&other_obj)) > min_dist do continue
+
+		pos: Vec2;
+		if set_pos == MARKER_VEC2 do pos = transform_to_world(obj).pos;
+		else {
+			pos = set_pos;
+		}
+		obj_rect := aabb_obj_to_world_rect(obj);
+		obj_rect.xy = pos - obj_rect.zw / 2;
+
+		r1 := transmute(rl.Rectangle) obj_rect;
+		r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(&other_obj);
+		if check_phys_objects_collide(obj_id, i, first_set_pos = pos) {
+			collision_rect := rl_rectangle_to_rect(rl.GetCollisionRec(r1, r2));
+			append(&rects, collision_rect)
+			append(&objs, &other_obj)
+
+			any_hits = true
+		}
+	}
+
+	return
+}
+
 update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	obj := phys_obj(obj_id);
 	pos := transform_to_world(obj).pos;
@@ -335,21 +403,41 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		obj.acc = {0, EARTH_GRAVITY} * obj.mass;
 	}
 
-	if Physics_Object_Flag.No_Collisions not_in obj.flags {
-		collision_rect, other_obj, ok := get_first_collision_in_world(obj_id, set_pos = next_pos);
-		if ok && .Trigger not_in other_obj.collision_layers {
-			momentum := obj.mass * obj.vel; // vector quantity just to store two scalars
+	if .No_Collisions in obj.flags {
+		setpos(obj, next_pos); // TODO: doesn't work if parented
+		obj.vel = next_vel;
+		return
+	}
+
+	// collision_rect, other_obj, ok := get_first_collision_in_world(obj_id, set_pos = next_pos);
+	// TODO: use an arena boy...
+	rects, objs, hit := get_all_collisions_in_world(obj_id, set_pos = next_pos)
+	if !hit {
+		setpos(obj, next_pos); // TODO: doesn't work if parented
+		obj.vel = next_vel;
+		return
+	}
+
+	for i in 0..<len(rects) {
+		collision_rect := rects[i]
+		if collision_rect == Rect(0) do continue
+
+		other_obj := objs[i]
+		if .Trigger not_in other_obj.collision_layers {
+			momentum := Vec2(0) //obj.mass * obj.vel; // vector quantity just to store two scalars
 
 			other_pos := transform_to_world(other_obj).pos;
 			// use obj.pos instead of next_pos so we know where we came from
 			obj_centre := phys_obj_centre(obj);
 			other_obj_centre := phys_obj_centre(other_obj);
-			move_back := linalg.normalize(obj_centre - other_obj_centre);
+			dist := obj_centre - other_obj_centre
+			if dist == 0 do continue
+			move_back := linalg.normalize(dist);
 
-			if collision_rect.height > MIN_COLLISION_MOVE_BACK && collision_rect.width > collision_rect.height {
+			if collision_rect.w > MIN_COLLISION_MOVE_BACK && collision_rect.z > collision_rect.w {
 				sign := -1.0 if move_back.y < 0.0 else f32(1.0);
-				move_back.y = collision_rect.height * sign;
-				if collision_rect.height > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.y {
+				move_back.y = collision_rect.w * sign;
+				if collision_rect.w > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.y {
 					if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.y) > MIN_SPEED {
 						other_obj.vel.y = momentum.y / other_obj.mass * COLLISION_MOMENTUM_DAMPING;
 						next_vel.y 		= momentum.y / obj.mass * COLLISION_MOMENTUM_DAMPING;
@@ -362,10 +450,10 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				move_back.x = 0.0;
 				next_pos += move_back;
 			}
-			else if collision_rect.width < collision_rect.height && collision_rect.width > MIN_COLLISION_MOVE_BACK {
+			else if collision_rect.z < collision_rect.w && collision_rect.z > MIN_COLLISION_MOVE_BACK {
 				sign := -1.0 if move_back.x < 0.0 else f32(1.0);
-				move_back.x = collision_rect.width * sign;
-				if collision_rect.width > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.x {
+				move_back.x = collision_rect.z * sign;
+				if collision_rect.z > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.x {
 					if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.x) > MIN_SPEED {
 						other_obj.vel.x = momentum.x / other_obj.mass * COLLISION_MOMENTUM_DAMPING;
 						next_vel.x 		= momentum.x / obj.mass * COLLISION_MOMENTUM_DAMPING;
@@ -378,6 +466,16 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				move_back.y = 0.0;
 				next_pos += move_back;
 			}
+			// else {
+			// 	next_pos += collision_rect.wz * Vec2{math.sign(move_back.x), math.sign(move_back.y)}
+			// }
+			// else {				
+			// 	sign := Vec2{f32(-1) if move_back.x < 0 else 1, f32(-1) if move_back.y < 0 else 1} 
+			// 	magnitude := Vec2{collision_rect.width, collision_rect.height}
+			// 	next_pos += sign * magnitude
+			// 	// next_pos = pos
+			// 	// next_vel = Vec2(0)
+			// }
 		}
 	}
 

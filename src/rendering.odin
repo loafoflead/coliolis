@@ -45,13 +45,23 @@ draw_rectangle_transform :: proc(
 	cam_scaled_rect := rect;
 	cam_scaled_rect.xy *= camera.zoom; // TODO: make this a proc in the camera file
 
+	// transform without rotation on the y and x axis
+	aligned_transform := transform_new(transform.pos, transform.rot) 
+
     rlgl.Begin(rlgl.QUADS);
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
         rlgl.Normal3f(0, 0, 1); // TODO: find out what this does
 
-        for i in 0..<len(vertices) {
-        	rlgl.TexCoord2f(uv[i].x, uv[i].y);
-        	rlgl.Vertex2f(vertices[i].x - cam_scaled_rect.x/2, vertices[i].y - cam_scaled_rect.y/2);
+        if aligned_transform != transform^ {
+	        #reverse for vert, i in vertices {
+	        	rlgl.TexCoord2f(uv[i].x, uv[i].y);
+	        	rlgl.Vertex2f(vert.x - cam_scaled_rect.x/2, vert.y - cam_scaled_rect.y/2);
+	        }
+        } else {
+        	for vert, i in vertices {
+	        	rlgl.TexCoord2f(uv[i].x, uv[i].y);
+	        	rlgl.Vertex2f(vert.x - cam_scaled_rect.x/2, vert.y - cam_scaled_rect.y/2);
+	        }
         }
     rlgl.End();
 }

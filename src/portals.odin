@@ -101,10 +101,12 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 		collided := check_phys_objects_collide(portal.obj, collider);
 		if collided && !occupied && is_timer_done("portal_tp") {
-			portal.occupant = collider;
 			obj := phys_obj(collider);
-			portal.occupant_layers = obj.collide_with_layers;
-			obj.collide_with_layers = {.L0};
+			if .Fixed not_in obj.flags {
+				portal.occupant = collider;
+				portal.occupant_layers = obj.collide_with_layers;
+				obj.collide_with_layers = {.L0};
+			}
 		}
 		else {
 			if occupied && !collided {
@@ -117,6 +119,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 		if !occupied do continue;
 
+
 		portal_obj := phys_obj(portal.obj);
 
 		phys_obj(portal_handler.edge_colliders[0]).parent = portal_obj;
@@ -125,6 +128,9 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		if !is_timer_done("portal_tp") do continue;
 
 		obj := phys_obj(occupant_id);
+		// debug_log("%v", obj.collide_with_layers, timed=false);
+
+		// debug_log("%v", obj.collide_with_layers)
 
 		to_occupant_centre := obj.pos - phys_obj_centre(portal_obj);
 		side := linalg.dot(to_occupant_centre, -transform_forward(portal_obj));
@@ -137,12 +143,13 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		portal_mat := portal_obj.mat;
 		obj_mat := obj.mat;
 
-		mirror := Mat4x4 {
-			-1, 0,  0, 0,
-			0, 1, 	0, 0,
-			0, 0, 	1, 0,
-			0, 0, 0, 1,
-		}
+		// mirror := Mat4x4 {
+		// 	-1, 0,  0, 0,
+		// 	0, 1, 	0, 0,
+		// 	0, 0, 	1, 0,
+		// 	0, 0, 0, 1,
+		// }
+		mirror := matrix4_rotate_f32(PI, Y_AXIS);
 
 		obj_local := matrix4_inverse(portal_mat) * obj_mat;
 		relative_to_other_portal := mirror * obj_local;
@@ -159,7 +166,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 			obj.vel = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.vel) + PORTAL_EXIT_SPEED_BOOST);
 			// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
-			transform_reset_rotation_plane(&ntr);
+			// transform_reset_rotation_plane(&ntr);
 			obj.local = ntr;
 			// setpos(obj, ntr.pos);
 

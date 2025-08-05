@@ -35,17 +35,9 @@ free_timers :: proc() {
 
 update_timers :: proc(dt: f32) {
 	for &timer in timers.unnamed {
-		if .Finished in timer.flags {
-			if .Repeating in timer.flags do reset_timer(&timer);
-			else do continue;
-		}
 		if .Update_Automatically in timer.flags 	do update_timer(&timer, dt);
 	}
 	for _, &timer in timers.named {
-		if .Finished in timer.flags {
-			if .Repeating in timer.flags do reset_timer(&timer);
-			else do continue;
-		}
 		if .Update_Automatically in timer.flags 	do update_timer(&timer, dt);
 	}
 }
@@ -101,11 +93,15 @@ ref_is_timer_just_done :: proc(timer: ^Timer) -> bool {
 
 ref_update_timer :: proc(timer: ^Timer, dt: f32) {
 	if is_timer_done(timer) {
+		if .Repeating in timer.flags {
+			reset_timer(timer);
+		}
 		if .Just_Finished in timer.flags do timer.flags -= {.Just_Finished};
-		return;
+	} 
+	else {
+		timer.current += dt;
+		if timer.current >= timer.duration do timer.flags += {.Finished, .Just_Finished};
 	}
-	timer.current += dt;
-	if timer.current >= timer.duration do timer.flags += {.Finished, .Just_Finished};
 }
 
 ref_set_timer_done :: proc(timer: ^Timer) {

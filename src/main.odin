@@ -21,6 +21,8 @@ portal_handler 	: Portal_Handler;
 
 window_width : i32 = 600;
 window_height : i32 = 400;
+
+debug_print: bool = false;
 // --------------   END   --------------
 
 BACKGROUND_COLOUR :: 0x181818;
@@ -62,6 +64,10 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 }
 
 main :: proc() {	
+	when DEBUG do initialise_debugging();
+
+	fmt.println(linalg.normalize(Vec2(0)))
+
 	initialise_camera();
 
 	// TODO: make this not a global?
@@ -77,8 +83,12 @@ main :: proc() {
 	rl.InitWindow(window_width, window_height, "yeah");
 	rl.SetTargetFPS(60);
 
-	five_w, ok := load_texture("5W.png");
-	if !ok do os.exit(1);
+	five_w, ok := load_texture("5W.png")
+	if !ok do os.exit(1)
+
+	dir_tex: Texture_Id
+	dir_tex, ok = load_texture("nesw_sprite.png")
+	if !ok do os.exit(1)
 
 	test_map, tmap_ok := load_tilemap("second_map.tmx");
 	if !tmap_ok do os.exit(1);
@@ -87,7 +97,7 @@ main :: proc() {
 	initialise_portal_handler();
 	defer free_portal_handler();
 
-	player: Player = player_new(five_w);
+	player: Player = player_new(dir_tex);
 
 	portal_handler.portals.x.state += {.Alive};
 	portal_handler.portals.y.state += {.Alive};
@@ -103,6 +113,8 @@ main :: proc() {
 	set_timer_done(player_step_timer);
 
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
+
+	run_physics := true
 
 	test_obj := add_phys_object_aabb(
 		pos = get_screen_centre(), 
@@ -129,8 +141,6 @@ main :: proc() {
 
 	selected_portal: int = 0;
 
-	debug_timer := create_named_timer("debug", 1.0, flags={.Update_Automatically, .Repeating});
-
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
 	for !rl.WindowShouldClose() {
@@ -141,10 +151,6 @@ main :: proc() {
 		rl.DrawFPS(0, 0);
 
 		player_obj:=phys_obj(player.obj);
-
-		if is_timer_done(debug_timer) {
-			// debug printing here
-		}
 
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
 		// for i in 0..<len(phys_world.objects) {
@@ -163,14 +169,17 @@ main :: proc() {
 
 		// draw_phys_obj(a);
 		// draw_phys_obj(b);
-		draw_phys_obj(test_obj);
+		draw_phys_obj(test_obj, texture=dir_tex, colour=Colour(255));
 		// ------------   END   ------------
 
 		// ------------ UPDATING ------------
-		update_phys_world(dt);
-		// update_portals(test_obj);
-		update_portals(player.obj);
+		if run_physics || rl.IsKeyPressed(rl.KeyboardKey.U) do update_phys_world(dt);
+		if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics
+		update_portals(test_obj);
+		// update_portals(player.obj);
 		update_timers(dt);
+
+		when DEBUG do update_debugging(dt);
 		// ------------    END   ------------
 
 		// vvvvvv <- random testing stuff ahead
@@ -275,28 +284,28 @@ main :: proc() {
 			update_timer(player_step_timer, dt);			
 		}
 
-		if rl.IsKeyDown(rl.KeyboardKey.G) {
-			rotate(player_obj, 0.01);
-		}
-		else if rl.IsKeyDown(rl.KeyboardKey.H) {
-			rotate(player_obj, -0.01);
-		}
-		else {
-			if math.abs(player_obj.rot) > 0.3 {
-				// rotate(player_obj, player_obj.rot * 0.01);
-				rotate(player_obj, player_obj.rot * -0.05);
-			}
-			else {
-				player_obj.local = transform_new(player_obj.pos, 0);
-				// setrot(player_obj, 0);
-			}
-			// if player_obj.rot < 0 && player_obj.rot > -linalg.PI {
-			// 	rotate(player_obj, player_obj.rot * 0.01);
-			// }
-			// else if player_obj.rot > 0 && player_obj.rot < linalg.PI {
-			// 	rotate(player_obj, -player_obj.rot * 0.01);
-			// }
-		}
+		// if rl.IsKeyDown(rl.KeyboardKey.G) {
+		// 	rotate(player_obj, 0.01);
+		// }
+		// else if rl.IsKeyDown(rl.KeyboardKey.H) {
+		// 	rotate(player_obj, -0.01);
+		// }
+		// else {
+		// 	if math.abs(player_obj.rot) > 0.3 {
+		// 		// rotate(player_obj, player_obj.rot * 0.01);
+		// 		rotate(player_obj, player_obj.rot * -0.05);
+		// 	}
+		// 	else {
+		// 		player_obj.local = transform_new(player_obj.pos, 0);
+		// 		// setrot(player_obj, 0);
+		// 	}
+		// 	// if player_obj.rot < 0 && player_obj.rot > -linalg.PI {
+		// 	// 	rotate(player_obj, player_obj.rot * 0.01);
+		// 	// }
+		// 	// else if player_obj.rot > 0 && player_obj.rot < linalg.PI {
+		// 	// 	rotate(player_obj, -player_obj.rot * 0.01);
+		// 	// }
+		// }
 		// player.obj.vel += move * PLAYER_SPEED * dt;
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
@@ -342,6 +351,8 @@ main :: proc() {
 		if mouse_move != 0 {
 			camera.zoom += mouse_move * 0.1;
 		}
+
+		when DEBUG do if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
 		
 		rl.EndDrawing();
 	}

@@ -26,17 +26,18 @@ player_new :: proc(texture: Texture_Id) -> Player {
 		pos = get_screen_centre(), 
 		mass = kg(PLAYER_WEIGHT_KG), 
 		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
-		flags = {.Drag_Exception}, 
+		flags = {.Drag_Exception},
+		collide_with = {.Default, .L0},
 	);
 	player.texture = texture;
 	return player;
 }
 
 draw_player :: proc(player: ^Player) {
-	draw_phys_obj(player.obj);
-	// obj:=phys_obj(player.obj);
+	obj:=phys_obj(player.obj);
 	// r := phys_obj_to_rect(obj).zw;
-	// draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);
+	draw_phys_obj(player.obj);
+	draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);
 	// draw_texture(player.texture, obj.pos, pixel_scale=phys_obj_to_rect(obj).zw);	
 	// draw_rectangle(obj.pos - r/2, r);	
 }

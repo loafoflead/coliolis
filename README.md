@@ -90,6 +90,7 @@ The game itself is currently unfinished, any controls or gameplay listed below c
 - F 			: flip facing direction of selected portal
 - LEFT, RIGHT 	: rotate selected portal by 90 degrees in either direction
 - G, H 			: rotate player object in the left or right direction while held
+- B 			: enable continuous debug printing
 
 ## Mouse
 

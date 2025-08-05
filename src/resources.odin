@@ -6,7 +6,8 @@ import "core:fmt";
 
 ASSETS_PATH :: "./assets";
 
-Texture_Id :: distinct int;
+Texture_Id :: distinct int
+TEXTURE_INVALID :: Texture_Id(-1)
 
 Resources :: struct #no_copy {
 	textures: [dynamic]rl.Texture2D,
