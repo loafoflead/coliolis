@@ -150,6 +150,8 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		// 	0, 0, 0, 1,
 		// }
 		mirror := matrix4_rotate_f32(PI, Y_AXIS);
+		for i in 0..<3 do mirror[i, 3] = 0
+		for i in 0..<3 do mirror[3, i] = 0
 
 		obj_local := matrix4_inverse(portal_mat) * obj_mat;
 		relative_to_other_portal := mirror * obj_local;

@@ -1,6 +1,7 @@
 package main;
 
 import rl "thirdparty/raylib";
+import rlgl "thirdparty/raylib/rlgl"
 import "core:math";
 import "core:fmt";
 import "core:mem";
@@ -80,8 +81,10 @@ main :: proc() {
 	initialise_timers();
 	defer free_timers();
 
-	rl.InitWindow(window_width, window_height, "yeah");
-	rl.SetTargetFPS(60);
+	rl.InitWindow(window_width, window_height, "yeah")
+	rl.SetTargetFPS(60)
+	// Note: neccessary so that sprites flipped by portal travel get rendered
+	rlgl.DisableBackfaceCulling()
 
 	five_w, ok := load_texture("5W.png")
 	if !ok do os.exit(1)
@@ -175,8 +178,8 @@ main :: proc() {
 		// ------------ UPDATING ------------
 		if run_physics || rl.IsKeyPressed(rl.KeyboardKey.U) do update_phys_world(dt);
 		if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics
-		update_portals(test_obj);
-		// update_portals(player.obj);
+		// update_portals(test_obj);
+		update_portals(player.obj);
 		update_timers(dt);
 
 		when DEBUG do update_debugging(dt);

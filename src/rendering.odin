@@ -46,7 +46,7 @@ draw_rectangle_transform :: proc(
 	cam_scaled_rect.xy *= camera.zoom; // TODO: make this a proc in the camera file
 
 	// transform without rotation on the y and x axis
-	aligned_transform := transform_new(transform.pos, transform.rot) 
+	aligned_transform := transform_new(transform.pos, transform.rot)
 
     rlgl.Begin(rlgl.QUADS);
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
