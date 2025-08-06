@@ -1,7 +1,12 @@
 package main;
 
-PLAYER_HORIZ_ACCEL :: 10_000.0; // pixels per second
-PLAYER_JUMP_STR :: 100.0; // idk
+import "core:math"
+import "core:math/ease";
+
+import rl "thirdparty/raylib"
+
+PLAYER_HORIZ_ACCEL :: 20_000.0; // pixels per second
+PLAYER_JUMP_STR :: 300.0; // idk
 
 PLAYER_WIDTH :: 32;
 PLAYER_HEIGHT :: 32;
@@ -13,6 +18,15 @@ PLAYER_STEP_UP_HEIGHT :: 20;
 Player :: struct {
 	obj: Physics_Object_Id,
 	texture: Texture_Id,
+	step_timer: Timer,
+
+	lerp_origin, lerp_target: Vec2, 
+
+
+	in_air: bool,
+	jump_timer: Timer,
+	jumping: bool,
+	coyote_timer: Timer,
 }
 
 player_feet :: proc(player: ^Player) -> Vec2 {
@@ -30,7 +44,116 @@ player_new :: proc(texture: Texture_Id) -> Player {
 		collide_with = {.Default, .L0},
 	);
 	player.texture = texture;
+
+	player.step_timer = timer_new(0.2)
+	set_timer_done(&player.step_timer)
+
+	player.coyote_timer = timer_new(0.2)
+	player.jump_timer = timer_new(0.25)
+
 	return player;
+}
+
+update_player :: proc(player: ^Player, dt: f32) {
+	player_obj:=phys_obj(player.obj);
+
+	move: f32 = 0.0;
+	if rl.IsKeyDown(rl.KeyboardKey.D) {
+		move +=  1;
+	}
+	if rl.IsKeyDown(rl.KeyboardKey.A) {
+		move += -1;
+	}
+
+	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
+		if !player.in_air || !is_timer_done(&player.coyote_timer) {
+			player.jumping = true;
+			if !is_timer_done(&player.coyote_timer) do set_timer_done(&player.coyote_timer);
+		}
+	}
+	if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
+		if player.jumping && !is_timer_done(&player.jump_timer) {
+			player_obj.vel.y = -PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current));
+			update_timer(&player.jump_timer, dt);
+		}
+	}
+	else {
+		player.jumping = false;
+	}
+
+	if phys_obj_grounded(player.obj) {
+		player.in_air = false;
+		reset_timer(&player.jump_timer);
+		reset_timer(&player.coyote_timer);
+	}
+	else {
+		update_timer(&player.coyote_timer, dt);
+		player.in_air = true;
+	}
+
+
+	if move != 0.0 && is_timer_done(&player.step_timer) {
+		dir := Vec2 { move, 0 };
+		ahead_of_feet := player_feet(player) + dir * 20;
+		ahead_of_knees := player_feet(player) + -Y_AXIS.xy * PLAYER_STEP_UP_HEIGHT + dir * 20;
+		draw_line(player_feet(player), ahead_of_feet, Colour{255, 0, 0, 255});
+		draw_line(player_feet(player), ahead_of_knees, Colour{0, 0, 255, 255});
+		_, _, hit_inside_body := point_collides_in_world(player_feet(player), layers = {.Default, .L0}, exclude = {player.obj});
+		_, _, hit_feet := point_collides_in_world(ahead_of_feet, layers = {.Default, .L0});
+		_, _, too_high := point_collides_in_world(ahead_of_knees, layers = {.Default, .L0});
+		if !hit_inside_body && hit_feet && !too_high {
+			// og := player_obj.pos + dir * 20;
+			draw_line(player_obj.pos, ahead_of_knees, Colour{0, 255, 0, 255});
+
+			col, hit := cast_ray_in_world(ahead_of_knees, Y_AXIS.xy);
+			if hit && col.distance > 1 {
+				reset_timer(&player.step_timer);
+				player_obj.flags += {.Non_Kinematic, .No_Collisions}
+				player.lerp_origin = player_obj.pos;
+				player.lerp_target = (transmute(Vec3) col.point).xy - Vec2{0, phys_obj_to_rect(player_obj).w/2};
+			}
+		}
+	}
+
+	if move != 0.0 && is_timer_done(&player.step_timer) {
+		player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
+	}
+	else {
+		player_obj.acc.x = 0.0;
+	}
+
+	if !is_timer_done(&player.step_timer) {
+		player_obj.pos = player.lerp_origin + (player.lerp_target - player.lerp_origin) * ease.ease(ease.Ease.Circular_In, timer_fraction(&player.step_timer)); 
+		update_timer(&player.step_timer, dt);
+	}
+
+	if is_timer_just_done(&player.step_timer) {
+		player_obj.flags -= {.Non_Kinematic, .No_Collisions}
+		update_timer(&player.step_timer, dt);			
+	}
+
+	if rl.IsKeyDown(rl.KeyboardKey.G) {
+		rotate(player_obj, 0.01);
+	}
+	else if rl.IsKeyDown(rl.KeyboardKey.H) {
+		rotate(player_obj, -0.01);
+	}
+	else {
+		if math.abs(player_obj.rot) > 0.1 {
+			// rotate(player_obj, player_obj.rot * 0.01);
+			rotate(player_obj, player_obj.rot * -0.05);
+		}
+		else {
+			player_obj.local = transform_new(player_obj.pos, 0);
+			// setrot(player_obj, 0);
+		}
+		// if player_obj.rot < 0 && player_obj.rot > -linalg.PI {
+		// 	rotate(player_obj, player_obj.rot * 0.01);
+		// }
+		// else if player_obj.rot > 0 && player_obj.rot < linalg.PI {
+		// 	rotate(player_obj, -player_obj.rot * 0.01);
+		// }
+	}
 }
 
 draw_player :: proc(player: ^Player) {

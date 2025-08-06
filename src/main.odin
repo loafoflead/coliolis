@@ -6,7 +6,6 @@ import "core:math";
 import "core:fmt";
 import "core:mem";
 
-import "core:math/ease";
 import "core:math/linalg";
 
 import "core:os";
@@ -105,17 +104,11 @@ main :: proc() {
 	portal_handler.portals.x.state += {.Alive};
 	portal_handler.portals.y.state += {.Alive};
 
-	in_air: bool;
-	jump_timer := get_temp_timer(0.2);
-	jumping: bool;
-	coyote_timer := get_temp_timer(0.25);
-
-	player_step_target: Vec2;
-	player_step_origin: Vec2;
-	player_step_timer := get_temp_timer(0.2);
-	set_timer_done(player_step_timer);
-
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
+
+	when DEBUG {
+		debug_mode := false
+	}
 
 	run_physics := true
 
@@ -143,6 +136,8 @@ main :: proc() {
 	pointer : Vec2;
 
 	selected_portal: int = 0;
+
+	collision: rl.RayCollision
 
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
@@ -179,15 +174,14 @@ main :: proc() {
 		if run_physics || rl.IsKeyPressed(rl.KeyboardKey.U) do update_phys_world(dt);
 		if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics
 		// update_portals(test_obj);
-		update_portals(player.obj);
-		update_timers(dt);
+		update_portals(player.obj)
+		update_timers(dt)
+		update_player(&player, dt)
 
 		when DEBUG do update_debugging(dt);
 		// ------------    END   ------------
 
 		// vvvvvv <- random testing stuff ahead
-
-		phys_obj(a).rot += 1 * dt;
 
 		rotate_dir: f32;
 		portal_obj := phys_obj(portal_handler.portals[selected_portal].obj);
@@ -212,104 +206,7 @@ main :: proc() {
 			camera.pos += 0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos);
 		}
 
-		move: f32 = 0.0;
-		if rl.IsKeyDown(rl.KeyboardKey.D) {
-			move +=  1;
-		}
-		if rl.IsKeyDown(rl.KeyboardKey.A) {
-			move += -1;
-		}
-
-		if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-			if !in_air || !is_timer_done(coyote_timer) {
-				jumping = true;
-				if !is_timer_done(coyote_timer) do set_timer_done(coyote_timer);
-			}
-		}
-		if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
-			if jumping && !is_timer_done(jump_timer) {
-				player_obj.vel.y = -PLAYER_JUMP_STR * (1 - ease.exponential_out(jump_timer.current));
-				update_timer(jump_timer, dt);
-			}
-		}
-		else {
-			jumping = false;
-		}
-
-		if phys_obj_grounded(player.obj) {
-			in_air = false;
-			reset_timer(jump_timer);
-			reset_timer(coyote_timer);
-		}
-		else {
-			update_timer(coyote_timer, dt);
-			in_air = true;
-		}
-
-
-		if move != 0.0 && is_timer_done(player_step_timer) {
-			dir := Vec2 { move, 0 };
-			ahead_of_feet := player_feet(&player) + dir * 20;
-			ahead_of_knees := player_feet(&player) + -Y_AXIS.xy * PLAYER_STEP_UP_HEIGHT + dir * 20;
-			draw_line(player_feet(&player), ahead_of_feet, Colour{255, 0, 0, 255});
-			draw_line(player_feet(&player), ahead_of_knees, Colour{0, 0, 255, 255});
-			_, _, hit_inside_body := point_collides_in_world(player_feet(&player), layers = {.Default, .L0}, exclude = {player.obj});
-			_, _, hit_feet := point_collides_in_world(ahead_of_feet, layers = {.Default, .L0});
-			_, _, too_high := point_collides_in_world(ahead_of_knees, layers = {.Default, .L0});
-			if !hit_inside_body && hit_feet && !too_high {
-				// og := player_obj.pos + dir * 20;
-				draw_line(player_obj.pos, ahead_of_knees, Colour{0, 255, 0, 255});
-
-				col, hit := cast_ray_in_world(ahead_of_knees, Y_AXIS.xy);
-				if hit && col.distance > 1 {
-					reset_timer(player_step_timer);
-					player_obj.flags += {.Non_Kinematic, .No_Collisions}
-					player_step_origin = player_obj.pos;
-					player_step_target = (transmute(Vec3) col.point).xy - Vec2{0, phys_obj_to_rect(player_obj).w/2};
-				}
-			}
-		}
-
-		if move != 0.0 && is_timer_done(player_step_timer) {
-			player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
-		}
-		else {
-			player_obj.acc.x = 0.0;
-		}
-
-		if !is_timer_done(player_step_timer) {
-			player_obj.pos = player_step_origin + (player_step_target - player_step_origin) * ease.ease(ease.Ease.Circular_In, timer_fraction(player_step_timer)); 
-			update_timer(player_step_timer, dt);
-		}
-
-		if is_timer_just_done(player_step_timer) {
-			player_obj.flags -= {.Non_Kinematic, .No_Collisions}
-			update_timer(player_step_timer, dt);			
-		}
-
-		// if rl.IsKeyDown(rl.KeyboardKey.G) {
-		// 	rotate(player_obj, 0.01);
-		// }
-		// else if rl.IsKeyDown(rl.KeyboardKey.H) {
-		// 	rotate(player_obj, -0.01);
-		// }
-		// else {
-		// 	if math.abs(player_obj.rot) > 0.3 {
-		// 		// rotate(player_obj, player_obj.rot * 0.01);
-		// 		rotate(player_obj, player_obj.rot * -0.05);
-		// 	}
-		// 	else {
-		// 		player_obj.local = transform_new(player_obj.pos, 0);
-		// 		// setrot(player_obj, 0);
-		// 	}
-		// 	// if player_obj.rot < 0 && player_obj.rot > -linalg.PI {
-		// 	// 	rotate(player_obj, player_obj.rot * 0.01);
-		// 	// }
-		// 	// else if player_obj.rot > 0 && player_obj.rot < linalg.PI {
-		// 	// 	rotate(player_obj, -player_obj.rot * 0.01);
-		// 	// }
-		// }
-		// player.obj.vel += move * PLAYER_SPEED * dt;
+		
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
 			pointer = get_world_mouse_pos();
@@ -317,45 +214,74 @@ main :: proc() {
 		else if rl.IsKeyPressed(rl.KeyboardKey.C) do pointer = get_world_screen_centre();
 		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.05, 0.05});
 
-		selected_obj, any_selected := phys_obj(selected);
-		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
-			obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos());
-			if ok && .Fixed not_in obj.flags {
-				og_flags = obj.flags;
-				obj.flags |= {.Non_Kinematic, .Fixed};
-				selected = obj_id;
+		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+			hit: bool
+			collision, hit = cast_ray_in_world(
+				player_obj.pos, 
+				linalg.normalize(get_world_mouse_pos() - phys_obj_world_pos(player_obj)),
+				layers = {.Portal_Surface}
+			)
+			if hit {
+				prtl_obj := phys_obj(portal_handler.portals[selected_portal].obj)
+				og := Vec3{collision.point.x, collision.point.y, 0}
+				pt := og + Vec3{collision.normal.x, collision.normal.y, 0}
+				prtl_obj.local.mat = 
+					linalg.matrix4_look_at_f32(og, og + pt * 10, Z_AXIS)
+				// transform_reset_rotation_plane(prtl_obj)
+				// transform_update(portal_obj)
+				setpos(prtl_obj, collision.point.xy)
 			}
 		}
-		if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
-			selected_obj.flags = og_flags;
-			selected_obj.vel = (get_world_mouse_pos() - mouse_last_pos) * 100;
-			// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
-			selected = -1;
-		}
-		if any_selected {
-			// FIXME: doesn't work with parent transforms
-			setpos(selected_obj, get_world_mouse_pos());
-			mouse_last_pos = get_world_mouse_pos();
+		if collision.hit {
+			draw_line(collision.point.xy, collision.point.xy + collision.normal.xy * 100, Colour{1 = 255, 3 = 255})
 		}
 
-		if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
-			dragging = true;
-			drag_og = camera.pos + get_mouse_pos();
-			follow_player = false;
-		}
-		if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
-			dragging = false;
-		}
-		if dragging {
-			camera.pos = drag_og - get_mouse_pos();
+when DEBUG {
+		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
+
+		if debug_mode {
+			selected_obj, any_selected := phys_obj(selected);
+			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
+				obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos());
+				if ok && .Fixed not_in obj.flags {
+					og_flags = obj.flags;
+					obj.flags |= {.Non_Kinematic, .Fixed};
+					selected = obj_id;
+				}
+			}
+			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
+				selected_obj.flags = og_flags;
+				selected_obj.vel = (get_world_mouse_pos() - mouse_last_pos) * 100;
+				// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
+				selected = -1;
+			}
+			if any_selected {
+				// FIXME: doesn't work with parent transforms
+				setpos(selected_obj, get_world_mouse_pos());
+				mouse_last_pos = get_world_mouse_pos();
+			}
+
+			if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
+				dragging = true;
+				drag_og = camera.pos + get_mouse_pos();
+				follow_player = false;
+			}
+			if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
+				dragging = false;
+			}
+			if dragging {
+				camera.pos = drag_og - get_mouse_pos();
+			}
+
+			mouse_move := rl.GetMouseWheelMove();
+			if mouse_move != 0 {
+				camera.zoom += mouse_move * 0.1;
+			}
+
+			if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
 		}
 
-		mouse_move := rl.GetMouseWheelMove();
-		if mouse_move != 0 {
-			camera.zoom += mouse_move * 0.1;
-		}
-
-		when DEBUG do if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
+} // when DEBUG
 		
 		rl.EndDrawing();
 	}

@@ -27,7 +27,7 @@ draw_rectangle_transform :: proc(
 		transform: ^Transform, 
 		rect: Rect, 
 		colour: Colour = Colour(255),
-		texture_id: Texture_Id = -1,
+		texture_id := TEXTURE_INVALID,
 		uv: [4]Vec2 = UV_FULL_IMAGE,
 ) {
 	vertices := rect_to_points(rect);
@@ -37,7 +37,7 @@ draw_rectangle_transform :: proc(
 		vert = world_pos_to_screen_pos(camera, vert);
 	}
 
-	if texture_id != -1 {
+	if texture_id != TEXTURE_INVALID {
 		rlgl.SetTexture(resources.textures[texture_id].id);
 	}
 	else do rlgl.SetTexture(rlgl.GetTextureIdDefault());

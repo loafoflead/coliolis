@@ -23,6 +23,14 @@ Timer :: struct {
 	flags: bit_set[Timer_Flags],
 }
 
+timer_new :: proc(duration: f32, current := f32(0), flags : bit_set[Timer_Flags] = {}) -> Timer {
+	return Timer {
+		duration = duration,
+		current = current,
+		flags = flags
+	}
+}
+
 initialise_timers :: proc() {
 	timers.named = make(map[string]Timer);
 	timers.timer_index = 0;

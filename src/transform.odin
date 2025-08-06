@@ -62,7 +62,6 @@ setrot :: proc(transform: ^Transform, radians: f32) {
 	// transform^ = new;
 }
 
-@private
 transform_update :: proc(transform: ^Transform) {
 	transform.pos = pos(transform);
 	transform.rot = rot(transform);

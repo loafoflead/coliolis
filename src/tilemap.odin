@@ -28,6 +28,7 @@ generate_static_physics_for_tilemap :: proc(tilemap: int, layer: int) {
 					cast(f32) tileset.tileheight 
 				},
 				flags = {.Non_Kinematic, .No_Gravity, .Fixed},
+				collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface}
 			);
 		}
 	}

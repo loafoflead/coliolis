@@ -28,9 +28,15 @@ MIN_COLLISION_MOVE_BACK :: 0.001;
 // TODO: distinct
 Physics_Object_Id :: int; 
 Collision_Layer :: enum {
-	Default, Trigger, L0, L1,
+	Default,
+	Trigger,
+	Portal_Surface,
+	L0, L1,
 }
-COLLISION_LAYERS_ALL: bit_set[Collision_Layer] : {.Default, .Trigger, .L0, .L1};
+COLLISION_LAYERS_ALL: bit_set[Collision_Layer] : {.Default, .Trigger, .Portal_Surface, .L0, .L1};
+
+PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer] { .Default, .Trigger }
+PHYS_OBJ_DEFAULT_COLLISION_LAYERS 	  :: bit_set[Collision_Layer] { .Default }
 
 AABB :: [2]f32;
 
@@ -142,10 +148,7 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}, text
 	switch co in obj.collider {
 	case AABB:
 		w_rect := aabb_obj_to_world_rect(obj);
-		if texture == TEXTURE_INVALID do draw_rectangle(w_rect.xy, w_rect.zw, col=dcolour);
-		else {
-			draw_rectangle_transform(obj, phys_obj_to_rect(obj), colour=dcolour, texture_id=texture)
-		}
+		draw_rectangle_transform(obj, phys_obj_to_rect(obj), colour=dcolour, texture_id=texture)
 		world := transform_to_world(obj);
 		// draw_rectangle(obj.pos - co/2, co);
 		// box := phys_obj_bounding_box(obj);
@@ -424,7 +427,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 
 		other_obj := objs[i]
 		if .Trigger not_in other_obj.collision_layers {
-			momentum := Vec2(0) //obj.mass * obj.vel; // vector quantity just to store two scalars
+			momentum := obj.mass * obj.vel; // vector quantity just to store two scalars
 
 			other_pos := transform_to_world(other_obj).pos;
 			// use obj.pos instead of next_pos so we know where we came from
@@ -517,8 +520,8 @@ add_phys_object_aabb :: proc(
 	acc:   Vec2 = Vec2{},
 	parent: ^Transform = nil,
 	flags: bit_set[Physics_Object_Flag] = {},
-	collision_layers: bit_set[Collision_Layer] = {.Default},
-	collide_with: bit_set[Collision_Layer] = {.Default, .Trigger},
+	collision_layers: bit_set[Collision_Layer] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+	collide_with: bit_set[Collision_Layer] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
 ) -> (id: Physics_Object_Id)
 {
 	local := transform_new(pos, rot=0, parent=parent);
