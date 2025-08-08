@@ -7,6 +7,9 @@ import "core:math";
 	import "core:fmt";
 // }
 
+Rad :: distinct f32
+Deg :: distinct f32 // TODO: not needed(?)
+
 Mat3x3 :: linalg.Matrix3f32;
 Mat4x4 :: linalg.Matrix4f32;
 Mat2x2 :: linalg.Matrix2f32;
@@ -22,13 +25,13 @@ Z_AXIS :: Vec3 {0, 0, 1};
 
 Transform :: struct {
 	pos: Vec2,
-	rot: f32,
+	rot: Rad,
 	mat: Mat4x4,
 	// TODO: this pointer is invalidated if the parent is updated... :(
 	parent: ^Transform,
 }
 
-transform_new :: proc(pos: Vec2, rot: f32, parent: ^Transform = nil) -> Transform {
+transform_new :: proc(pos: Vec2, rot: Rad, parent: ^Transform = nil) -> Transform {
 	new := transform_from_matrix(linalg.MATRIX4F32_IDENTITY);
 	rotate(&new, rot);
 	setpos(&new, pos);
@@ -41,34 +44,48 @@ transform_reset_rotation_plane :: proc(transform: ^Transform) {
 	transform^ = new;
 }
 
-rotate :: proc(transform: ^Transform, radians: f32) {
-	transform.mat = transform.mat * linalg.matrix4_rotate_f32(radians, Z_AXIS);
-	transform_update(transform);
+rotate :: proc(transform: ^Transform, radians: Rad) {
+	transform.mat = transform.mat * linalg.matrix4_rotate_f32(f32(radians), Z_AXIS);
+	transform_align(transform);
 }
 
 move :: proc(transform: ^Transform, delta: Vec2) {
 	transform.mat[3].xy += delta;
-	transform_update(transform);
+	transform_align(transform);
 }
 
 setpos :: proc(transform: ^Transform, pos: Vec2) {
 	transform.mat[3].xy = pos;
-	transform_update(transform);
+	transform_align(transform);
 }
 
-setrot :: proc(transform: ^Transform, radians: f32) {
-	unimplemented();
-	// new := transform_new(transform.pos, radians);
-	// transform^ = new;
+setrot :: proc(transform: ^Transform, radians: Rad) {
+	// z-axis rot:
+	// cos(a) -sin(a) .. ..
+	// sin(a) cos(a)  .. ..
+	// ..  	  ..	  .. ..
+	// 0 	  0 	  0  0
+	rads := f32(radians)
+	transform.mat[0,0] = math.cos(rads)
+	transform.mat[1,0] = -math.sin(rads)
+
+	transform.mat[1,1] = math.cos(rads)
+	transform.mat[0,1] = math.sin(rads)
+	transform_align(transform)
 }
 
-transform_update :: proc(transform: ^Transform) {
+// realigns 'accessible' fields pos and rot to reflect the matrix
+// state of the structure
+// this is to allow users to do transform.rot and transform.pos, 
+// but it's stupid and outdated, only added bc i was too lazy to go 
+// everywhere to change it, will remove it (or not...)
+transform_align :: proc(transform: ^Transform) {
 	transform.pos = pos(transform);
 	transform.rot = rot(transform);
 }
 
-rot :: proc(transform: ^Transform) -> f32 {
-	return math.atan2(transform.mat[0][1], transform.mat[0][0]);
+rot :: proc(transform: ^Transform) -> Rad {
+	return Rad(math.atan2(transform.mat[0][1], transform.mat[0][0]));
 }
 
 pos :: proc(transform: ^Transform) -> Vec2 {
@@ -88,8 +105,14 @@ pos :: proc(transform: ^Transform) -> Vec2 {
 // }
 
 transform_flip :: proc(transform: ^Transform) -> Transform {
-	rot := linalg.matrix4_rotate_f32(linalg.PI, Y_AXIS);
-	return transform_from_matrix(transform.mat * rot);
+	mirror := linalg.matrix4_rotate_f32(linalg.PI, Y_AXIS);
+	for i in 0..<3 do mirror[i, 3] = 0
+	for i in 0..<3 do mirror[3, i] = 0
+
+	mirrored := transform.mat * mirror;
+
+	ntr := transform_from_matrix(mirrored);
+	return ntr;
 }
 
 transform_forward :: proc(transform: ^Transform) -> Vec2 {
@@ -116,7 +139,7 @@ transform_from_matrix :: proc(mat: Mat4x4) -> Transform {
 	t := Transform {
 		mat = mat
 	};
-	transform_update(&t);
+	transform_align(&t);
 	return t;
 }
 

@@ -84,6 +84,7 @@ main :: proc() {
 	rl.SetTargetFPS(60)
 	// Note: neccessary so that sprites flipped by portal travel get rendered
 	rlgl.DisableBackfaceCulling()
+	rl.SetWindowState({.WINDOW_RESIZABLE})
 
 	five_w, ok := load_texture("5W.png")
 	if !ok do os.exit(1)
@@ -139,6 +140,9 @@ main :: proc() {
 
 	collision: rl.RayCollision
 
+	target: Vec3
+	spin: f32
+
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
 	for !rl.WindowShouldClose() {
@@ -183,6 +187,20 @@ main :: proc() {
 
 		// vvvvvv <- random testing stuff ahead
 
+		spin += 1 * dt
+		target = Vec3 { math.cos(spin), math.sin(spin), 0 }
+		draw_line(Vec2(0), target.xy * 50, Colour(255))
+
+		// mat := 
+		// 	linalg.matrix3_look_at_f32(Vec3(0), target, Z_AXIS)
+		// quat := linalg.quaternion_from_matrix3_f32(mat)
+		quat := linalg.quaternion_look_at(Vec3(0), target, Z_AXIS)
+		// facing := linalg.yaw_from_quaternion(quat)
+		x, y, z := linalg.euler_angles_xyz_from_quaternion(quat)
+		facing := -z + linalg.PI/2
+		draw_line(Vec2(0), Vec2 { math.cos(facing), math.sin(facing) } * 100, Colour{2..<4 = 255})
+		// draw_line(Vec2(0), Vec2{mat[0, 0], mat[0, 1]} * 100, Colour{3=255, 2=255})
+
 		rotate_dir: f32;
 		portal_obj := phys_obj(portal_handler.portals[selected_portal].obj);
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT) {
@@ -196,7 +214,7 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.F) {
 			portal_obj.local = transform_flip(portal_obj);
 		}
-		rotate(portal_obj, rotate_dir * math.PI/2);
+		rotate(portal_obj, Rad(rotate_dir * math.PI/2));
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_ALT) do selected_portal = 1 - selected_portal;
 
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
@@ -225,8 +243,15 @@ main :: proc() {
 				prtl_obj := phys_obj(portal_handler.portals[selected_portal].obj)
 				og := Vec3{collision.point.x, collision.point.y, 0}
 				pt := og + Vec3{collision.normal.x, collision.normal.y, 0}
-				prtl_obj.local.mat = 
-					linalg.matrix4_look_at_f32(og, og + pt * 10, Z_AXIS)
+				quat := linalg.quaternion_look_at(og, pt, Z_AXIS)
+
+				// facing := linalg.yaw_from_quaternion(quat)
+				x, y, z := linalg.euler_angles_xyz_from_quaternion(quat)
+				facing := z + linalg.PI/2
+				setrot(prtl_obj, Rad(facing))
+				prtl_obj.local = transform_flip(prtl_obj)
+				// prtl_obj.local.mat =
+				// 	linalg.matrix4_look_at_f32(og, og + pt * 10, Z_AXIS)
 				// transform_reset_rotation_plane(prtl_obj)
 				// transform_update(portal_obj)
 				setpos(prtl_obj, collision.point.xy)
@@ -235,6 +260,8 @@ main :: proc() {
 		if collision.hit {
 			draw_line(collision.point.xy, collision.point.xy + collision.normal.xy * 100, Colour{1 = 255, 3 = 255})
 		}
+		// setrot(phys_obj(portal_handler.portals[selected_portal].obj), Rad(-spin))
+
 
 when DEBUG {
 		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode

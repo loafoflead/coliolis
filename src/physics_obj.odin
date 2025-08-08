@@ -148,8 +148,8 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}, text
 	switch co in obj.collider {
 	case AABB:
 		w_rect := aabb_obj_to_world_rect(obj);
-		draw_rectangle_transform(obj, phys_obj_to_rect(obj), colour=dcolour, texture_id=texture)
 		world := transform_to_world(obj);
+		draw_rectangle_transform(&world, phys_obj_to_rect(obj), colour=dcolour, texture_id=texture)
 		// draw_rectangle(obj.pos - co/2, co);
 		// box := phys_obj_bounding_box(obj);
 		// draw_rectangle(world.pos - box.zw / 2, box.zw, col=dcolour);
@@ -482,8 +482,13 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		}
 	}
 
-	setpos(obj, next_pos); // TODO: doesn't work if parented
-	obj.vel = next_vel;
+	if linalg.length(next_vel) < MIN_SPEED {
+		next_vel = 0
+	}
+	else {
+		setpos(obj, next_pos); // TODO: doesn't work if parented
+		obj.vel = next_vel;
+	}
 }
 
 phys_obj_grounded :: proc(obj_id: int) -> bool {
