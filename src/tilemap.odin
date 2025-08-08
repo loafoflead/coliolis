@@ -9,9 +9,9 @@ Tilemap :: struct {
 }
 
 
-generate_static_physics_for_tilemap :: proc(tilemap: int, layer: int) {
-	tileset := resources.tilemaps[tilemap].tileset;
-	layer := resources.tilemaps[tilemap].layers[layer];
+generate_static_physics_for_tilemap :: proc(id: Tilemap_Id, layer: int) {
+	tileset := tilemap(id).tileset;
+	layer := tilemap(id).layers[layer];
 	for y in 0..<layer.height {
 		for x in 0..<layer.width {
 			tile := layer.data[y * layer.width + x];
@@ -38,24 +38,26 @@ generate_texture_for_tilemap :: proc(tilemap: ^Tilemap) -> bool {
 	unimplemented();
 }
 
-draw_tilemap :: proc(index: int, pos: Vec2) {
+draw_tilemap :: proc(id: Tilemap_Id, pos: Vec2) {
 	// TODO: blit the entire tilemap into a texture and draw that instead of doing this every frame
-	src_idx := resources.tilemaps[index].texture_id;
-	tileset := resources.tilemaps[index].tileset;
+	src_idx := tilemap(id).texture_id;
+	tileset := tilemap(id).tileset;
 	DRAWN_LAYER :: 0;
-	layer := resources.tilemaps[index].layers[DRAWN_LAYER];
+	layer := tilemap(id).layers[DRAWN_LAYER];
 	for y in 0..<layer.height {
 		for x in 0..<layer.width {
-			tile := layer.data[y * layer.width + x];
+			tile := layer.data[y * layer.width + x]
+			tile_id := uint(tile)
+
 			// NOTE: zero seems to mean nothing, so all offsets have one added to them
-			if tile == 0 do continue;
-			tile -= 1;
+			if tile_id == 0 do continue;
+			tile_id -= 1;
 			// TODO: figure out what these magic values mean
-			if tile >= 1610612788 do continue; //tile == 1610612806 || tile == 1610612807 || tile == 1610612797 || tile == 1610612788 do continue;
+			if tile_id >= 1610612788 do continue; //tile == 1610612806 || tile == 1610612807 || tile == 1610612797 || tile == 1610612788 do continue;
 
 			// the index of the tile in the source image
-			tile_x := tile % tileset.columns;
-			tile_y := (tile - tile_x) / (tileset.columns);
+			tile_x := tile_id % tileset.columns;
+			tile_y := (tile_id - tile_x) / (tileset.columns);
 
 			tile_pos := pos + Vec2 {cast(f32)x, cast(f32)y} * Vec2 {cast(f32)tileset.tilewidth, cast(f32)tileset.tileheight};
 			drawn_portion := Rect { 

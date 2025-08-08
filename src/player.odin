@@ -11,7 +11,7 @@ PLAYER_JUMP_STR :: 300.0; // idk
 PLAYER_WIDTH :: 32;
 PLAYER_HEIGHT :: 32;
 
-PLAYER_WEIGHT_KG :: 5;
+PLAYER_WEIGHT_KG :: 3;
 
 PLAYER_STEP_UP_HEIGHT :: 20;
 
@@ -138,22 +138,22 @@ update_player :: proc(player: ^Player, dt: f32) {
 	else if rl.IsKeyDown(rl.KeyboardKey.H) {
 		rotate(player_obj, -0.01);
 	}
-	else {
-		if math.abs(player_obj.rot) > 0.1 {
-			// rotate(player_obj, player_obj.rot * 0.01);
-			rotate(player_obj, player_obj.rot * -0.05);
-		}
-		else {
-			player_obj.local = transform_new(player_obj.pos, 0);
-			// setrot(player_obj, 0);
-		}
-		// if player_obj.rot < 0 && player_obj.rot > -linalg.PI {
-		// 	rotate(player_obj, player_obj.rot * 0.01);
-		// }
-		// else if player_obj.rot > 0 && player_obj.rot < linalg.PI {
-		// 	rotate(player_obj, -player_obj.rot * 0.01);
-		// }
-	}
+	// else {
+	// 	if math.abs(player_obj.rot) > 0.1 {
+	// 		// rotate(player_obj, player_obj.rot * 0.01);
+	// 		rotate(player_obj, player_obj.rot * -0.05);
+	// 	}
+	// 	else {
+	// 		player_obj.local = transform_new(player_obj.pos, 0);
+	// 		// setrot(player_obj, 0);
+	// 	}
+	// 	// if player_obj.rot < 0 && player_obj.rot > -linalg.PI {
+	// 	// 	rotate(player_obj, player_obj.rot * 0.01);
+	// 	// }
+	// 	// else if player_obj.rot > 0 && player_obj.rot < linalg.PI {
+	// 	// 	rotate(player_obj, -player_obj.rot * 0.01);
+	// 	// }
+	// }
 }
 
 draw_player :: proc(player: ^Player) {

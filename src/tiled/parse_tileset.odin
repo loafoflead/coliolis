@@ -13,6 +13,7 @@ Tileset :: struct {
 	tilecount, columns: uint,
 	width, height: uint,
 	source: string,
+	// TODO: make this string memory owned by this struct, free the xml file
 }
 
 parse_tileset :: proc(path: string) -> (t: Tileset, err: bool) {

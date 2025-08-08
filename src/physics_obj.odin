@@ -482,13 +482,8 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		}
 	}
 
-	if linalg.length(next_vel) < MIN_SPEED {
-		next_vel = 0
-	}
-	else {
-		setpos(obj, next_pos); // TODO: doesn't work if parented
-		obj.vel = next_vel;
-	}
+	setpos(obj, next_pos); // TODO: doesn't work if parented
+	obj.vel = next_vel;
 }
 
 phys_obj_grounded :: proc(obj_id: int) -> bool {

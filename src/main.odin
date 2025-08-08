@@ -26,6 +26,7 @@ debug_print: bool = false;
 // --------------   END   --------------
 
 BACKGROUND_COLOUR :: 0x181818;
+TILEMAP :: "test_map.tmx"
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
@@ -66,8 +67,6 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 main :: proc() {	
 	when DEBUG do initialise_debugging();
 
-	fmt.println(linalg.normalize(Vec2(0)))
-
 	initialise_camera();
 
 	// TODO: make this not a global?
@@ -93,8 +92,9 @@ main :: proc() {
 	dir_tex, ok = load_texture("nesw_sprite.png")
 	if !ok do os.exit(1)
 
-	test_map, tmap_ok := load_tilemap("second_map.tmx");
+	test_map, tmap_ok := load_tilemap(TILEMAP);
 	if !tmap_ok do os.exit(1);
+	fmt.printfln("%#v", tilemap(test_map))
 	generate_static_physics_for_tilemap(test_map, 0);
 
 	initialise_portal_handler();
@@ -220,8 +220,8 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
 
 		if !dragging && selected == -1 && follow_player {
-			delta := 0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos)
-			camera.pos += 0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos);
+			delta := 0.05 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos)
+			camera.pos += delta//0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos);
 		}
 
 		
@@ -232,7 +232,11 @@ main :: proc() {
 		else if rl.IsKeyPressed(rl.KeyboardKey.C) do pointer = get_world_screen_centre();
 		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.05, 0.05});
 
-		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+		click: int
+		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) do click = 1
+		else if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) do click = 2
+
+		if click != 0 {
 			hit: bool
 			collision, hit = cast_ray_in_world(
 				player_obj.pos, 
@@ -240,7 +244,7 @@ main :: proc() {
 				layers = {.Portal_Surface}
 			)
 			if hit {
-				prtl_obj := phys_obj(portal_handler.portals[selected_portal].obj)
+				prtl_obj := phys_obj(portal_handler.portals[click - 1].obj)
 				og := Vec3{collision.point.x, collision.point.y, 0}
 				pt := og + Vec3{collision.normal.x, collision.normal.y, 0}
 				quat := linalg.quaternion_look_at(og, pt, Z_AXIS)
