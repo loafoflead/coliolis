@@ -29,13 +29,12 @@ MIN_COLLISION_MOVE_BACK :: 0.001;
 Physics_Object_Id :: int; 
 Collision_Layer :: enum {
 	Default,
-	Trigger,
 	Portal_Surface,
 	L0, L1,
 }
-COLLISION_LAYERS_ALL: bit_set[Collision_Layer] : {.Default, .Trigger, .Portal_Surface, .L0, .L1};
+COLLISION_LAYERS_ALL: bit_set[Collision_Layer] : {.Default, .Portal_Surface, .L0, .L1};
 
-PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer] { .Default, .Trigger }
+PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer] { .Default }
 PHYS_OBJ_DEFAULT_COLLISION_LAYERS 	  :: bit_set[Collision_Layer] { .Default }
 
 AABB :: [2]f32;
@@ -56,6 +55,8 @@ Physics_Object :: struct {
 	collider: Collider,
 	collision_layers: bit_set[Collision_Layer],
 	collide_with_layers: bit_set[Collision_Layer],
+
+	linked_game_object: Maybe(Game_Object_Id),
 }
 
 Physics_Object_Flag :: enum u32 {
@@ -64,6 +65,7 @@ Physics_Object_Flag :: enum u32 {
 	No_Collisions, 			// doesn't collide
 	No_Gravity,				// unaffected by gravity
 	Drag_Exception, 		// use drag values for the player 
+	Trigger,				// collide but don't physics
 	Fixed,					// used outside of the physics world to mark objects as no-touch
 }
 
@@ -383,7 +385,7 @@ get_all_collisions_in_world :: proc(
 update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	obj := phys_obj(obj_id);
 	pos := transform_to_world(obj).pos;
-	if Physics_Object_Flag.Non_Kinematic in obj.flags || .Trigger in obj.collision_layers {
+	if Physics_Object_Flag.Non_Kinematic in obj.flags || .Trigger in obj.flags {
 		return;
 	}
 	resistance: Vec2 = Vec2 {1.0, 1.0};
@@ -426,7 +428,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		if collision_rect == Rect(0) do continue
 
 		other_obj := objs[i]
-		if .Trigger not_in other_obj.collision_layers {
+		if .Trigger not_in other_obj.flags {
 			momentum := obj.mass * obj.vel; // vector quantity just to store two scalars
 
 			other_pos := transform_to_world(other_obj).pos;
@@ -480,6 +482,23 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 			// 	// next_vel = Vec2(0)
 			// }
 		}
+		else {
+			other_linked, other_has_link := other_obj.linked_game_object.?
+			my_linked, i_am_linked := obj.linked_game_object.?
+			// TODO: how to make this not as shit?
+			if other_has_link && i_am_linked {
+				queue_inform_game_object(other_linked, Collision {
+					other = my_linked,
+					self_obj = other_obj,
+					other_obj = obj
+				})
+				queue_inform_game_object(my_linked, Collision {
+					other = other_linked,
+					self_obj = obj,
+					other_obj = other_obj
+				})
+			}
+		}
 	}
 
 	setpos(obj, next_pos); // TODO: doesn't work if parented
@@ -518,6 +537,7 @@ add_phys_object_aabb :: proc(
 	pos:   Vec2 = Vec2{},
 	vel:   Vec2 = Vec2{},
 	acc:   Vec2 = Vec2{},
+	game_obj: Maybe(Game_Object_Id) = nil,
 	parent: ^Transform = nil,
 	flags: bit_set[Physics_Object_Flag] = {},
 	collision_layers: bit_set[Collision_Layer] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
@@ -531,6 +551,7 @@ add_phys_object_aabb :: proc(
 		local = local,
 		mass = mass, 
 		flags = flags,
+		linked_game_object = game_obj,
 		collider = cast(AABB) scale,
 		collision_layers = collision_layers,
 		collide_with_layers = collide_with,

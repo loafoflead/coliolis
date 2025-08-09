@@ -103,6 +103,30 @@ The game itself is currently unfinished, any controls or gameplay listed below c
 You can move around as the player, jumping and going left/right, as well as travel through portals. Panning the camera unlocks it from following the player, re-centre on the player by pressing *LEFT CONTROL*.
 Pick up and move the portals using *LEFT CLICK* on the mouse, rotate them with the arrow keys and select them by pressing *LEFT ALT* to toggle which portal you have selected.
 
+## Level creation
+
+Levels are made using the Tiled editor (credits below)
+
+### Naming conventions
+
+- Player spawn
+```json 
+{
+	"name": "<whatever you want>",
+	"tiled_class": "Point",
+	"properties": {
+		"type": "player_spawn"
+	}
+}
+```
+
+- Layer properties
+ + 'generate' property (arguments: string)
+  + 'static_collision'	: generate collision boxes for each tile on this layer
+  + 'hurt'				: generate hurt boxes for each tile on this layer
+ + 'no_render' property (arguments: none \[technically a string but nothing is expected\])
+Will skip rendering this layer
+
 # Credits:
 
 - Tileset (assets/level_tileset.png), created by [aimen23b](https://www.fiverr.com/aimen23b), distributed by (i guess owned by?) [foozle](www.foozle.io): https://foozlecc.itch.io/sci-fi-lab-tileset-decor-traps
@@ -111,8 +135,8 @@ Pick up and move the portals using *LEFT CLICK* on the mouse, rotate them with t
 
 # TODO:
 
-- [] fix player collision sometimes freezing against flat surfaces
-- [] add diagonal colliders (non AABB)
-- [] change player movement speed, jump str, and gravity to better suit movement through portals
-- [] fix just_teleported_to variable, make it a delay instead of a lock? or a percent of collision instead of complete non-intersection
-- [] notion of 'Rendered' object, so that portal can render half of a thing through itself
+- [X] fix player collision sometimes freezing against flat surfaces
+- [ ] add diagonal colliders (non AABB)
+- [X] change player movement speed, jump str, and gravity to better suit movement through portals
+- [X] fix just_teleported_to variable, make it a delay instead of a lock? or a percent of collision instead of complete non-intersection
+- [ ] notion of 'Rendered' object, so that portal can render half of a thing through itself

@@ -34,14 +34,14 @@ initialise_portal_handler :: proc() {
 
 	portal_handler.portals.x.obj = add_phys_object_aabb(
 		scale = Vec2 { 20.0, 100.0 },
-		flags = {.Non_Kinematic},
-		collision_layers = {.Trigger},
+		flags = {.Non_Kinematic, .Trigger},
+		collision_layers = {},
 		collide_with = COLLISION_LAYERS_ALL,
 	);
 	portal_handler.portals.y.obj = add_phys_object_aabb(
 		scale = Vec2 { 20.0, 100.0 },
-		flags = {.Non_Kinematic},
-		collision_layers = {.Trigger},
+		flags = {.Non_Kinematic, .Trigger},
+		collision_layers = {},
 		collide_with = COLLISION_LAYERS_ALL,
 	);
 	portal_handler.edge_colliders = {

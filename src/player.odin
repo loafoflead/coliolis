@@ -54,7 +54,8 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	return player;
 }
 
-update_player :: proc(player: ^Player, dt: f32) {
+update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
+	player := game_obj(player, Player)
 	player_obj:=phys_obj(player.obj);
 
 	move: f32 = 0.0;
@@ -154,10 +155,14 @@ update_player :: proc(player: ^Player, dt: f32) {
 	// 	// 	rotate(player_obj, -player_obj.rot * 0.01);
 	// 	// }
 	// }
+
+	return
 }
 
-draw_player :: proc(player: ^Player) {
+draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
+	player := game_obj(player, Player)
 	obj:=phys_obj(player.obj);
+	
 	// r := phys_obj_to_rect(obj).zw;
 	draw_phys_obj(player.obj);
 	draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);

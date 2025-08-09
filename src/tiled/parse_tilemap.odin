@@ -47,6 +47,7 @@ Tilemap_Layer :: struct {
 	id: uint,
 	width, height: uint,
 	data: []Tile,
+	properties: map[string]string,
 }
 
 Tile 	   :: distinct uint
@@ -65,9 +66,23 @@ tile_from_id :: proc(id: uint) -> Tile {
 	return Tile(id)
 }
 
+find_layers_with_property :: proc(tilemap: ^Tilemap, property, value: string) -> (layers: [dynamic]^Tilemap_Layer, found: bool) {
+	layers = make([dynamic]^Tilemap_Layer)
+	for &layer, i in tilemap.layers {
+		if property in layer.properties {
+			if layer.properties[property] == value {
+				append(&layers, &layer)
+				found = true
+			}
+		}
+	}
+
+	return
+}
+
 parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_automatically: bool = true, check_tileset_valid: bool = true) -> (_t: Tilemap, err: bool) {
-	doc, oopsie := xml.load_from_file(path);
 	// TODO: how to free?
+	doc, oopsie := xml.load_from_file(path);
 	if oopsie != nil {
 		fmt.printfln("ERROR: Tilemap `{}` not found in {}", path, os.get_current_directory());
 		return Tilemap{}, false;
@@ -144,6 +159,24 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 		string_data := doc.elements[data_xml_id].value[0]; // TODO: brutal assertion here
 		layer.data = parse_layer_from_csv(string_data.(string), layer.width, layer.height) or_return;
 
+		props_id, found_props := xml.find_child_by_ident(doc, layer_xml_id, "properties")
+		if !found_props {
+			append(&layers, layer);
+			continue
+		}
+
+		layer.properties = make(map[string]string)
+
+		prop_idx: int
+		for {
+			prop_id := xml.find_child_by_ident(doc, props_id, "property", prop_idx) or_break
+
+			prop_name := xml.find_attribute_val_by_key(doc, prop_id, "name") or_break
+			prop_value := xml.find_attribute_val_by_key(doc, prop_id, "value") or_break
+			layer.properties[prop_name] = prop_value
+			prop_idx += 1
+		}
+
 		append(&layers, layer);
 	}
 
@@ -192,7 +225,7 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 			append(&group.objects, object)
 		}
 
-		append(&object_groups, group);
+		append(&object_groups, group)
 	}
 
 	// layer_def := xml.find_attribute_val_by_key(doc, 0, "renderorder") or_return;

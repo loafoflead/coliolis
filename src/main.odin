@@ -13,11 +13,12 @@ import "core:os";
 import "tiled";
 
 // -------------- GLOBALS --------------
-camera 		: Camera2D;
-resources 	: Resources;
-phys_world  : Physics_World;
-timers  	: Timer_Handler;
-portal_handler 	: Portal_Handler;
+game_state  : Game_State
+camera 		: Camera2D
+resources 	: Resources
+phys_world  : Physics_World
+timers  	: Timer_Handler
+portal_handler 	: Portal_Handler
 
 window_width : i32 = 600;
 window_height : i32 = 400;
@@ -79,6 +80,9 @@ main :: proc() {
 	initialise_timers();
 	defer free_timers();
 
+	initialise_game_state()
+	defer free_game_state()
+
 	rl.InitWindow(window_width, window_height, "yeah")
 	rl.SetTargetFPS(60)
 	// Note: neccessary so that sprites flipped by portal travel get rendered
@@ -95,12 +99,14 @@ main :: proc() {
 	test_map, tmap_ok := load_tilemap(TILEMAP);
 	if !tmap_ok do os.exit(1);
 	fmt.printfln("%#v", tilemap(test_map))
-	generate_static_physics_for_tilemap(test_map, 0);
+	generate_static_physics_for_tilemap(test_map);
+	generate_kill_triggers_for_tilemap(test_map);
 
 	initialise_portal_handler();
 	defer free_portal_handler();
 
-	player: Player = player_new(dir_tex);
+	player_gobj_id := obj_player_new(dir_tex)
+	player := game_obj(player_gobj_id, Player)
 
 	portal_handler.portals.x.state += {.Alive};
 	portal_handler.portals.y.state += {.Alive};
@@ -121,9 +127,9 @@ main :: proc() {
 	); 
 	// test object
 
-	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity}, collision_layers = {.Trigger});
+	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity, .Trigger});
 	papi := &phys_obj(a).local;
-	b := add_phys_object_aabb(pos=Vec2(50), scale=Vec2(40), parent=papi, flags= {.Non_Kinematic, .No_Gravity}, collision_layers = {.Trigger});
+	b := add_phys_object_aabb(pos=Vec2(50), scale=Vec2(40), parent=papi, flags= {.Non_Kinematic, .No_Gravity, .Trigger});
 
 	follow_player: bool = true;
 
@@ -167,7 +173,7 @@ main :: proc() {
 		// ------------ DRAWING ------------
 		draw_tilemap(test_map, {0., 0.});
 		draw_portals(selected_portal);
-		draw_player(&player);
+		render_game_objects(camera)
 
 		// draw_phys_obj(a);
 		// draw_phys_obj(b);
@@ -175,12 +181,14 @@ main :: proc() {
 		// ------------   END   ------------
 
 		// ------------ UPDATING ------------
+
 		if run_physics || rl.IsKeyPressed(rl.KeyboardKey.U) do update_phys_world(dt);
 		if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics
+		
+		update_game_state(dt)
 		// update_portals(test_obj);
 		update_portals(player.obj)
 		update_timers(dt)
-		update_player(&player, dt)
 
 		when DEBUG do update_debugging(dt);
 		// ------------    END   ------------

@@ -4,7 +4,10 @@
   <export target="second_map.tmx" format="tmx"/>
  </editorsettings>
  <tileset firstgid="1" source="example.tsx"/>
- <layer id="1" name="#static_collision" width="30" height="20" locked="1">
+ <layer id="1" name="level" width="30" height="20" locked="1">
+  <properties>
+   <property name="generate" value="static_collision"/>
+  </properties>
   <data encoding="csv">
 11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
 11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,
@@ -28,7 +31,10 @@
 2147483677,2147483677,2147483677,2147483677,2147483677,2147483677,2147483677,2147483676,11,11,11,11,11,11,11,11,11,11,11,11,11,11,28,29,29,29,29,29,29,29
 </data>
  </layer>
- <layer id="4" name="#hurt" width="30" height="20" locked="1">
+ <layer id="4" name="obstacles" width="30" height="20" locked="1">
+  <properties>
+   <property name="generate" value="hurt_box"/>
+  </properties>
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
