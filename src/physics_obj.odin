@@ -241,10 +241,11 @@ check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id, first_set_
 	unreachable();
 }
 
-check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL) -> bool {
-	obj := phys_obj(obj_id);
-	if .No_Collisions in obj.flags do return false;
-	if layers & obj.collision_layers == {} do return false;
+check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL, ignore_triggers:=true) -> bool {
+	obj := phys_obj(obj_id)
+	if .No_Collisions in obj.flags do return false
+	if layers & obj.collision_layers == {} do return false
+	if ignore_triggers && .Trigger in obj.flags do return false
 	ty := phys_obj_collider_ty(obj);
 	switch ty {
 	case .AABB:
@@ -284,7 +285,7 @@ cast_ray_in_world :: proc(og, dir: Vec2, layers: bit_set[Collision_Layer] = COLL
 	return closest, closest.hit;
 }
 
-point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL, exclude: []Physics_Object_Id = {}) -> (
+point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL, exclude: []Physics_Object_Id = {}, ignore_triggers := true) -> (
 	collided_with: ^Physics_Object = nil, 
 	collided_with_id: Physics_Object_Id = -1,
 	success: bool = false
@@ -292,7 +293,7 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = 
 {
 	for i in 0..<len(phys_world.objects) {
 		if slice.contains(exclude, i) do continue;
-		if check_phys_object_point_collide(i, point, layers) {
+		if check_phys_object_point_collide(i, point, layers, ignore_triggers) {
 			collided_with = phys_obj(i);
 			collided_with_id = i;
 			success = true;
@@ -511,7 +512,7 @@ phys_obj_grounded :: proc(obj_id: int) -> bool {
 	centre := phys_obj_centre(obj);
 	centre.y += phys_obj_bounding_box(obj).w;
 	// draw_rectangle(centre, Vec2(10), col=Colour{0, 255, 255, 255});
-	_, _, ok = point_collides_in_world(centre, layers = {.Default} );
+	_, _, ok = point_collides_in_world(centre, layers = {.Default}, ignore_triggers=true);
 	return ok;
 }
 

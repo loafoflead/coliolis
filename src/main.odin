@@ -187,7 +187,7 @@ main :: proc() {
 		
 		update_game_state(dt)
 		// update_portals(test_obj);
-		update_portals(player.obj)
+		// update_portals(player.obj)
 		update_timers(dt)
 
 		when DEBUG do update_debugging(dt);
