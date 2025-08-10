@@ -7,10 +7,13 @@ import xml "core:encoding/xml";
 import "core:strconv";
 import "core:os";
 import "core:fmt";
+import "core:log";
 
 TILEMAP_MAX_LAYERS :: 10
 TILEMAP_MAX_OBJECT_GROUPS :: 10
 TILEMAP_MAX_OBJECTS_PER_GROUP :: 10
+
+TILEMAP_OBJ_TYPE_MARKER :: "marker"
 
 Tilemap :: struct {
 	// TODO: make possible to have multiple
@@ -18,14 +21,16 @@ Tilemap :: struct {
 	version: string,
 	width, height: uint,
 	tilewidth, tileheight: uint,
+	width_pixels, height_pixels: uint,
 	layers: [dynamic]Tilemap_Layer,
-	object_groups: [dynamic]Object_Group,
+	objects: [dynamic]Tilemap_Object,
+	object_groups: map[string]Object_Group,
 }
 
 Object_Group :: struct {
 	name: string,
 	id: uint,
-	objects: [dynamic]Tilemap_Object,
+	objects: [dynamic]Tilemap_Object_Id,
 }
 
 Object_Class :: enum {
@@ -33,10 +38,18 @@ Object_Class :: enum {
 	Point,
 }
 
+Tilemap_Object_Type :: enum {
+	Other = 0,
+	Marker,
+}
+
+Tilemap_Object_Id :: distinct int
+
 Tilemap_Object :: struct {
 	name: string,
 	id: uint,
-	type: string,
+	type_string: string,
+	type: Tilemap_Object_Type,
 	class: Object_Class,
 	pos: [2]f32,
 	properties: map[string]string,
@@ -55,10 +68,10 @@ Tile 	   :: distinct uint
 free_tilemap :: proc(tilemap: Tilemap) {
 	for layer in tilemap.layers do delete(layer.data)
 	delete(tilemap.layers)
-	for group in tilemap.object_groups {
-		for obj in group.objects do delete(obj.properties)
+	for name, group in tilemap.object_groups {
 		delete(group.objects)
 	}
+	// TODO: use an arena here to avoid this... unsavoury code
 	delete(tilemap.object_groups)
 }
 
@@ -112,6 +125,9 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 	tilemap.height = strconv.parse_uint(xml.find_attribute_val_by_key(doc, 0, "height") or_return) or_return;
 	tilemap.tilewidth = strconv.parse_uint(xml.find_attribute_val_by_key(doc, 0, "tilewidth") or_return) or_return;
 	tilemap.tileheight = strconv.parse_uint(xml.find_attribute_val_by_key(doc, 0, "tileheight") or_return) or_return;
+
+	tilemap.width_pixels = tilemap.width * tilemap.tilewidth
+	tilemap.height_pixels = tilemap.height * tilemap.tileheight
 
 	tileset_id := xml.find_child_by_ident(doc, 0, "tileset") or_return;
 	if parse_tileset_automatically {
@@ -180,7 +196,8 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 		append(&layers, layer);
 	}
 
-	object_groups := make([dynamic]Object_Group);
+	objects := make([dynamic]Tilemap_Object)
+	object_groups := make(map[string]Object_Group)
 
 	for i in 0..=TILEMAP_MAX_OBJECT_GROUPS {
 		group_xml_id := xml.find_child_by_ident(doc, 0, "objectgroup", i) or_break;
@@ -188,7 +205,7 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 		group.id 	 = strconv.parse_uint(xml.find_attribute_val_by_key(doc, group_xml_id, "id") or_return) or_return;
 		group.name 	 = xml.find_attribute_val_by_key(doc, group_xml_id, "name") or_return;
 
-		group.objects = make([dynamic]Tilemap_Object);
+		group.objects = make([dynamic]Tilemap_Object_Id);
 
 		for j in 0..=TILEMAP_MAX_OBJECTS_PER_GROUP {
 			object: Tilemap_Object
@@ -198,7 +215,8 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 			object.pos.x = strconv.parse_f32(xml.find_attribute_val_by_key(doc, obj_xml_id, "x") or_return) or_return
 			object.pos.y = strconv.parse_f32(xml.find_attribute_val_by_key(doc, obj_xml_id, "y") or_return) or_return
 			object.name = xml.find_attribute_val_by_key(doc, obj_xml_id, "name") or_return
-			object.type = xml.find_attribute_val_by_key(doc, obj_xml_id, "type") or_return
+			object.type_string = xml.find_attribute_val_by_key(doc, obj_xml_id, "type") or_return
+			object.type = tilemap_obj_type_from_string(object.type_string)
 
 			_, is_point := xml.find_child_by_ident(doc, obj_xml_id, "point")
 			if is_point do object.class = .Point
@@ -206,7 +224,9 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 
 			props_id, found_props := xml.find_child_by_ident(doc, obj_xml_id, "properties")
 			if !found_props {
-				append(&group.objects, object)
+				id := Tilemap_Object_Id(len(objects))
+				append(&objects, object)
+				append(&group.objects, id)
 				continue
 			}
 
@@ -222,16 +242,19 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 				prop_idx += 1
 			}
 
-			append(&group.objects, object)
+			id := Tilemap_Object_Id(len(objects))
+			append(&objects, object)
+			append(&group.objects, id)
 		}
 
-		append(&object_groups, group)
+		object_groups[group.name] = group
 	}
 
 	// layer_def := xml.find_attribute_val_by_key(doc, 0, "renderorder") or_return;
 
 	tilemap.layers = layers
 	tilemap.object_groups = object_groups
+	tilemap.objects = objects
 
 	return tilemap, true;
 }
@@ -244,6 +267,15 @@ tiled_data_to_tile :: proc(data: uint) -> (tile: Tile) {
 	tile = tile_from_id(data & ~(uint(0x80000000) | uint(0x40000000) | uint(0x20000000))) //clear the flags
 
 	return
+}
+
+tilemap_obj_type_from_string :: proc(s: string) -> Tilemap_Object_Type {
+	switch s {
+	case TILEMAP_OBJ_TYPE_MARKER: return Tilemap_Object_Type.Marker
+	case: 
+		log.warnf("Tilemap object type '%s' unknown", s)
+		return Tilemap_Object_Type.Other
+	}
 }
 
 parse_layer_from_csv :: proc(csv_str: string, width, height: uint) -> (data: []Tile, err: bool = false) {

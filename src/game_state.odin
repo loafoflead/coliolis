@@ -3,6 +3,11 @@ package main
 import "core:fmt"
 import "core:container/queue"
 
+Level_Features :: struct {
+	player_spawn: Vec2,
+	level_exit: Vec2,
+}
+
 Game_Object_On_Collide_Function :: #type proc(self, other: Game_Object_Id, self_phys, other_phys: ^Physics_Object)
 Game_Object_On_Update_Function  :: #type proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool)
 Game_Object_Render_Function     :: #type proc(self: Game_Object_Id, camera: Camera2D)
@@ -13,6 +18,7 @@ Game_State :: struct {
 	initialised: bool,
 	objects: [dynamic]Game_Object,
 	player: Game_Object_Id,
+	current_level: Maybe(Level_Features),
 
 	messages: queue.Queue(Game_Object_Message),
 }
@@ -25,6 +31,16 @@ initialise_game_state :: proc() {
 
 free_game_state :: proc() {
 	delete(game_state.objects)
+}
+
+state_get_player_spawn :: proc() -> (point: Vec2 = 0, loaded: bool = false) #optional_ok {
+	assert(game_state.initialised)
+
+	if lvl, ok := game_state.current_level.?; ok == true {
+		point = lvl.player_spawn
+		loaded = true
+	}
+	return
 }
 
 get_game_obj :: proc(id: Game_Object_Id) -> (^Game_Object, bool) #optional_ok {
@@ -135,7 +151,6 @@ obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id) -> (id: Ga
 			obj = obj,
 		},
 		on_collide = trigger_on_collide,
-		render_fn = render_trigger,
 	})
 	phys_obj(game_state.objects[int(id)].data.(G_Trigger).obj).linked_game_object = id
 
@@ -160,13 +175,8 @@ trigger_on_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Ph
 
 	switch trigger.type {
 	case .Kill:
-		setpos(other_obj, 0)
+		other_obj.vel = 0
+		setpos(other_obj, state_get_player_spawn())
 		fmt.println("died")
 	}
-}
-
-render_trigger :: proc(self: Game_Object_Id, _: Camera2D) {
-	trigger := game_obj(self, G_Trigger)
-	obj := phys_obj(trigger.obj)
-	draw_rectangle_transform(obj, phys_obj_to_rect(obj), Colour{2..<4 = 255})
 }

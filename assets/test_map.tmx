@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="30" height="20" tilewidth="32" tileheight="32" infinite="0" nextlayerid="5" nextobjectid="5">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="30" height="20" tilewidth="32" tileheight="32" infinite="0" nextlayerid="5" nextobjectid="7">
  <editorsettings>
   <export target="second_map.tmx" format="tmx"/>
  </editorsettings>
@@ -71,6 +71,12 @@
     <property name="type" value="level_exit"/>
     <property name="typed" type="color" value="#ffee0a52"/>
    </properties>
+  </object>
+  <object id="5" name="cam_focus" type="marker" x="480" y="320">
+   <properties>
+    <property name="type" value="cam_focus_point"/>
+   </properties>
+   <point/>
   </object>
  </objectgroup>
 </map>

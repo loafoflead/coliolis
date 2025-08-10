@@ -13,6 +13,7 @@ when DEBUG {
 		print_continuous = false,
 		debug_timer = Timer {duration = DEBUG_TIMER_DURATION, flags = {.Repeating}},
 	}
+	
 
 	initialise_debugging :: proc() {}
 

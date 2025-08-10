@@ -10,14 +10,16 @@ import "core:math/linalg";
 
 import "core:os";
 
+import "core:log"
+
 import "tiled";
 
 // -------------- GLOBALS --------------
-game_state  : Game_State
-camera 		: Camera2D
-resources 	: Resources
-phys_world  : Physics_World
-timers  	: Timer_Handler
+game_state  	: Game_State
+camera 			: Camera2D
+resources 		: Resources
+phys_world  	: Physics_World
+timers  		: Timer_Handler
 portal_handler 	: Portal_Handler
 
 window_width : i32 = 600;
@@ -66,7 +68,10 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 }
 
 main :: proc() {	
-	when DEBUG do initialise_debugging();
+	when DEBUG {
+		initialise_debugging();
+		context.logger = log.create_console_logger() // TODO: free? or not?
+	}
 
 	initialise_camera();
 
@@ -98,9 +103,13 @@ main :: proc() {
 
 	test_map, tmap_ok := load_tilemap(TILEMAP);
 	if !tmap_ok do os.exit(1);
-	fmt.printfln("%#v", tilemap(test_map))
-	generate_static_physics_for_tilemap(test_map);
-	generate_kill_triggers_for_tilemap(test_map);
+	// fmt.printfln("%#v", tilemap(test_map))
+	generate_static_physics_for_tilemap(test_map)
+	generate_kill_triggers_for_tilemap(test_map)
+	lvl, any_found := level_features_from_tilemap(test_map)
+	if !any_found do log.error("Failed to load level features from tilemap", TILEMAP)
+	log.info(lvl)
+	game_state.current_level = lvl
 
 	initialise_portal_handler();
 	defer free_portal_handler();
@@ -184,7 +193,7 @@ main :: proc() {
 
 		if run_physics || rl.IsKeyPressed(rl.KeyboardKey.U) do update_phys_world(dt);
 		if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics
-		
+
 		update_game_state(dt)
 		// update_portals(test_obj);
 		// update_portals(player.obj)

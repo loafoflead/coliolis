@@ -4,9 +4,15 @@ import "tiled";
 
 import "core:strings"
 import "core:fmt"
+import "core:log"
 
 GENERATE_STATIC_COLLISION 	:: "static_collision"
 GENERATE_KILL_TRIGGER 		:: "hurt_box"
+
+PROP_MARKER_TYPE :: "type"
+
+MARKER_PLAYER_SPAWN :: "player_spawn"
+MARKER_LEVEL_EXIT :: "level_exit"
 
 Tilemap :: struct {
 	using tilemap: tiled.Tilemap,
@@ -14,6 +20,31 @@ Tilemap :: struct {
 	render_texture: rl.RenderTexture2D,
 }
 
+
+level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features, any_found: bool) {
+	tm := tilemap(id)
+
+	for object in tm.objects {
+		if object.type == .Marker {
+			type, ok := object.properties[PROP_MARKER_TYPE]
+			if !ok {
+				log.errorf("Marker object has no type field, it cannot be used. Object: %v", object)
+				continue
+			} 
+			switch type {
+			case "player_spawn"	: features.player_spawn = object.pos - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}
+			case "level_exit"	: features.level_exit = object.pos - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}
+			case "cam_focus_point"	: log.warn("TODO: marker camera_focus")
+			case:
+				log.warnf("Unknown marker type '%s'", type)
+				continue
+			}
+			any_found = true
+		}
+	}
+
+	return
+}
 
 generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
 	tileset := tilemap(id).tileset;
