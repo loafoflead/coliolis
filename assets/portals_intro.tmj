@@ -53,7 +53,7 @@
                         }, 
                         {
                          "name":"culler",
-                         "type":"color",
+                         "type":"string",
                          "value":""
                         }, 
                         {
@@ -116,7 +116,10 @@
                          "type":"class",
                          "value":
                             {
-                             "link":21
+                             "activation_condition":"{\"type\":\"always\"}",
+                             "facing_y":1,
+                             "link":21,
+                             "portal":1
                             }
                         }],
                  "rotation":0,
@@ -138,7 +141,10 @@
                          "type":"class",
                          "value":
                             {
-                             "link":19
+                             "activation_condition":"{\"type\":\"always\"}",
+                             "facing_y":-1,
+                             "link":19,
+                             "portal":2
                             }
                         }],
                  "rotation":0,

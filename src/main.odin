@@ -107,9 +107,12 @@ main :: proc() {
 	generate_static_physics_for_tilemap(test_map)
 	generate_kill_triggers_for_tilemap(test_map)
 	lvl, any_found := level_features_from_tilemap(test_map)
+
 	if !any_found do log.error("Failed to load level features from tilemap", TILEMAP)
 	log.info(lvl)
 	game_state.current_level = lvl
+
+	game_init_level()
 
 	initialise_portal_handler();
 	defer free_portal_handler();
@@ -238,8 +241,9 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
 
 		if !dragging && selected == -1 && follow_player {
-			delta := 0.05 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos)
-			camera.pos += delta//0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos);
+			camera.pos = player_obj.pos - get_screen_centre() / 2
+			// delta := 0.05 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos)
+			// camera.pos += delta//0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos);
 		}
 
 		
@@ -271,7 +275,13 @@ main :: proc() {
 				x, y, z := linalg.euler_angles_xyz_from_quaternion(quat)
 				facing := z + linalg.PI/2
 
-				obstructed := cast_box_in_world(collision.point.xy + collision.normal.xy * (portal_dims().x/2 + 0.5), portal_dims(), Rad(facing))
+				obstructed := cast_box_in_world(
+					collision.point.xy + collision.normal.xy * (portal_dims().x/2 + 0.5), 
+					portal_dims(), 
+					Rad(facing),
+					exclude = {player.obj},
+					layers = {.Default},
+				)
 				if !obstructed {
 					setrot(prtl_obj, Rad(facing))
 					if collision.normal.x == 0 {

@@ -1,11 +1,20 @@
 package main
 
-import "core:fmt"
+import "core:log"
 import "core:container/queue"
+
+import vmem "core:mem/virtual"
+
+import "tiled"
 
 Level_Features :: struct {
 	player_spawn: Vec2,
 	level_exit: Vec2,
+
+	portal_fixtures: [dynamic]Portal_Fixture,
+
+	// TODO: arena plz i love the buggers
+	// arena: vmem.Arena,
 }
 
 Game_Object_On_Collide_Function :: #type proc(self, other: Game_Object_Id, self_phys, other_phys: ^Physics_Object)
@@ -33,6 +42,17 @@ free_game_state :: proc() {
 	delete(game_state.objects)
 }
 
+game_init_level :: proc() {
+	assert(game_state.initialised && game_state.current_level != nil)
+
+	obj_trigger_new(.Level_Exit)
+
+	// log.error(state_level().portal_fixtures)
+	for fixture in state_level().portal_fixtures {
+		obj_prtl_frame_new(fixture)
+	}
+}
+
 state_get_player_spawn :: proc() -> (point: Vec2 = 0, loaded: bool = false) #optional_ok {
 	assert(game_state.initialised)
 
@@ -41,6 +61,15 @@ state_get_player_spawn :: proc() -> (point: Vec2 = 0, loaded: bool = false) #opt
 		loaded = true
 	}
 	return
+}
+
+state_level :: proc() -> ^Level_Features {
+	assert(game_state.initialised)
+	if lvl, ok := &game_state.current_level.?; ok == true {
+		return lvl
+	}
+
+	return nil
 }
 
 get_game_obj :: proc(id: Game_Object_Id) -> (^Game_Object, bool) #optional_ok {
@@ -128,11 +157,37 @@ Game_Object :: struct {
 	render_fn: Game_Object_Render_Function,
 
 	// Add here any new game object types
-	data: union{G_Trigger, Player},
+	data: union{G_Trigger, Player, Portal_Fixture},
+}
+
+Condition_Type :: enum {
+	Always_Active,
+	On_Event,
+}
+
+Condition :: struct {
+	type: Condition_Type,
+}
+
+condition_true :: proc(cond: Condition) -> bool {
+	switch cond.type {
+	case .Always_Active:
+		return true
+	case .On_Event:
+		unimplemented()
+	}
+	return false
+}
+
+Portal_Fixture :: struct {
+	active_condition: Condition,
+	portal: i32,
+	pos, facing: Vec2,
 }
 
 G_Trigger_Type :: enum {
 	Kill,
+	Level_Exit,
 }
 
 G_Trigger :: struct {
@@ -141,14 +196,45 @@ G_Trigger :: struct {
 	// TODO: callback?
 }
 
-obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id) -> (id: Game_Object_Id) {
+obj_prtl_frame_new :: proc(fixture: Portal_Fixture) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
+
+	id = Game_Object_Id(len(game_state.objects))
+	append(&game_state.objects, Game_Object {
+		data = fixture,
+		// TODO: on_event instead for the logic stuff
+		update_fn = update_prtl_frame,
+	})
+
+	return // id
+}
+
+obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_INVALID) -> (id: Game_Object_Id) {
+	assert(game_state.initialised)
+
+	trueobj := obj
+
+	if trueobj == PHYS_OBJ_INVALID {
+		switch type {
+		case .Kill: 
+			log.error("Cannot generate collider for kill trigger without physics object")
+			return GAME_OBJECT_INVALID
+		case .Level_Exit:
+			log.info("Generating default level exit")
+			trueobj = add_phys_object_aabb(
+				pos = state_level().level_exit,
+				scale = {32*4, 32*2},
+				flags = {.Non_Kinematic, .No_Gravity, .Fixed},
+				collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS
+			)
+		}
+	}
 
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = G_Trigger {
 			type = type,
-			obj = obj,
+			obj = trueobj,
 		},
 		on_collide = trigger_on_collide,
 	})
@@ -169,14 +255,34 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 	return id
 }
 
+update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
+	frame := game_obj(self, Portal_Fixture)
+
+	if condition_true(frame.active_condition) {
+		portal_goto(frame.portal, frame.pos, frame.facing)
+	}
+
+	return false
+}
+
+
 trigger_on_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
 	trigger, ok := game_state.objects[int(self)].data.(G_Trigger)
 	assert(ok)
 
 	switch trigger.type {
+	case .Level_Exit:
+		log.info("TODO: implement going to the next level")
+		fallthrough
 	case .Kill:
 		other_obj.vel = 0
 		setpos(other_obj, state_get_player_spawn())
-		fmt.println("died")
+		log.info("Player hit death trigger")
 	}
+}
+
+trigger_render :: proc(self: Game_Object_Id, _: Camera2D) {
+	gobj := game_obj(self, G_Trigger)
+
+	draw_phys_obj(gobj.obj)
 }

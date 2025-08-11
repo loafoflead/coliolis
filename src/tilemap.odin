@@ -6,6 +6,8 @@ import "core:strings"
 import "core:fmt"
 import "core:log"
 
+import "core:encoding/json"
+
 GENERATE_STATIC_COLLISION 	:: "static_collision"
 GENERATE_KILL_TRIGGER 		:: "hurt_box"
 
@@ -20,6 +22,34 @@ Tilemap :: struct {
 	render_texture: rl.RenderTexture2D,
 }
 
+Condition_Json :: struct {
+	type: string,
+}
+
+condition_from_json :: proc(json_string: string) -> (Condition, bool) {
+	condition_json: Condition_Json
+	json_err := json.unmarshal_string(json_string, &condition_json, allocator = context.temp_allocator)
+	if json_err != nil {
+		log.errorf("Failed to parse json string for condition, error: %v", json_err)
+		return {}, false
+	}
+
+	type: Condition_Type
+
+	switch condition_json.type {
+	case "always":
+		type = .Always_Active
+	case "event":
+		type = .On_Event
+	case:
+		log.errorf("Uknown condition type '%s'", condition_json.type)
+		return {}, false
+	}
+
+	return Condition {
+		type = type,
+	}, true
+}
 
 level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features, any_found: bool) {
 	tm := tilemap(id)
@@ -32,9 +62,18 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					log.warnf("property '%s' with value '%s' will be ignored", name, value)
 				case tiled.Tilemap_Class:
 					switch value.classname {
-					case "Entry_Chute"	: features.player_spawn = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
-					case "Exit_Chute"	: features.level_exit = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
-					case "Portal_Fixture"	: log.warn("TODO: portal fixture gen")
+					case "Entry_Chute"		: features.player_spawn = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
+					case "Exit_Chute"		: features.level_exit = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
+					case "Portal_Fixture"	: 
+						append(&features.portal_fixtures, Portal_Fixture{ 
+							pos = object.pos,
+							facing = Vec2 {
+								cast(f32) (value.json_value["facing_x"].(i64) or_else 0),
+								cast(f32) (value.json_value["facing_y"].(i64) or_else 0),
+							},
+							portal = cast(i32) (value.json_value["portal"].(i64) or_else 0),
+							active_condition = condition_from_json(value.json_value["activation_condition"].(string) or_else "{}") or_continue
+						})
 					case:
 						log.warnf("Unknown object class '%s'", value.classname)
 						continue

@@ -27,6 +27,8 @@ MIN_COLLISION_MOVE_BACK :: 0.001;
 
 // TODO: distinct
 Physics_Object_Id :: int; 
+PHYS_OBJ_INVALID :: Physics_Object_Id(-1)
+
 Collision_Layer :: enum {
 	Default,
 	Portal_Surface,
@@ -258,13 +260,17 @@ check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2, 
 	unreachable();
 }
 
-cast_box_in_world :: proc(centre, dimensions: Vec2, rot: Rad) -> bool {
+cast_box_in_world :: proc(centre, dimensions: Vec2, rot: Rad, exclude: []Physics_Object_Id = {}, layers := COLLISION_LAYERS_ALL) -> bool {
 	pholder := phys_obj(phys_world.collision_placeholder)
 	pholder.collider = cast(AABB) dimensions
 	setrot(pholder, rot)
 	setpos(pholder, centre)
 
-	_rect, _obj, hit := get_first_collision_in_world(phys_world.collision_placeholder)
+	_rect, obj, hit := get_first_collision_in_world(phys_world.collision_placeholder)
+	if hit {
+		for o in exclude do if phys_obj(o) == obj do return false
+		if layers & obj.collision_layers == {} do return false
+	}
 	return hit
 }
 

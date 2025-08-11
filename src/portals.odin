@@ -34,6 +34,13 @@ portal_dims :: proc() -> Vec2 {
 	return {PORTAL_WIDTH, PORTAL_HEIGHT}
 }
 
+portal_goto :: proc(portal: i32, pos, facing: Vec2) {
+	assert(portal > 0 && portal < 3)
+
+	setpos(phys_obj(portal_handler.portals[portal - 1].obj), pos)
+	portal_handler.portals[portal - 1].state += {.Alive}
+}
+
 initialise_portal_handler :: proc() {
 	if !phys_world.initialised do panic("Must initialise physics world before initialising portals");
 	if !timers.initialised do panic("Must initialise timers before initialising portals");

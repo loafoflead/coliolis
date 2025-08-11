@@ -48,11 +48,11 @@
 28,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,30,31
 </data>
  </layer>
- <objectgroup id="3" name="markers" locked="1">
+ <objectgroup id="3" name="markers">
   <object id="8" name="Entry" type="func" x="160" y="0" width="128" height="64" rotation="90">
    <properties>
     <property name="class" type="class" propertytype="Entry_Chute"/>
-    <property name="culler" type="color" value=""/>
+    <property name="culler" value=""/>
     <property name="file" type="file" value="portal_spawner.tx"/>
     <property name="floot" type="float" value="0"/>
     <property name="lien" type="object" value="19"/>
@@ -68,7 +68,10 @@
    <properties>
     <property name="class" type="class" propertytype="Portal_Fixture">
      <properties>
+      <property name="activation_condition" value="{&quot;type&quot;:&quot;always&quot;}"/>
+      <property name="facing_y" type="float" value="1"/>
       <property name="link" type="object" value="21"/>
+      <property name="portal" type="int" value="1"/>
      </properties>
     </property>
    </properties>
@@ -78,7 +81,10 @@
    <properties>
     <property name="class" type="class" propertytype="Portal_Fixture">
      <properties>
+      <property name="activation_condition" value="{&quot;type&quot;:&quot;always&quot;}"/>
+      <property name="facing_y" type="float" value="-1"/>
       <property name="link" type="object" value="19"/>
+      <property name="portal" type="int" value="2"/>
      </properties>
     </property>
    </properties>
