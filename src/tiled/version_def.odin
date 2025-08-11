@@ -1,3 +1,4 @@
 package tiled;
 
-EXPECTED_VERSION :: "1.10";
+EXPECTED_JSON_VERSION :: "1.8";
+EXPECTED_XML_VERSION :: "1.10";

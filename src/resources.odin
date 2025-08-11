@@ -2,7 +2,9 @@ package main;
 import rl "thirdparty/raylib";
 import "tiled";
 import "core:strings";
+import "core:log";
 import "core:fmt";
+import vmem "core:mem/virtual"
 
 ASSETS_PATH :: "./assets";
 
@@ -18,8 +20,8 @@ Resources :: struct #no_copy {
 }
 
 initialise_resources :: proc() {
-	resources.textures = make([dynamic]rl.Texture2D, 10);
-	resources.tilemaps = make([dynamic]Tilemap, 10);
+	resources.textures = make([dynamic]rl.Texture2D, len=0, cap=10);
+	resources.tilemaps = make([dynamic]Tilemap, len=0, cap=10);
 }
 
 free_resources :: proc() {
@@ -57,8 +59,18 @@ load_tilemap :: proc(path: string) -> (id: Tilemap_Id = TILEMAP_INVALID, err: bo
 	fullpath := fmt.tprintf("%s/%s", ASSETS_PATH, path);
 	tilemap := tiled.parse_tilemap(fullpath, path_prefix = ASSETS_PATH) or_return;
 	
-	texture_id := load_texture(tilemap.tileset.source) or_return;
-	tmap := Tilemap { tilemap = tilemap, texture_id = texture_id };
+	alloc := vmem.arena_allocator(&tilemap.arena)
+	textures := make_slice([]Texture_Id, len(tilemap.tilesets), allocator = alloc)
+
+	for tileset, i in tilemap.tilesets {
+		texture_id, ok := load_texture(tileset.source);
+		if !ok {
+			log.errorf("Failed to load tileset source image texture for tilemap '%s', tileset source: '%s'", path, tileset.source)
+			continue
+		}
+		textures[i] = texture_id
+	}
+	tmap := Tilemap { tilemap = tilemap, textures = textures };
 
 	// TODO: generate raylib RenderTexture to avoid redrawing tile by tile for 
 	// static layers

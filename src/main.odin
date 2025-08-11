@@ -29,7 +29,7 @@ debug_print: bool = false;
 // --------------   END   --------------
 
 BACKGROUND_COLOUR :: 0x181818;
-TILEMAP :: "test_map.tmx"
+TILEMAP :: "portals_intro.tmj"
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
@@ -116,6 +116,7 @@ main :: proc() {
 
 	player_gobj_id := obj_player_new(dir_tex)
 	player := game_obj(player_gobj_id, Player)
+	setpos(phys_obj(player.obj), state_get_player_spawn())
 
 	portal_handler.portals.x.state += {.Alive};
 	portal_handler.portals.y.state += {.Alive};

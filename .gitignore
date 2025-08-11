@@ -3,4 +3,7 @@ src/thirdparty/
 
 coliolis
 test.tiled-*
+*.tiled-session
+*.tiled-project
+*.tx
 bin/*

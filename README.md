@@ -126,6 +126,12 @@ Levels are made using the Tiled editor (credits below)
   + 'hurt'				: generate hurt boxes for each tile on this layer
  + 'no_render' property (arguments: none \[technically a string but nothing is expected\])
 Will skip rendering this layer
+- Object types
+ + 'marker' type, indicates that this is a marker (spawnpoint, camera focus point, etc...)
+  + 'type' property of the 'marker' type, indicates what this marker is, one of (may be out of date!):
+   1. cam_focus_point: exclusive focus point for the camera in this level
+   1. player_spawn: player respawn point
+   1. level_exit: location of the level exit trigger
 
 # Credits:
 
