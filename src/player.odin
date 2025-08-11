@@ -22,11 +22,12 @@ Player :: struct {
 
 	lerp_origin, lerp_target: Vec2, 
 
-
 	in_air: bool,
 	jump_timer: Timer,
 	jumping: bool,
 	coyote_timer: Timer,
+
+	portals_unlocked: int,
 }
 
 player_feet :: proc(player: ^Player) -> Vec2 {
@@ -139,6 +140,8 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	else if rl.IsKeyDown(rl.KeyboardKey.H) {
 		rotate(player_obj, -0.01);
 	}
+
+	if rl.IsKeyPressed(rl.KeyboardKey.L) do player.portals_unlocked += 1
 	// else {
 	// 	if math.abs(player_obj.rot) > 0.1 {
 	// 		// rotate(player_obj, player_obj.rot * 0.01);

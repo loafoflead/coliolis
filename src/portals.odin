@@ -4,9 +4,11 @@ import rl "thirdparty/raylib";
 
 import "core:os";
 import "core:math/linalg";
-
+import "core:log"
 
 PORTAL_EXIT_SPEED_BOOST :: 10;
+
+PORTAL_WIDTH, PORTAL_HEIGHT :: f32(30), f32(100)
 
 Portal_State :: enum {
 	Connected,
@@ -24,8 +26,12 @@ Portal :: struct {
 
 Portal_Handler :: struct {
 	portals: [2]Portal,
-	edge_colliders: [2]Physics_Object_Id,
+	edge_colliders: [4]Physics_Object_Id,
 	teleported_timer: ^Timer,
+}
+
+portal_dims :: proc() -> Vec2 {
+	return {PORTAL_WIDTH, PORTAL_HEIGHT}
 }
 
 initialise_portal_handler :: proc() {
@@ -33,39 +39,56 @@ initialise_portal_handler :: proc() {
 	if !timers.initialised do panic("Must initialise timers before initialising portals");
 
 	portal_handler.portals.x.obj = add_phys_object_aabb(
-		scale = Vec2 { 20.0, 100.0 },
+		scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},
 		collision_layers = {},
 		collide_with = COLLISION_LAYERS_ALL,
 	);
 	portal_handler.portals.y.obj = add_phys_object_aabb(
-		scale = Vec2 { 20.0, 100.0 },
+		scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},
 		collision_layers = {},
 		collide_with = COLLISION_LAYERS_ALL,
 	);
 	portal_handler.edge_colliders = {
 		add_phys_object_aabb(
-			pos = {0, -60},
-			scale = Vec2 { 20.0, 20.0 },
+			pos = {0, -50},
+			scale = Vec2 { 20.0, 10.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
+			collide_with = {},
 		),
 		add_phys_object_aabb(
-			pos = {0, 60},
-			scale = Vec2 { 20.0, 20.0 },
+			pos = {0, 50},
+			scale = Vec2 { 20.0, 10.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
+			collide_with = {},
+		),
+		add_phys_object_aabb(
+			pos = {10, -60},
+			scale = Vec2 { 10.0, 10.0 },
+			flags = {.Non_Kinematic}, 
+			collision_layers = {.L0},
+			collide_with = {},
+		),
+		add_phys_object_aabb(
+			pos = {10, 60},
+			scale = Vec2 { 10.0, 10.0 },
+			flags = {.Non_Kinematic}, 
+			collision_layers = {.L0},
+			collide_with = {},
 		),
 	};
 
 	portal_handler.teleported_timer = 
-		create_named_timer("portal_tp", 1.0, flags={.Update_Automatically});
+		create_named_timer("portal_tp", 0.1, flags={.Update_Automatically});
 }
 free_portal_handler :: proc() {}
 
 draw_portals :: proc(selected_portal: int) {
 	for &portal, i in portal_handler.portals {
+		if .Alive not_in portal.state do continue
 		value: f32;
 		hue := f32(1);
 		sat := f32(1);
@@ -80,7 +103,7 @@ draw_portals :: proc(selected_portal: int) {
 			if portal.occupant_last_side > 0 do value = 0;
 			else do value = 115;
 		}
-		if !is_timer_done("portal_tp") do sat = 0;
+		if !is_timer_done("portal_tp") || .Connected not_in portal.state do sat = 0;
 		// TODO: messed up HSV pls fix it l8r
 		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
 		draw_phys_obj(portal.obj, colour);
@@ -96,7 +119,20 @@ draw_portals :: proc(selected_portal: int) {
 
 // TODO: make player a global?
 update_portals :: proc(collider: Physics_Object_Id) {
+	if .Alive in portal_handler.portals[0].state && .Alive in portal_handler.portals[1].state {
+		for &ptl in portal_handler.portals {
+			ptl.state += {.Connected}
+		}
+	}
+	else {
+		for &ptl in portal_handler.portals {
+			ptl.state -= {.Connected}
+		}
+	}
+
 	for &portal, i in portal_handler.portals {
+		if .Connected not_in portal.state do continue
+
 		occupant_id, occupied := portal.occupant.?;
 
 		collided := check_phys_objects_collide(portal.obj, collider);
@@ -112,6 +148,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			if occupied && !collided {
 				obj := phys_obj(occupant_id);
 				obj.collide_with_layers = portal.occupant_layers;
+				obj.collide_with_layers -= {.L0}
 				portal.occupant = nil;
 				set_timer_done("portal_tp");
 			}
@@ -122,8 +159,9 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 		portal_obj := phys_obj(portal.obj);
 
-		phys_obj(portal_handler.edge_colliders[0]).parent = portal_obj;
-		phys_obj(portal_handler.edge_colliders[1]).parent = portal_obj;
+		for edge in portal_handler.edge_colliders {
+			phys_obj(edge).parent = portal_obj	
+		}
 
 		if !is_timer_done("portal_tp") do continue;
 

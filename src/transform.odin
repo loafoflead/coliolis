@@ -115,6 +115,17 @@ transform_flip :: proc(transform: ^Transform) -> Transform {
 	return ntr;
 }
 
+transform_flip_vert :: proc(transform: ^Transform) -> Transform {
+	mirror := linalg.matrix4_rotate_f32(-linalg.PI, X_AXIS);
+	for i in 0..<3 do mirror[i, 3] = 0
+	for i in 0..<3 do mirror[3, i] = 0
+
+	mirrored := transform.mat * mirror;
+
+	ntr := transform_from_matrix(mirrored);
+	return ntr;
+}
+
 transform_forward :: proc(transform: ^Transform) -> Vec2 {
 	// https://stackoverflow.com/questions/53608944/getting-a-forward-vector-from-rotation-and-position
 	// const mat4 inverted = glm::inverse(transformationMatrix);

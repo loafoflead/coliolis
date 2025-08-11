@@ -258,6 +258,16 @@ check_phys_object_point_collide :: proc(obj_id: Physics_Object_Id, point: Vec2, 
 	unreachable();
 }
 
+cast_box_in_world :: proc(centre, dimensions: Vec2, rot: Rad) -> bool {
+	pholder := phys_obj(phys_world.collision_placeholder)
+	pholder.collider = cast(AABB) dimensions
+	setrot(pholder, rot)
+	setpos(pholder, centre)
+
+	_rect, _obj, hit := get_first_collision_in_world(phys_world.collision_placeholder)
+	return hit
+}
+
 cast_ray_in_world :: proc(og, dir: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL) -> (rl.RayCollision, bool) {
 	closest: rl.RayCollision;
 	closest.distance = math.F32_MAX;
@@ -519,11 +529,16 @@ phys_obj_grounded :: proc(obj_id: int) -> bool {
 Physics_World :: struct #no_copy {
 	objects: [dynamic]Physics_Object,
 	initialised: bool,
+	collision_placeholder: Physics_Object_Id, // used for casting rect
 	// timestep: f32,
 }
 
 initialise_phys_world :: proc() {
 	phys_world.objects = make([dynamic]Physics_Object, 0, 10);
+	phys_world.collision_placeholder = add_phys_object_aabb(
+		scale={1, 1},
+		flags = {.Non_Kinematic, .Fixed, .Trigger},
+	)
 	phys_world.initialised = true;
 }
 

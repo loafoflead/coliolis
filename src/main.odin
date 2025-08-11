@@ -118,8 +118,8 @@ main :: proc() {
 	player := game_obj(player_gobj_id, Player)
 	setpos(phys_obj(player.obj), state_get_player_spawn())
 
-	portal_handler.portals.x.state += {.Alive};
-	portal_handler.portals.y.state += {.Alive};
+	// portal_handler.portals.x.state += {.Alive};
+	// portal_handler.portals.y.state += {.Alive};
 
 	// --------- DEVELOPMENT VARIABLES -- REMOVE THESE --------- 
 
@@ -197,7 +197,7 @@ main :: proc() {
 
 		update_game_state(dt)
 		// update_portals(test_obj);
-		// update_portals(player.obj)
+		update_portals(player.obj)
 		update_timers(dt)
 
 		when DEBUG do update_debugging(dt);
@@ -254,7 +254,7 @@ main :: proc() {
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) do click = 1
 		else if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) do click = 2
 
-		if click != 0 {
+		if click != 0 && click <= player.portals_unlocked {
 			hit: bool
 			collision, hit = cast_ray_in_world(
 				player_obj.pos, 
@@ -270,17 +270,37 @@ main :: proc() {
 				// facing := linalg.yaw_from_quaternion(quat)
 				x, y, z := linalg.euler_angles_xyz_from_quaternion(quat)
 				facing := z + linalg.PI/2
-				setrot(prtl_obj, Rad(facing))
-				prtl_obj.local = transform_flip(prtl_obj)
-				// prtl_obj.local.mat =
-				// 	linalg.matrix4_look_at_f32(og, og + pt * 10, Z_AXIS)
-				// transform_reset_rotation_plane(prtl_obj)
-				// transform_update(portal_obj)
-				setpos(prtl_obj, collision.point.xy)
+
+				obstructed := cast_box_in_world(collision.point.xy + collision.normal.xy * (portal_dims().x/2 + 0.5), portal_dims(), Rad(facing))
+				if !obstructed {
+					setrot(prtl_obj, Rad(facing))
+					if collision.normal.x == 0 {
+						if collision.normal.y < 0 {
+							rotate(prtl_obj, Rad(linalg.PI))
+						} else {
+							prtl_obj.local = transform_flip(prtl_obj)
+						}
+					}
+					else if collision.normal.x < 0 {
+						rotate(prtl_obj, Rad(linalg.PI))
+					}
+					else {
+						prtl_obj.local = transform_flip(prtl_obj)
+					}
+
+					portal_handler.portals[click - 1].state += {.Alive}
+
+					// prtl_obj.local.mat =
+					// 	linalg.matrix4_look_at_f32(og, og + pt * 10, Z_AXIS)
+					// transform_reset_rotation_plane(prtl_obj)
+					// transform_update(portal_obj)
+					setpos(prtl_obj, collision.point.xy - collision.normal.xy * 8)
+				}
 			}
 		}
 		if collision.hit {
 			draw_line(collision.point.xy, collision.point.xy + collision.normal.xy * 100, Colour{1 = 255, 3 = 255})
+			// draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
 		}
 		// setrot(phys_obj(portal_handler.portals[selected_portal].obj), Rad(-spin))
 
