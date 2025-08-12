@@ -3,6 +3,7 @@ package main
 import "core:log"
 import "core:container/queue"
 import "core:slice"
+import "core:math/ease"
 
 import vmem "core:mem/virtual"
 
@@ -12,9 +13,6 @@ Level_Features :: struct {
 	player_spawn, player_spawn_facing: Vec2,
 	level_exit: Vec2,
 	next_level: string,
-
-	portal_fixtures: [dynamic]Portal_Fixture,
-	cube_buttons: [dynamic]Cube_Button,
 
 	// TODO: arena plz i love the buggers
 	// arena: vmem.Arena,
@@ -36,33 +34,25 @@ Game_State :: struct {
 
 	messages: queue.Queue(Game_Object_Message),
 	events: [Game_Event_Type]queue.Queue(Game_Event),
+	event_subscribers: map[Game_Object_Id]Game_Event_Set,
 }
 
-Game_Event_Type :: enum {
-	Logic,
-}
+Game_Object_Type :: union{G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door}
 
-channel_from_string :: proc(s: string) -> (Game_Event_Type, bool) {
-	switch s {
-	case "Logic":
-		return .Logic, true
-	case "None":
-		return {}, false
-	case:
-		log.errorf("Unknown channel '%s'", s)
-		return {}, false
-	}
-}
+Game_Object :: struct {
+	on_collide: Game_Object_On_Collide_Function,
+	on_collide_enter: Game_Object_On_Collide_Function,
+	on_collide_exit: Game_Object_On_Collide_Function,
+	is_colliding: bool,
 
-Game_Event :: struct {
-	sender: Game_Object_Id,
-	name: string,
+	on_update: Game_Object_On_Update_Function,
+	on_render: Game_Object_Render_Function,
+	on_event: Game_Object_Event_Recv_Function,
 
-	payload: union{Logic_Event},
-}
-
-Logic_Event :: struct {
-	activated: bool,
+	// Add here any new game object types
+	data: Game_Object_Type,
+	// TODO: add optional phys_obj field for consistency and lightening load on message system
+	// and decoupling physics system
 }
 
 initialise_game_state :: proc() {
@@ -83,15 +73,6 @@ game_init_level :: proc() {
 	assert(game_state.initialised && game_state.current_level != nil)
 
 	obj_trigger_new(.Level_Exit)
-
-	// log.error(state_level().portal_fixtures)
-	for fixture in state_level().portal_fixtures {
-		obj_prtl_frame_new(fixture)
-	}
-
-	for btn in state_level().cube_buttons {
-		obj_cube_btn_new(btn)
-	}
 }
 
 state_get_player_spawn :: proc() -> (point: Vec2 = 0, loaded: bool = false) #optional_ok {
@@ -133,7 +114,7 @@ update_game_state :: proc(dt: f32) {
 	to_delete := make([dynamic]int)
 	for obj, i in game_state.objects {
 		should_delete := false
-		if obj.update_fn != nil do should_delete = (obj.update_fn)(Game_Object_Id(i), dt)
+		if obj.on_update != nil do should_delete = (obj.on_update)(Game_Object_Id(i), dt)
 		if should_delete do append(&to_delete, i)
 	}
 
@@ -144,17 +125,14 @@ update_game_state :: proc(dt: f32) {
 		inform_game_object(message.gobj, message.payload)
 	}
 
-	// logic events
-	// TODO: this code structure makes no sense??? do it object-wise or ... some other way
 	for _ in 0..<GAMESTATE_EVENTS_PER_FRAME {
 		l_event := queue.pop_back_safe(&game_state.events[.Logic]) or_break
 
-		// TODO: keep track of subscribers in the game state, and not per-object
-		// to avoid iterating one william times
-		for gobj, i in game_state.objects {
-			if !slice.contains(gobj.event_channels_subscribed, Game_Event_Type.Logic) do continue
-
-			if gobj.on_event != nil do (gobj.on_event)(Game_Object_Id(i), &l_event)
+		for id, channels in game_state.event_subscribers {
+			gobj := game_obj(id)
+			if .Logic in channels {
+				if gobj.on_event != nil do (gobj.on_event)(id, &l_event)
+			}
 		}
 	}
 
@@ -167,70 +145,14 @@ update_game_state :: proc(dt: f32) {
 
 render_game_objects :: proc(camera: Camera2D) {
 	for obj, i in game_state.objects {
-		if obj.render_fn != nil do (obj.render_fn)(Game_Object_Id(i), camera)
+		if obj.on_render != nil do (obj.on_render)(Game_Object_Id(i), camera)
 	}
 }
 
-queue_inform_game_object :: proc(obj: Game_Object_Id, payload: Game_Object_Message_Payload) {
-	assert(obj != GAME_OBJECT_INVALID && int(obj) < len(game_state.objects) )
-
-	queue.push_front(&game_state.messages, Game_Object_Message { gobj = obj, payload = payload })
-}
-
-inform_game_object :: proc(obj: Game_Object_Id, payload: Game_Object_Message_Payload) {
-	assert(obj != GAME_OBJECT_INVALID && int(obj) < len(game_state.objects) )
-
-	// gobj is so funny to me idk why
-	gobj := game_obj(obj)
-
-	switch data in payload {
-	case Collision:
-		if gobj.on_collide != nil do (gobj.on_collide)(obj, data.other, data.self_obj, data.other_obj)
-	}
-}
-
-send_game_event :: proc(event: Game_Event) {
-	assert(game_state.initialised)
-
-	switch _ in event.payload {
-	case Logic_Event:
-		queue.push_front(&game_state.events[.Logic], event)
-	case:
-		log.error(event)
-		unimplemented()
-	}
-}
-
-Collision :: struct {
-	other: Game_Object_Id,
-	self_obj, other_obj: ^Physics_Object,
-}
-
-Game_Object_Message_Payload :: union {
-	Collision,
-}
-
-Game_Object_Message :: struct {
-	gobj: Game_Object_Id,
-	payload: Game_Object_Message_Payload,
-}
 
 Game_Object_Id :: distinct int
 GAME_OBJECT_INVALID :: Game_Object_Id(-1)
 
-Game_Object :: struct {
-	update_fn: Game_Object_On_Update_Function,
-	on_collide: Game_Object_On_Collide_Function,
-	render_fn: Game_Object_Render_Function,
-	on_event: Game_Object_Event_Recv_Function,
-
-	// Add here any new game object types
-	data: union{G_Trigger, Player, Portal_Fixture, Cube_Button},
-	// TODO: add optional phys_obj field for consistency and lightening load on message system
-	// and decoupling physics system
-
-	event_channels_subscribed: []Game_Event_Type,
-}
 
 Condition_Type :: enum {
 	Always_Active,
@@ -256,7 +178,7 @@ condition_true :: proc(cond: Condition) -> bool {
 }
 
 Level_Feature_Common :: struct {
-	pos, facing: Vec2,
+	pos, facing, dims: Vec2,
 }
 
 Cube_Button :: struct {
@@ -272,6 +194,14 @@ Portal_Fixture :: struct {
 	portal: i32,
 }
 
+Sliding_Door :: struct {
+	using common: Level_Feature_Common,
+	obj: Physics_Object_Id,
+	condition: Condition,
+	open_percent: f32,
+	open: bool,
+}
+
 G_Trigger_Type :: enum {
 	Kill,
 	Level_Exit,
@@ -283,13 +213,40 @@ G_Trigger :: struct {
 	// TODO: callback?
 }
 
+obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
+	assert(game_state.initialised)
+
+	door := door
+
+	obj := add_phys_object_aabb(
+		pos = door.pos,
+		scale = door.dims,
+		flags = {.Non_Kinematic, .No_Gravity},
+		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS
+	)
+
+	door.obj = obj
+
+	id = Game_Object_Id(len(game_state.objects))
+	append(&game_state.objects, Game_Object {
+		data = door,
+		// TODO: on_event instead for the logic stuff
+		on_update = sliding_door_update,
+		on_event = sliding_door_event_recv,
+	})
+	events_subscribe(id, {.Logic})
+	phys_obj(game_state.objects[int(id)].data.(Sliding_Door).obj).linked_game_object = id
+
+	return // id
+}
+
 obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
 
 	btn := btn
 
 	obj := add_phys_object_aabb(
-		pos = btn.pos - Vec2(32/2),
+		pos = btn.pos,
 		// TODO: rot
 		scale = {32*2, 20},
 		flags = {.Non_Kinematic, .No_Gravity, .Trigger},
@@ -302,26 +259,14 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 	append(&game_state.objects, Game_Object {
 		data = btn,
 		// TODO: on_event instead for the logic stuff
-		on_collide = cube_btn_collide,
+		on_collide_enter = cube_btn_collide,
+		on_collide_exit = cube_btn_exit,
 	})
 	phys_obj(game_state.objects[int(id)].data.(Cube_Button).obj).linked_game_object = id
 
 	return // id
 }
 
-cube_btn_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
-	btn := game_obj(self, Cube_Button)
-	if other_obj == phys_obj(game_obj(game_state.player, Player).obj) {
-		log.info("here")
-		send_game_event(Game_Event {
-			sender = self,
-			name = btn.event,
-			payload = Logic_Event {
-				activated = true
-			}
-		})
-	}	
-}
 
 obj_prtl_frame_new :: proc(fixture: Portal_Fixture) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
@@ -330,10 +275,10 @@ obj_prtl_frame_new :: proc(fixture: Portal_Fixture) -> (id: Game_Object_Id) {
 	append(&game_state.objects, Game_Object {
 		data = fixture,
 		// TODO: on_event instead for the logic stuff
-		update_fn = update_prtl_frame,
+		on_update = update_prtl_frame,
 		on_event = prtl_frame_event_recv,
-		event_channels_subscribed = {.Logic},
 	})
+	events_subscribe(id, {.Logic})
 
 	return // id
 }
@@ -366,7 +311,6 @@ obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_
 			obj = trueobj,
 		},
 		on_collide = trigger_on_collide,
-		event_channels_subscribed = {.Logic},
 	})
 	phys_obj(game_state.objects[int(id)].data.(G_Trigger).obj).linked_game_object = id
 
@@ -377,8 +321,8 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 	id := Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = player_new(tex),
-		update_fn = update_player,
-		render_fn = draw_player,
+		on_update = update_player,
+		on_render = draw_player,
 	})
 	phys_obj(game_state.objects[int(id)].data.(Player).obj).linked_game_object = id
 	game_state.player = id
@@ -386,22 +330,32 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 	return id
 }
 
-update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
-	frame := game_obj(self, Portal_Fixture)
 
-	if condition_true(frame.condition) {
-		portal_goto(frame.portal, frame.pos - Vec2(16), frame.facing)
-	}
-
-	return false
+cube_btn_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
+	log.info("hi")
+	btn := game_obj(self, Cube_Button)
+	if other_obj == phys_obj(game_obj(game_state.player, Player).obj) {
+		send_game_event(Game_Event {
+			sender = self,
+			name = btn.event,
+			payload = Logic_Event {
+				activated = true
+			}
+		})
+	}	
 }
 
-prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
-	#partial switch payload in event.payload {
-	case Logic_Event:
-		self := game_obj(self, Portal_Fixture)
-		if event.name == self.condition.event_name do self.condition.override = payload.activated
-	}
+cube_btn_exit :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
+	log.info("bye")
+	btn := game_obj(self, Cube_Button)
+	
+	send_game_event(Game_Event {
+		sender = self,
+		name = btn.event,
+		payload = Logic_Event {
+			activated = false
+		}
+	})	
 }
 
 trigger_on_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
@@ -418,6 +372,61 @@ trigger_on_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Ph
 		log.info("Player hit death trigger")
 	}
 }
+
+update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
+	frame := game_obj(self, Portal_Fixture)
+
+	if condition_true(frame.condition) {
+		portal_goto(frame.portal, frame.pos, frame.facing)
+	}
+
+	return false
+}
+
+sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
+	door := game_obj(self, Sliding_Door)
+
+	obj := phys_obj(door.obj)
+
+	target: Vec2
+
+	if door.open && door.open_percent < 1 {
+		target = door.pos + (door.dims * door.facing)
+		door.open_percent += dt
+	}
+	else if !door.open && door.open_percent > 0 {
+		target = door.pos
+		door.open_percent -= dt
+	}
+
+	if door.open_percent < 0 do door.open_percent = 0
+	if door.open_percent > 1 do door.open_percent = 1
+
+	new_pos := obj.pos + (target - obj.pos) * ease.ease(ease.Ease.Circular_In, door.open_percent);
+	setpos(obj, new_pos)
+
+	return false
+}
+
+sliding_door_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
+	#partial switch payload in event.payload {
+	case Logic_Event:
+		door := game_obj(self, Sliding_Door)
+		if event.name == door.condition.event_name {
+			door.open = payload.activated
+		}
+	}
+}
+
+prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
+	#partial switch payload in event.payload {
+	case Logic_Event:
+		self := game_obj(self, Portal_Fixture)
+		if event.name == self.condition.event_name do self.condition.override = payload.activated
+	}
+}
+
+
 
 trigger_render :: proc(self: Game_Object_Id, _: Camera2D) {
 	gobj := game_obj(self, G_Trigger)

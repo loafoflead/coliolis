@@ -27,6 +27,15 @@ Condition_Json :: struct {
 	event_name: string,
 }
 
+facing_from_json :: proc(json_value: json.Value) -> Vec2 {
+	obj, ok := json_value.(json.Object)
+	if !ok do return Vec2(0)
+	return Vec2 {
+		cast(f32) (obj["facing_x"].(i64) or_else 0),
+		cast(f32) (obj["facing_y"].(i64) or_else 0),
+	}
+}
+
 condition_from_json :: proc(json_obj: json.Object) -> (Condition, bool) {
 	condition_json: Condition_Json
 	json_err := json.unmarshal_string(json_obj["activated_when"].(string) or_else "{}", &condition_json, allocator = context.temp_allocator)
@@ -59,7 +68,8 @@ condition_from_json :: proc(json_obj: json.Object) -> (Condition, bool) {
 level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features, any_found: bool) {
 	tm := tilemap(id)
 
-	for object in tm.objects {
+	for &object in tm.objects {
+		object.pos -= Vec2(32/2)
 		if object.type == .Func {
 			for name, prop in object.properties {
 				#partial switch value in prop {
@@ -69,37 +79,39 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					switch value.classname {
 					case "Entry_Chute"		: 
 						features.player_spawn = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
-						features.player_spawn_facing = Vec2 {
-							cast(f32) (value.json_value["facing_x"].(i64) or_else 0),
-							cast(f32) (value.json_value["facing_y"].(i64) or_else 0),
-						}
+						features.player_spawn_facing = facing_from_json(value.json_value)
 					case "Exit_Chute"		:
 						next_lvl_found: bool
-						features.level_exit = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
+						features.level_exit = object.pos + object.dims / 2
 						features.next_level, next_lvl_found = value.json_value["next_level"].(string)
 						if !next_lvl_found {
 							log.error("Level exit object does not specify a next level, will just respawn endlessly")
 						}
 					case "Portal_Fixture"	: 
-						append(&features.portal_fixtures, Portal_Fixture{ 
+						frame := Portal_Fixture{ 
 							pos = object.pos,
-							facing = Vec2 {
-								cast(f32) (value.json_value["facing_x"].(i64) or_else 0),
-								cast(f32) (value.json_value["facing_y"].(i64) or_else 0),
-							},
+							facing = facing_from_json(value.json_value),
 							portal = cast(i32) (value.json_value["portal"].(i64) or_else 0),
 							condition = condition_from_json(value.json_value["condition"].(json.Object)) or_continue
-						})
+						}
+						obj_prtl_frame_new(frame)
+						// append(&features.portal_fixtures, )
 					case "Cube_Button":
-						append(&features.cube_buttons, Cube_Button{ 
+						btn := Cube_Button{ 
 							pos = object.pos,
-							facing = Vec2 {
-								cast(f32) (value.json_value["facing_x"].(i64) or_else 0),
-								cast(f32) (value.json_value["facing_y"].(i64) or_else 0),
-							},
+							facing = facing_from_json(value.json_value),
 							channel = channel_from_string(value.json_value["channel"].(string) or_else "") or_else .Logic,
 							event = value.json_value["event"].(string) or_else ""
-						})
+						}
+						obj_cube_btn_new(btn)
+					case "Sliding_Door":
+						door := Sliding_Door {
+							pos = object.pos + object.dims / 2,
+							facing = facing_from_json(value.json_value),
+							dims = object.dims,
+							condition = condition_from_json(value.json_value["condition"].(json.Object)) or_continue
+						}
+						obj_sliding_door_new(door)
 					case:
 						log.warnf("Unknown object class '%s'", value.classname)
 						continue

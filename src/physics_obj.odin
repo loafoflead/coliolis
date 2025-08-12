@@ -536,6 +536,7 @@ Physics_World :: struct #no_copy {
 	objects: [dynamic]Physics_Object,
 	initialised: bool,
 	collision_placeholder: Physics_Object_Id, // used for casting rect
+	collisions: [dynamic]Collision,
 	// timestep: f32,
 }
 
