@@ -24,30 +24,35 @@ Tilemap :: struct {
 
 Condition_Json :: struct {
 	type: string,
+	event_name: string,
 }
 
-condition_from_json :: proc(json_string: string) -> (Condition, bool) {
+condition_from_json :: proc(json_obj: json.Object) -> (Condition, bool) {
 	condition_json: Condition_Json
-	json_err := json.unmarshal_string(json_string, &condition_json, allocator = context.temp_allocator)
+	json_err := json.unmarshal_string(json_obj["activated_when"].(string) or_else "{}", &condition_json, allocator = context.temp_allocator)
 	if json_err != nil {
 		log.errorf("Failed to parse json string for condition, error: %v", json_err)
 		return {}, false
 	}
 
 	type: Condition_Type
+	// TODO: whose memory is this...?
+	event_name: string
 
 	switch condition_json.type {
 	case "always":
 		type = .Always_Active
 	case "event":
 		type = .On_Event
+		event_name = json_obj["event"].(string) or_else ""
 	case:
-		log.errorf("Uknown condition type '%s'", condition_json.type)
+		log.errorf("Unknown condition type '%s'", condition_json.type)
 		return {}, false
 	}
 
 	return Condition {
 		type = type,
+		event_name = event_name,
 	}, true
 }
 
@@ -62,8 +67,19 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					log.warnf("property '%s' with value '%s' will be ignored", name, value)
 				case tiled.Tilemap_Class:
 					switch value.classname {
-					case "Entry_Chute"		: features.player_spawn = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
-					case "Exit_Chute"		: features.level_exit = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
+					case "Entry_Chute"		: 
+						features.player_spawn = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
+						features.player_spawn_facing = Vec2 {
+							cast(f32) (value.json_value["facing_x"].(i64) or_else 0),
+							cast(f32) (value.json_value["facing_y"].(i64) or_else 0),
+						}
+					case "Exit_Chute"		:
+						next_lvl_found: bool
+						features.level_exit = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
+						features.next_level, next_lvl_found = value.json_value["next_level"].(string)
+						if !next_lvl_found {
+							log.error("Level exit object does not specify a next level, will just respawn endlessly")
+						}
 					case "Portal_Fixture"	: 
 						append(&features.portal_fixtures, Portal_Fixture{ 
 							pos = object.pos,
@@ -72,7 +88,17 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 								cast(f32) (value.json_value["facing_y"].(i64) or_else 0),
 							},
 							portal = cast(i32) (value.json_value["portal"].(i64) or_else 0),
-							active_condition = condition_from_json(value.json_value["activation_condition"].(string) or_else "{}") or_continue
+							condition = condition_from_json(value.json_value["condition"].(json.Object)) or_continue
+						})
+					case "Cube_Button":
+						append(&features.cube_buttons, Cube_Button{ 
+							pos = object.pos,
+							facing = Vec2 {
+								cast(f32) (value.json_value["facing_x"].(i64) or_else 0),
+								cast(f32) (value.json_value["facing_y"].(i64) or_else 0),
+							},
+							channel = channel_from_string(value.json_value["channel"].(string) or_else "") or_else .Logic,
+							event = value.json_value["event"].(string) or_else ""
 						})
 					case:
 						log.warnf("Unknown object class '%s'", value.classname)

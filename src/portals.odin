@@ -37,7 +37,31 @@ portal_dims :: proc() -> Vec2 {
 portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	assert(portal > 0 && portal < 3)
 
-	setpos(phys_obj(portal_handler.portals[portal - 1].obj), pos)
+	og := Vec3{pos.x, pos.y, 0}
+	pt := og + Vec3{facing.x, facing.y, 0}
+	quat := linalg.quaternion_look_at(og, pt, Z_AXIS)
+
+	x, y, z := linalg.euler_angles_xyz_from_quaternion(quat)
+	ang := z + linalg.PI/2
+
+	obj := phys_obj(portal_handler.portals[portal - 1].obj)
+
+	setrot(obj, Rad(ang))
+	if facing.x == 0 {
+		if facing.y < 0 {
+			rotate(obj, Rad(linalg.PI))
+		} else {
+			obj.local = transform_flip(obj)
+		}
+	}
+	else if facing.x < 0 {
+		rotate(obj, Rad(linalg.PI))
+	}
+	else {
+		obj.local = transform_flip(obj)
+	}
+
+	setpos(obj, pos)
 	portal_handler.portals[portal - 1].state += {.Alive}
 }
 

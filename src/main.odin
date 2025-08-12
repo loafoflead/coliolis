@@ -29,7 +29,7 @@ debug_print: bool = false;
 // --------------   END   --------------
 
 BACKGROUND_COLOUR :: 0x181818;
-TILEMAP :: "portals_intro.tmj"
+TILEMAP :: "cube_intro.tmj" // "portals_intro.tmj"
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
@@ -109,7 +109,6 @@ main :: proc() {
 	lvl, any_found := level_features_from_tilemap(test_map)
 
 	if !any_found do log.error("Failed to load level features from tilemap", TILEMAP)
-	log.info(lvl)
 	game_state.current_level = lvl
 
 	game_init_level()
@@ -174,9 +173,9 @@ main :: proc() {
 		player_obj:=phys_obj(player.obj);
 
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
-		// for i in 0..<len(phys_world.objects) {
-		// 	draw_phys_obj(i);
-		// }
+		for i in 0..<len(phys_world.objects) {
+			draw_phys_obj(i);
+		}
 
 		// an_obj := phys_obj(a);
 		// bb := phys_obj_bounding_box(an_obj);

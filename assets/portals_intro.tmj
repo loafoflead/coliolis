@@ -48,7 +48,7 @@
                          "type":"class",
                          "value":
                             {
-
+                             "facing_y":1
                             }
                         }, 
                         {
@@ -117,7 +117,7 @@
                          "value":
                             {
                              "activation_condition":"{\"type\":\"always\"}",
-                             "facing_y":1,
+                             "facing_y":-1,
                              "link":21,
                              "portal":1
                             }
@@ -142,7 +142,7 @@
                          "value":
                             {
                              "activation_condition":"{\"type\":\"always\"}",
-                             "facing_y":-1,
+                             "facing_y":1,
                              "link":19,
                              "portal":2
                             }

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="7">
+ <editorsettings>
+  <export target="cube_intro.tmj" format="json"/>
+ </editorsettings>
+ <tileset firstgid="1" source="colours.tsx"/>
+ <layer id="1" name="collision" width="32" height="16" locked="1">
+  <properties>
+   <property name="generate" value="static_collision"/>
+  </properties>
+  <data encoding="csv">
+2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2
+</data>
+ </layer>
+ <objectgroup id="2" name="Object Layer 1">
+  <object id="1" name="Entry" type="func" x="160" y="0" width="128" height="64" rotation="90">
+   <properties>
+    <property name="class" type="class" propertytype="Entry_Chute">
+     <properties>
+      <property name="facing_y" type="int" value="1"/>
+     </properties>
+    </property>
+   </properties>
+  </object>
+  <object id="2" name="Exit" type="func" x="512" y="384" width="128" height="64">
+   <properties>
+    <property name="class" type="class" propertytype="Exit_Chute"/>
+   </properties>
+  </object>
+  <object id="3" name="door" type="func" x="224" y="224" width="96" height="64">
+   <properties>
+    <property name="class" type="class" propertytype="Sliding_Door">
+     <properties>
+      <property name="condition" type="class" propertytype="Condition">
+       <properties>
+        <property name="activated_by" type="object" value="5"/>
+        <property name="activated_when" value="{&quot;type&quot;:&quot;event&quot;}"/>
+        <property name="channel" propertytype="Event_Channels" value="Logic"/>
+        <property name="event" value="door"/>
+       </properties>
+      </property>
+      <property name="facing_x" type="int" value="1"/>
+     </properties>
+    </property>
+   </properties>
+  </object>
+  <object id="5" name="btn" type="func" x="416" y="223">
+   <properties>
+    <property name="class" type="class" propertytype="Cube_Button">
+     <properties>
+      <property name="channel" propertytype="Event_Channels" value="Logic"/>
+      <property name="event" value="door"/>
+     </properties>
+    </property>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>
