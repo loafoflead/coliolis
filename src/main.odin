@@ -129,7 +129,7 @@ main :: proc() {
 		debug_mode := false
 	}
 
-	run_physics := true
+	run_physics := false
 
 	test_obj := add_phys_object_aabb(
 		pos = get_screen_centre(), 

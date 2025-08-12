@@ -79,7 +79,7 @@ state_get_player_spawn :: proc() -> (point: Vec2 = 0, loaded: bool = false) #opt
 	assert(game_state.initialised)
 
 	if lvl, ok := game_state.current_level.?; ok == true {
-		point = lvl.player_spawn + lvl.player_spawn_facing * PLAYER_HEIGHT / 2
+		point = lvl.player_spawn + lvl.player_spawn_facing * PLAYER_HEIGHT * 1.5
 		loaded = true
 	}
 	return
