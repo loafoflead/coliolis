@@ -145,7 +145,7 @@ generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
 				add_phys_object_aabb(
 					pos = pos, 
 					mass = 0,
-					scale = Vec2 { 
+					scale = Vec2 {
 						cast(f32) tileset.tilewidth, 
 						cast(f32) tileset.tileheight 
 					},

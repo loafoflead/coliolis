@@ -67,6 +67,10 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
 }
 
+// TODO: GET RID GET RID GET RID OMG
+dir_tex: Texture_Id
+
+
 main :: proc() {	
 	when DEBUG {
 		initialise_debugging();
@@ -97,28 +101,14 @@ main :: proc() {
 	five_w, ok := load_texture("5W.png")
 	if !ok do os.exit(1)
 
-	dir_tex: Texture_Id
 	dir_tex, ok = load_texture("nesw_sprite.png")
 	if !ok do os.exit(1)
 
-	test_map, tmap_ok := load_tilemap(TILEMAP);
-	if !tmap_ok do os.exit(1);
-	// fmt.printfln("%#v", tilemap(test_map))
-	generate_static_physics_for_tilemap(test_map)
-	generate_kill_triggers_for_tilemap(test_map)
-	lvl, any_found := level_features_from_tilemap(test_map)
-
-	if !any_found do log.error("Failed to load level features from tilemap", TILEMAP)
-	game_state.current_level = lvl
-
-	game_init_level()
+	player_gobj_id := game_load_level_from_tilemap(TILEMAP)
+	player := game_obj(player_gobj_id, Player)
 
 	initialise_portal_handler();
 	defer free_portal_handler();
-
-	player_gobj_id := obj_player_new(dir_tex)
-	player := game_obj(player_gobj_id, Player)
-	setpos(phys_obj(player.obj), state_get_player_spawn())
 
 	test_gobj := obj_cube_new(get_screen_centre())
 	test_obj := game_obj(test_gobj, Cube).obj
@@ -168,9 +158,9 @@ main :: proc() {
 		player_obj:=phys_obj(player.obj);
 
 		// draw_hitbox_at(player_obj.pos, &player_obj.hitbox);
-		for i in 0..<len(phys_world.objects) {
-			draw_phys_obj(i);
-		}
+		// for i in 0..<len(phys_world.objects) {
+		// 	draw_phys_obj(i);
+		// }
 
 		// an_obj := phys_obj(a);
 		// bb := phys_obj_bounding_box(an_obj);
@@ -178,7 +168,7 @@ main :: proc() {
 		// draw_rectangle_transform(an_obj, phys_obj_to_rect(an_obj));
 
 		// ------------ DRAWING ------------
-		draw_tilemap(test_map, {0., 0.});
+		draw_tilemap(state_level().tilemap, {0., 0.});
 		draw_portals(selected_portal);
 		render_game_objects(camera)
 

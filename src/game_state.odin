@@ -14,6 +14,8 @@ Level_Features :: struct {
 	level_exit: Vec2,
 	next_level: string,
 
+	tilemap: Tilemap_Id,
+
 	// TODO: arena plz i love the buggers
 	// arena: vmem.Arena,
 }
@@ -67,6 +69,36 @@ initialise_game_state :: proc() {
 free_game_state :: proc() {
 	delete(game_state.objects)
 	// TODO: free queues
+}
+
+game_load_level_from_tilemap :: proc(path: string) -> (player_gobj_id: Game_Object_Id) {
+	tmap, tmap_ok := load_tilemap(path);
+	if !tmap_ok {
+		log.error("Failed to load game level from tilemap", path)
+		return
+	}
+
+	clear(&phys_world.objects)
+	clear(&game_state.objects)
+	// fmt.printfln("%#v", tilemap(test_map))
+	generate_static_physics_for_tilemap(tmap)
+	generate_kill_triggers_for_tilemap(tmap)
+	lvl, any_found := level_features_from_tilemap(tmap)
+
+	if !any_found {
+		log.error("Failed to load level features from tilemap", path)
+		return
+	}
+	lvl.tilemap = tmap
+	game_state.current_level = lvl
+
+	player_gobj_id = obj_player_new(dir_tex)
+	player := game_obj(player_gobj_id, Player)
+	setpos(phys_obj(player.obj), state_get_player_spawn())
+
+	game_init_level()
+
+	return player_gobj_id
 }
 
 game_init_level :: proc() {
@@ -273,6 +305,7 @@ obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 		// TODO: on_event instead for the logic stuff
 		on_update = sliding_door_update,
 		on_event = sliding_door_event_recv,
+		on_render = door_render,
 	})
 	events_subscribe(id, {.Logic})
 	phys_obj(game_state.objects[int(id)].data.(Sliding_Door).obj).linked_game_object = id
@@ -301,6 +334,7 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 		// TODO: on_event instead for the logic stuff
 		on_collide_enter = cube_btn_collide,
 		on_collide_exit = cube_btn_exit,
+		on_render = cube_btn_render,
 	})
 	phys_obj(game_state.objects[int(id)].data.(Cube_Button).obj).linked_game_object = id
 
@@ -402,8 +436,9 @@ trigger_on_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Ph
 
 	switch trigger.type {
 	case .Level_Exit:
-		log.info("TODO: implement going to the next level")
-		fallthrough
+		if state_level().next_level != "" {
+			game_load_level_from_tilemap(state_level().next_level)
+		}
 	case .Kill:
 		other_obj.vel = 0
 		setpos(other_obj, state_get_player_spawn())
@@ -467,6 +502,18 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 
 trigger_render :: proc(self: Game_Object_Id, _: Camera2D) {
 	gobj := game_obj(self, G_Trigger)
+
+	draw_phys_obj(gobj.obj)
+}
+
+cube_btn_render :: proc(self: Game_Object_Id, _: Camera2D) {
+	gobj := game_obj(self, Cube_Button)
+
+	draw_phys_obj(gobj.obj)
+}
+
+door_render :: proc(self: Game_Object_Id, _: Camera2D) {
+	gobj := game_obj(self, Sliding_Door)
 
 	draw_phys_obj(gobj.obj)
 }
