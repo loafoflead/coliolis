@@ -34,13 +34,13 @@ is_rect_visible_to_camera :: proc(camera: Camera2D, rect: Rect) -> bool {
 }
 
 world_pos_to_screen_pos :: proc(camera: Camera2D, pos: Vec2) -> Vec2 {
-	return (pos - camera.pos) * camera.zoom;
+	return (pos - (camera.pos - camera.scale / camera.zoom / 2)) * camera.zoom;
 }
 
 get_world_screen_centre :: proc() -> Vec2 {
-	return camera.pos + get_screen_centre() / camera.zoom
+	return camera.pos
 }
 
 get_world_mouse_pos :: proc() -> Vec2 {
-	return (camera.pos + get_mouse_pos() / camera.zoom);
+	return ((camera.pos - camera.scale / camera.zoom / 2) + get_mouse_pos() / camera.zoom);
 }

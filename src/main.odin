@@ -29,7 +29,7 @@ debug_print: bool = false;
 // --------------   END   --------------
 
 BACKGROUND_COLOUR :: 0x181818;
-TILEMAP :: "cube_intro.tmj" // "portals_intro.tmj"
+TILEMAP :: "portals_intro.tmj" // "portals_intro.tmj"
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
@@ -235,11 +235,16 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
 
 		if !dragging && selected == -1 && follow_player {
-			camera.pos = player_obj.pos - get_screen_centre() / 2
+			camera.pos = player_obj.pos
 			// delta := 0.05 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos)
 			// camera.pos += delta//0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos);
 		}
 
+		if rl.IsWindowResized() {
+			window_width = rl.GetScreenWidth()
+			window_height = rl.GetScreenHeight()
+			camera.scale = Vec2{cast(f32)window_width, cast(f32)window_height}
+		}
 		
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
@@ -336,14 +341,14 @@ when DEBUG {
 
 			if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
 				dragging = true;
-				drag_og = camera.pos + get_mouse_pos();
+				drag_og = camera.pos + get_mouse_pos() / camera.zoom;
 				follow_player = false;
 			}
 			if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
 				dragging = false;
 			}
 			if dragging {
-				camera.pos = drag_og - get_mouse_pos();
+				camera.pos = drag_og - (get_mouse_pos() / camera.zoom);
 			}
 
 			mouse_move := rl.GetMouseWheelMove();

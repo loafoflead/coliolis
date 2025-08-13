@@ -50,31 +50,6 @@
                             {
                              "facing_y":1
                             }
-                        }, 
-                        {
-                         "name":"culler",
-                         "type":"string",
-                         "value":""
-                        }, 
-                        {
-                         "name":"file",
-                         "type":"file",
-                         "value":"portal_spawner.tx"
-                        }, 
-                        {
-                         "name":"floot",
-                         "type":"float",
-                         "value":0
-                        }, 
-                        {
-                         "name":"lien",
-                         "type":"object",
-                         "value":19
-                        }, 
-                        {
-                         "name":"test",
-                         "type":"bool",
-                         "value":false
                         }],
                  "rotation":90,
                  "type":"func",
@@ -94,7 +69,7 @@
                          "type":"class",
                          "value":
                             {
-
+                             "next_level":"cube_intro.tmj"
                             }
                         }],
                  "rotation":0,
@@ -117,6 +92,10 @@
                          "value":
                             {
                              "activation_condition":"{\"type\":\"always\"}",
+                             "condition":
+                                {
+                                 "activated_when":"{\"type\":\"always\"}"
+                                },
                              "facing_y":-1,
                              "link":21,
                              "portal":1
@@ -142,6 +121,10 @@
                          "value":
                             {
                              "activation_condition":"{\"type\":\"always\"}",
+                             "condition":
+                                {
+                                 "activated_when":"{\"type\":\"always\"}"
+                                },
                              "facing_y":1,
                              "link":19,
                              "portal":2
