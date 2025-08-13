@@ -59,7 +59,7 @@
     </property>
    </properties>
   </object>
-  <object id="5" name="btn" type="func" x="416" y="223">
+  <object id="5" name="btn" type="func" x="416" y="221">
    <properties>
     <property name="class" type="class" propertytype="Cube_Button">
      <properties>

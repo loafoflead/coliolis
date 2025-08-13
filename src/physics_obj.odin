@@ -584,7 +584,8 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		if collision_rect == Rect(0) do continue
 
 		other_obj := objs[i]
-		if .Trigger not_in other_obj.flags && !done_physics {
+		if .Trigger not_in other_obj.flags {
+			if done_physics do continue
 			done_physics = true
 			momentum := obj.mass * obj.vel; // vector quantity just to store two scalars
 
@@ -729,9 +730,37 @@ add_phys_object_aabb :: proc(
 }
 
 update_phys_world :: proc(dt: f32) {
+	previous := make([][2]Physics_Object_Id, len(phys_world.collisions))
+	copy(previous[:], phys_world.collisions[:])
+	
 	clear(&phys_world.collisions)
 
 	cache_next_step_collisions(dt)
+
+	// if len(phys_world.collisions) != len(previous) {
+		for i in 0..<len(phys_world.collisions) {
+			// gained an element
+			col := phys_world.collisions[i]
+			if !slice.contains(previous, col) {
+				obj_link, link1 := phys_obj(col[0]).linked_game_object.?
+				other_obj_link, link2 := phys_obj(col[1]).linked_game_object.?
+				if link1 && link2 {
+					game_obj_col_enter(obj_link, other_obj_link, col[0], col[1])
+				}
+			}
+		}
+		for i in 0..<len(previous) {
+			// lost an element
+			col := previous[i]
+			if !slice.contains(phys_world.collisions[:], col) {
+				obj_link, link1 := phys_obj(col[0]).linked_game_object.?
+				other_obj_link, link2 := phys_obj(col[1]).linked_game_object.?
+				if link1 && link2 {
+					game_obj_col_exit(obj_link, other_obj_link, col[0], col[1])
+				}
+			}
+		}
+	// }
 
 	for _, i in phys_world.objects {
 		update_physics_object(i, &phys_world, dt);

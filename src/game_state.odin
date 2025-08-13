@@ -143,6 +143,17 @@ update_game_state :: proc(dt: f32) {
 	}
 }
 
+game_obj_col_enter :: proc(gobj_id, other_gobj: Game_Object_Id, obj, other_obj: Physics_Object_Id) {
+	gobj := game_obj(gobj_id)
+	if gobj.on_collide_enter != nil do (gobj.on_collide_enter)(gobj_id, other_gobj, phys_obj(obj), phys_obj(other_obj))
+}
+
+game_obj_col_exit :: proc(gobj_id, other_gobj: Game_Object_Id, obj, other_obj: Physics_Object_Id) {
+	gobj := game_obj(gobj_id)
+	if gobj.on_collide_exit != nil do (gobj.on_collide_exit)(gobj_id, other_gobj, phys_obj(obj), phys_obj(other_obj))
+}
+
+
 render_game_objects :: proc(camera: Camera2D) {
 	for obj, i in game_state.objects {
 		if obj.on_render != nil do (obj.on_render)(Game_Object_Id(i), camera)
@@ -193,6 +204,8 @@ Portal_Fixture :: struct {
 	condition: Condition,
 	portal: i32,
 }
+
+SLIDING_DOOR_SPEED_MS :: f32(1.0)
 
 Sliding_Door :: struct {
 	using common: Level_Feature_Common,
@@ -332,7 +345,6 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 
 
 cube_btn_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
-	log.info("hi")
 	btn := game_obj(self, Cube_Button)
 	if other_obj == phys_obj(game_obj(game_state.player, Player).obj) {
 		send_game_event(Game_Event {
@@ -346,7 +358,6 @@ cube_btn_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Phys
 }
 
 cube_btn_exit :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
-	log.info("bye")
 	btn := game_obj(self, Cube_Button)
 	
 	send_game_event(Game_Event {
@@ -388,21 +399,20 @@ sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bo
 
 	obj := phys_obj(door.obj)
 
-	target: Vec2
+	origin := door.pos
+	target := door.pos + door.dims * door.facing 
 
-	if door.open && door.open_percent < 1 {
-		target = door.pos + (door.dims * door.facing)
-		door.open_percent += dt
+	if door.open {
+		door.open_percent += SLIDING_DOOR_SPEED_MS * dt
 	}
-	else if !door.open && door.open_percent > 0 {
-		target = door.pos
-		door.open_percent -= dt
+	else {
+		door.open_percent -= SLIDING_DOOR_SPEED_MS * dt
 	}
 
 	if door.open_percent < 0 do door.open_percent = 0
 	if door.open_percent > 1 do door.open_percent = 1
 
-	new_pos := obj.pos + (target - obj.pos) * ease.ease(ease.Ease.Circular_In, door.open_percent);
+	new_pos := origin + (target - origin) * ease.ease(ease.Ease.Quintic_Out, door.open_percent);
 	setpos(obj, new_pos)
 
 	return false

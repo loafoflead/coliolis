@@ -53,13 +53,7 @@ inform_game_object :: proc(obj: Game_Object_Id, payload: Game_Object_Message_Pay
 
 	switch data in payload {
 	case Collision:
-		if gobj.is_colliding {
-			if gobj.on_collide != nil do (gobj.on_collide)(obj, data.other, data.self_obj, data.other_obj)
-		}
-		else {
-			if gobj.on_collide_enter != nil do (gobj.on_collide_enter)(obj, data.other, data.self_obj, data.other_obj)
-			gobj.is_colliding = true
-		}
+		if gobj.on_collide != nil do (gobj.on_collide)(obj, data.other, data.self_obj, data.other_obj)
 	}
 }
 
