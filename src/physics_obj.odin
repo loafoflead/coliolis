@@ -743,6 +743,18 @@ initialise_phys_world :: proc() {
 	phys_world.collision_placeholder = add_phys_object_aabb(
 		scale={1, 1},
 		flags = {.Non_Kinematic, .Fixed, .Trigger},
+		collision_layers = {.Default},
+	)
+	phys_world.initialised = true;
+}
+
+reinit_phys_world :: proc() {
+	clear(&phys_world.objects)
+	clear(&phys_world.collisions)
+	phys_world.collision_placeholder = add_phys_object_aabb(
+		scale={1, 1},
+		flags = {.Non_Kinematic, .Fixed, .Trigger},
+		collision_layers = {.Default},
 	)
 	phys_world.initialised = true;
 }

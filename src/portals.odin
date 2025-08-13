@@ -69,6 +69,12 @@ initialise_portal_handler :: proc() {
 	if !phys_world.initialised do panic("Must initialise physics world before initialising portals");
 	if !timers.initialised do panic("Must initialise timers before initialising portals");
 
+	for &ptl in portal_handler.portals {
+		ptl.state = {}
+		ptl.occupant = nil
+		ptl.obj = PHYS_OBJ_INVALID
+	}
+
 	portal_handler.portals.x.obj = add_phys_object_aabb(
 		scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},

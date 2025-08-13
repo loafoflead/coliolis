@@ -71,15 +71,18 @@ free_game_state :: proc() {
 	// TODO: free queues
 }
 
-game_load_level_from_tilemap :: proc(path: string) -> (player_gobj_id: Game_Object_Id) {
+game_load_level_from_tilemap :: proc(path: string) {
 	tmap, tmap_ok := load_tilemap(path);
 	if !tmap_ok {
 		log.error("Failed to load game level from tilemap", path)
 		return
 	}
 
-	clear(&phys_world.objects)
+	reinit_phys_world()
+
 	clear(&game_state.objects)
+	initialise_portal_handler()
+
 	// fmt.printfln("%#v", tilemap(test_map))
 	generate_static_physics_for_tilemap(tmap)
 	generate_kill_triggers_for_tilemap(tmap)
@@ -92,13 +95,12 @@ game_load_level_from_tilemap :: proc(path: string) -> (player_gobj_id: Game_Obje
 	lvl.tilemap = tmap
 	game_state.current_level = lvl
 
-	player_gobj_id = obj_player_new(dir_tex)
+	player_gobj_id := obj_player_new(dir_tex)
 	player := game_obj(player_gobj_id, Player)
 	setpos(phys_obj(player.obj), state_get_player_spawn())
+	game_state.player = player_gobj_id
 
 	game_init_level()
-
-	return player_gobj_id
 }
 
 game_init_level :: proc() {
@@ -124,6 +126,12 @@ state_level :: proc() -> ^Level_Features {
 	}
 
 	return nil
+}
+
+state_player :: proc() -> ^Player {
+	assert(game_state.initialised)
+
+	return game_obj(game_state.player, Player)
 }
 
 get_game_obj :: proc(id: Game_Object_Id) -> (^Game_Object, bool) #optional_ok {
@@ -494,6 +502,7 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
 	case Logic_Event:
 		self := game_obj(self, Portal_Fixture)
+		portal_goto(self.portal, self.pos, self.facing)
 		if event.name == self.condition.event_name do self.condition.override = payload.activated
 	}
 }

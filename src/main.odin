@@ -104,8 +104,7 @@ main :: proc() {
 	dir_tex, ok = load_texture("nesw_sprite.png")
 	if !ok do os.exit(1)
 
-	player_gobj_id := game_load_level_from_tilemap(TILEMAP)
-	player := game_obj(player_gobj_id, Player)
+	game_load_level_from_tilemap(TILEMAP)
 
 	initialise_portal_handler();
 	defer free_portal_handler();
@@ -154,6 +153,8 @@ main :: proc() {
 		rl.BeginDrawing();
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR));
 		rl.DrawFPS(0, 0);
+
+		player := state_player()
 
 		player_obj:=phys_obj(player.obj);
 
@@ -299,7 +300,7 @@ main :: proc() {
 		}
 		if collision.hit {
 			draw_line(collision.point.xy, collision.point.xy + collision.normal.xy * 100, Colour{1 = 255, 3 = 255})
-			// draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
+			draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
 		}
 		// setrot(phys_obj(portal_handler.portals[selected_portal].obj), Rad(-spin))
 
