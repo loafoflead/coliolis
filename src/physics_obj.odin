@@ -39,6 +39,8 @@ COLLISION_LAYERS_ALL: bit_set[Collision_Layer] : {.Default, .Portal_Surface, .L0
 PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer] { .Default }
 PHYS_OBJ_DEFAULT_COLLISION_LAYERS 	  :: bit_set[Collision_Layer] { .Default }
 
+PHYS_OBJ_DEFAULT_FLAGS :: bit_set[Physics_Object_Flag] {}
+
 AABB :: [2]f32;
 
 ColliderType :: enum {
@@ -74,6 +76,8 @@ Physics_Object_Flag :: enum u32 {
 	Drag_Exception, 		// use drag values for the player 
 	Trigger,				// collide but don't physics
 	Fixed,					// used outside of the physics world to mark objects as no-touch
+
+	Weigh_Down_Buttons,		// yeah... need to put this somewhere else eventually (bet I will never fix it)
 }
 
 // ----- STUFF THAT SHOULD GO IN ANOTHER PACKAGE -----
@@ -92,6 +96,13 @@ vec_abs_max_elem_wise :: proc(vec1, vec2: [$N]$T) -> (max: [N]T)
 		if math.abs(vec1[i]) > math.abs(vec2[i]) do max[i] = vec1[i]
 		else if math.abs(vec1[i]) == math.abs(vec2[i]) do max[i] = vec1[i] // choose first one (random but ye)
 		else do max[i] = vec2[i]
+	}
+	return
+}
+
+vec_abs :: proc(vec: [$N]$T) -> (abs: [N]T) {
+	for i in 0..<N {
+		abs[i] = math.abs(vec[i])
 	}
 	return
 }
@@ -595,9 +606,40 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 
 		other_obj := objs[i]
 		if .Trigger not_in other_obj.flags {
-			momentum := obj.mass * obj.vel; // vector quantity just to store two scalars
-
 			other_pos := transform_to_world(other_obj).pos;
+			
+			// https://en.wikipedia.org/wiki/Momentum
+			// https://en.wikipedia.org/wiki/Elastic_collision
+// https://github.com/OneLoneCoder/Javidx9/blob/master/ConsoleGameEngine/BiggerProjects/Balls/OneLoneCoder_Balls2.cpp
+			obj_momentum, other_obj_momentum: f32
+			normal, tangent, obj_dot, other_obj_dot: Vec2
+
+			if .Non_Kinematic not_in other_obj.flags {
+				// prob not the right assumption to make...
+				// (plus it makes an 'ass' out of 'u' and 'me' :[ )
+				normal = linalg.normalize(other_pos - next_pos)
+
+				tangent.x = -normal.y 
+				tangent.y = normal.x 
+
+				obj_dot = linalg.dot(obj.vel, tangent)
+				other_obj_dot = linalg.dot(other_obj.vel, tangent)
+
+				obj_dot_norm := linalg.dot(obj.vel, normal)
+				other_obj_dot_norm := linalg.dot(other_obj.vel, normal)
+
+				obj_momentum = COLLISION_MOMENTUM_DAMPING * 
+					(
+						obj_dot_norm * (obj.mass - other_obj.mass) 
+							+ f32(2) * other_obj.mass * other_obj_dot_norm
+					) / (obj.mass + other_obj.mass)
+				other_obj_momentum = COLLISION_MOMENTUM_DAMPING * 
+					(
+						other_obj_dot_norm * (other_obj.mass - obj.mass) 
+							+ f32(2) * obj.mass * obj_dot_norm
+					) / (obj.mass + other_obj.mass)
+			}
+
 			// use obj.pos instead of next_pos so we know where we came from
 			obj_centre := phys_obj_centre(obj);
 			other_obj_centre := phys_obj_centre(other_obj);
@@ -610,8 +652,8 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				move_back.y = collision_rect.w * sign;
 				if collision_rect.w > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.y {
 					if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.y) > MIN_SPEED {
-						other_obj.vel.y = momentum.y / other_obj.mass * COLLISION_MOMENTUM_DAMPING;
-						next_vel.y 		= momentum.y / obj.mass * COLLISION_MOMENTUM_DAMPING;
+						next_vel.y = tangent.y * obj_dot.y + normal.y * obj_momentum
+						other_obj.vel.y = tangent.y * other_obj_dot.y + normal.y * other_obj_momentum
 					}
 					else {
 						next_vel.y = 0; //-next_vel.y;
@@ -627,8 +669,8 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				move_back.x = collision_rect.z * sign;
 				if collision_rect.z > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.x {
 					if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.x) > MIN_SPEED {
-						other_obj.vel.x = momentum.x / other_obj.mass * COLLISION_MOMENTUM_DAMPING;
-						next_vel.x 		= momentum.x / obj.mass * COLLISION_MOMENTUM_DAMPING;
+						next_vel.x = tangent.x * obj_dot.x + normal.x * obj_momentum
+						other_obj.vel.x = tangent.x * other_obj_dot.x + normal.x * other_obj_momentum
 					}
 					else {
 						next_vel.x = 0; //-next_vel.y;
@@ -718,7 +760,7 @@ add_phys_object_aabb :: proc(
 	acc:   Vec2 = Vec2{},
 	game_obj: Maybe(Game_Object_Id) = nil,
 	parent: ^Transform = nil,
-	flags: bit_set[Physics_Object_Flag] = {},
+	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
 	collision_layers: bit_set[Collision_Layer] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 	collide_with: bit_set[Collision_Layer] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
 ) -> (id: Physics_Object_Id)

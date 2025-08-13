@@ -37,7 +37,7 @@ Game_State :: struct {
 	event_subscribers: map[Game_Object_Id]Game_Event_Set,
 }
 
-Game_Object_Type :: union{G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door}
+Game_Object_Type :: union{G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door, Cube}
 
 Game_Object :: struct {
 	on_collide: Game_Object_On_Collide_Function,
@@ -199,6 +199,10 @@ Cube_Button :: struct {
 	obj: Physics_Object_Id,
 }
 
+Cube :: struct {
+	obj: Physics_Object_Id,
+}
+
 Portal_Fixture :: struct {
 	using common: Level_Feature_Common,
 	condition: Condition,
@@ -224,6 +228,29 @@ G_Trigger :: struct {
 	type: G_Trigger_Type,
 	obj: Physics_Object_Id,
 	// TODO: callback?
+}
+
+obj_cube_new :: proc(pos: Vec2) -> (id: Game_Object_Id) {
+	assert(game_state.initialised)
+
+	obj := add_phys_object_aabb(
+		pos = pos,
+		mass = kg(3),
+		scale = {32, 32},
+		flags = {.Weigh_Down_Buttons},
+	)
+
+	cube: Cube
+
+	cube.obj = obj
+
+	id = Game_Object_Id(len(game_state.objects))
+	append(&game_state.objects, Game_Object {
+		data = cube,
+	})
+	phys_obj(game_state.objects[int(id)].data.(Cube).obj).linked_game_object = id
+
+	return // id
 }
 
 obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
@@ -346,7 +373,7 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 
 cube_btn_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
 	btn := game_obj(self, Cube_Button)
-	if other_obj == phys_obj(game_obj(game_state.player, Player).obj) {
+	if .Weigh_Down_Buttons in other_obj.flags {
 		send_game_event(Game_Event {
 			sender = self,
 			name = btn.event,

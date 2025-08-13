@@ -41,8 +41,8 @@ player_new :: proc(texture: Texture_Id) -> Player {
 		pos = get_screen_centre(), 
 		mass = kg(PLAYER_WEIGHT_KG), 
 		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
-		flags = {.Drag_Exception},
-		collide_with = {.Default, .L0},
+		flags = {.Drag_Exception, .Weigh_Down_Buttons},
+		collide_with = {.Default},
 	);
 	player.texture = texture;
 

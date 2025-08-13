@@ -120,6 +120,9 @@ main :: proc() {
 	player := game_obj(player_gobj_id, Player)
 	setpos(phys_obj(player.obj), state_get_player_spawn())
 
+	test_gobj := obj_cube_new(get_screen_centre())
+	test_obj := game_obj(test_gobj, Cube).obj
+
 	// portal_handler.portals.x.state += {.Alive};
 	// portal_handler.portals.y.state += {.Alive};
 
@@ -129,15 +132,7 @@ main :: proc() {
 		debug_mode := false
 	}
 
-	run_physics := false
-
-	test_obj := add_phys_object_aabb(
-		pos = get_screen_centre(), 
-		scale = Vec2{40, 40}, 
-		mass = kg(10), 
-		flags={.No_Gravity}
-	); 
-	// test object
+	run_physics := true
 
 	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity, .Trigger});
 	papi := &phys_obj(a).local;
