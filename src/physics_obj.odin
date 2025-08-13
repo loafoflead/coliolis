@@ -86,6 +86,16 @@ rect_diagonal :: proc(r: Rect) -> f32 {
 	return linalg.length(r.wz)
 }
 
+vec_abs_max_elem_wise :: proc(vec1, vec2: [$N]$T) -> (max: [N]T)
+{
+	for i in 0..<N {
+		if math.abs(vec1[i]) > math.abs(vec2[i]) do max[i] = vec1[i]
+		else if math.abs(vec1[i]) == math.abs(vec2[i]) do max[i] = vec1[i] // choose first one (random but ye)
+		else do max[i] = vec2[i]
+	}
+	return
+}
+
 // ---------------------------------------------------
 
 phys_obj :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
@@ -577,7 +587,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 		return
 	}
 
-	done_physics: bool
+	move_back_total: Vec2
 
 	for i in 0..<len(rects) {
 		collision_rect := rects[i]
@@ -585,8 +595,6 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 
 		other_obj := objs[i]
 		if .Trigger not_in other_obj.flags {
-			if done_physics do continue
-			done_physics = true
 			momentum := obj.mass * obj.vel; // vector quantity just to store two scalars
 
 			other_pos := transform_to_world(other_obj).pos;
@@ -611,7 +619,8 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				}
 
 				move_back.x = 0.0;
-				next_pos += move_back;
+				move_back_total = vec_abs_max_elem_wise(move_back_total, move_back)
+				// next_pos += move_back;
 			}
 			else if collision_rect.z < collision_rect.w && collision_rect.z > MIN_COLLISION_MOVE_BACK {
 				sign := -1.0 if move_back.x < 0.0 else f32(1.0);
@@ -627,7 +636,9 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				}
 
 				move_back.y = 0.0;
-				next_pos += move_back;
+				move_back_total = vec_abs_max_elem_wise(move_back_total, move_back)
+
+				// next_pos += move_back;
 			}
 			// else {
 			// 	next_pos += collision_rect.wz * Vec2{math.sign(move_back.x), math.sign(move_back.y)}
@@ -657,7 +668,10 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 				})
 			}
 		}
+		// TODO: get rid of this ^^^^ (replace with what????)
 	}
+
+	next_pos += move_back_total
 
 	setpos(obj, next_pos); // TODO: doesn't work if parented
 	obj.vel = next_vel;
