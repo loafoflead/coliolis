@@ -45,7 +45,6 @@ Game_Object :: struct {
 	on_collide: Game_Object_On_Collide_Function,
 	on_collide_enter: Game_Object_On_Collide_Function,
 	on_collide_exit: Game_Object_On_Collide_Function,
-	is_colliding: bool,
 
 	on_update: Game_Object_On_Update_Function,
 	on_render: Game_Object_Render_Function,
@@ -53,8 +52,7 @@ Game_Object :: struct {
 
 	// Add here any new game object types
 	data: Game_Object_Type,
-	// TODO: add optional phys_obj field for consistency and lightening load on message system
-	// and decoupling physics system
+	obj: Maybe(Physics_Object_Id),
 }
 
 initialise_game_state :: proc() {
@@ -149,6 +147,12 @@ get_game_obj_data :: proc(id: Game_Object_Id, $T: typeid) -> (^T, bool) #optiona
 }
 
 game_obj :: proc{get_game_obj, get_game_obj_data}
+
+@(private)
+pair_physics :: proc(gobj: Game_Object_Id, phobj: Physics_Object_Id) {
+	game_obj(gobj).obj = phobj
+	phys_obj(phobj).linked_game_object = gobj
+}
 
 update_game_state :: proc(dt: f32) {
 	to_delete := make([dynamic]int)
@@ -282,13 +286,11 @@ obj_cube_new :: proc(pos: Vec2) -> (id: Game_Object_Id) {
 
 	cube: Cube
 
-	cube.obj = obj
-
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = cube,
 	})
-	phys_obj(game_state.objects[int(id)].data.(Cube).obj).linked_game_object = id
+	pair_physics(id, obj)
 
 	return // id
 }
@@ -296,16 +298,12 @@ obj_cube_new :: proc(pos: Vec2) -> (id: Game_Object_Id) {
 obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
 
-	door := door
-
 	obj := add_phys_object_aabb(
 		pos = door.pos,
 		scale = door.dims,
 		flags = {.Non_Kinematic, .No_Gravity},
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS
 	)
-
-	door.obj = obj
 
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
@@ -316,15 +314,13 @@ obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 		on_render = door_render,
 	})
 	events_subscribe(id, {.Logic})
-	phys_obj(game_state.objects[int(id)].data.(Sliding_Door).obj).linked_game_object = id
+	pair_physics(id, obj)
 
 	return // id
 }
 
 obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
-
-	btn := btn
 
 	obj := add_phys_object_aabb(
 		pos = btn.pos,
@@ -334,8 +330,6 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS
 	)
 
-	btn.obj = obj
-
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = btn,
@@ -344,7 +338,7 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 		on_collide_exit = cube_btn_exit,
 		on_render = cube_btn_render,
 	})
-	phys_obj(game_state.objects[int(id)].data.(Cube_Button).obj).linked_game_object = id
+	pair_physics(id, obj)
 
 	return // id
 }
@@ -390,11 +384,10 @@ obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_
 	append(&game_state.objects, Game_Object {
 		data = G_Trigger {
 			type = type,
-			obj = trueobj,
 		},
 		on_collide = trigger_on_collide,
 	})
-	phys_obj(game_state.objects[int(id)].data.(G_Trigger).obj).linked_game_object = id
+	pair_physics(id, trueobj)
 
 	return // id
 }
@@ -467,7 +460,7 @@ update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool
 sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	door := game_obj(self, Sliding_Door)
 
-	obj := phys_obj(door.obj)
+	obj := phys_obj(game_obj(self).obj.?)
 
 	origin := door.pos
 	target := door.pos + door.dims * door.facing 
@@ -510,19 +503,19 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 
 
 trigger_render :: proc(self: Game_Object_Id, _: Camera2D) {
-	gobj := game_obj(self, G_Trigger)
+	gobj := game_obj(self)
 
-	draw_phys_obj(gobj.obj)
+	draw_phys_obj(gobj.obj.?)
 }
 
 cube_btn_render :: proc(self: Game_Object_Id, _: Camera2D) {
-	gobj := game_obj(self, Cube_Button)
+	gobj := game_obj(self)
 
-	draw_phys_obj(gobj.obj)
+	draw_phys_obj(gobj.obj.?)
 }
 
 door_render :: proc(self: Game_Object_Id, _: Camera2D) {
-	gobj := game_obj(self, Sliding_Door)
+	gobj := game_obj(self)
 
-	draw_phys_obj(gobj.obj)
+	draw_phys_obj(gobj.obj.?)
 }

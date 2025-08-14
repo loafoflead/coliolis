@@ -26,7 +26,7 @@ COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD :: Vec2 { 0.5, 0.1 };
 MIN_COLLISION_MOVE_BACK :: 0.001;
 
 // TODO: distinct
-Physics_Object_Id :: int; 
+Physics_Object_Id :: distinct int; 
 PHYS_OBJ_INVALID :: Physics_Object_Id(-1)
 
 Collision_Layer :: enum {
@@ -109,11 +109,29 @@ vec_abs :: proc(vec: [$N]$T) -> (abs: [N]T) {
 
 // ---------------------------------------------------
 
-phys_obj :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
-	if len(phys_world.objects) < cast(int) id || cast(int) id == -1 do return nil, false;
-	obj := &phys_world.objects[cast(int)id];
-	// obj.world = transform_to_world(obj.transform);
+phys_obj_from_id :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
+	if len(phys_world.objects) <= cast(int) id - phys_world.generation || cast(int) id - phys_world.generation < 0 || cast(int) id - phys_world.generation == -1 {
+		if int(id) <= phys_world.generation {
+			log.panicf("Physics object that was deleted was used: %i", id)
+		}
+		else {
+			log.panicf("invalid phys obj id used: %i", id);
+		}
+	}
+	obj := &phys_world.objects[cast(int)id - phys_world.generation];
 	return obj, true;
+}
+
+phys_obj_from_index :: proc(index: int) -> (^Physics_Object, bool) #optional_ok {
+	if len(phys_world.objects) < index || index == -1 do return nil, false;
+	obj := &phys_world.objects[index];
+	return obj, true;
+}
+
+phys_obj :: proc{phys_obj_from_id, phys_obj_from_index}
+
+index_to_id :: proc(index: int) -> Physics_Object_Id {
+	return Physics_Object_Id(index + phys_world.generation)
 }
 
 phys_obj_world_pos :: proc(obj: ^Physics_Object) -> Vec2 {
@@ -240,6 +258,8 @@ phys_obj_bounding_box :: proc(obj: ^Physics_Object) -> Rect {
 	}
 }
 
+
+
 cache_next_step_collisions :: proc(dt: f32) {
 	no_collide := make([dynamic]Physics_Object_Id, len=0, cap=len(phys_world.objects))
 	total_iters: int
@@ -251,9 +271,9 @@ cache_next_step_collisions :: proc(dt: f32) {
 		collides: bool
 		for other_obj, j in phys_world.objects {
 			if i == j do continue
-			if slice.contains(no_collide[:], j) do continue
+			if slice.contains(no_collide[:], index_to_id(j)) do continue
 			if .No_Collisions in other_obj.flags do continue
-			smaller, bigger := (i if i < j else j), (j if j > i else i)
+			smaller, bigger := index_to_id(i if i < j else j), index_to_id(j if j > i else i)
 			if slice.contains(phys_world.collisions[:], [2]Physics_Object_Id{smaller, bigger}) do continue
 
 			obj := phys_obj(smaller);
@@ -285,7 +305,7 @@ cache_next_step_collisions :: proc(dt: f32) {
 			}
 			total_iters += 1
 		}
-		if !collides do append(&no_collide, i)
+		if !collides do append(&no_collide, index_to_id(i))
 	}
 }
 
@@ -390,10 +410,11 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = 
 )
 {
 	for i in 0..<len(phys_world.objects) {
-		if slice.contains(exclude, i) do continue;
-		if check_phys_object_point_collide(i, point, layers, ignore_triggers) {
-			collided_with = phys_obj(i);
-			collided_with_id = i;
+		id := index_to_id(i)
+		if slice.contains(exclude, id ) do continue;
+		if check_phys_object_point_collide(id, point, layers, ignore_triggers) {
+			collided_with = phys_obj(id);
+			collided_with_id = id;
 			success = true;
 			return;
 		}
@@ -405,8 +426,9 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 	obj := phys_obj(obj_id);
 	if .No_Collisions in obj.flags do return rl.Rectangle{}, nil, false;
 	for &other_obj, i in phys_world.objects {
+		id := index_to_id(i)
 		if 
-			i == obj_id || Physics_Object_Flag.No_Collisions in other_obj.flags
+			id == obj_id || Physics_Object_Flag.No_Collisions in other_obj.flags
 		{ continue; }
 		if obj.collide_with_layers & other_obj.collision_layers == {} do continue;
 
@@ -420,7 +442,7 @@ get_first_collision_in_world :: proc(obj_id: Physics_Object_Id, set_pos: Vec2 = 
 
 		r1 := transmute(rl.Rectangle) obj_rect;
 		r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(&other_obj);
-		if check_phys_objects_collide(obj_id, i, first_set_pos = pos) {
+		if check_phys_objects_collide(obj_id, id, first_set_pos = pos) {
 			collision_rect := rl.GetCollisionRec(r1, r2);
 			return collision_rect, &other_obj, true;
 		}
@@ -433,6 +455,7 @@ get_all_collisions_in_world :: proc(
 	set_pos := MARKER_VEC2, 
 	allocator := context.temp_allocator,
 	layers := COLLISION_LAYERS_ALL,
+	ignore_cache := false,
 ) -> (
 	rects: [dynamic]Rect,
 	objs: [dynamic]^Physics_Object,
@@ -446,35 +469,21 @@ get_all_collisions_in_world :: proc(
 	rects = make([dynamic]Rect, len=0, cap = EXPECTED_COLLISIONS, allocator=allocator)
 	objs = make([dynamic]^Physics_Object, len=0, cap = EXPECTED_COLLISIONS, allocator=allocator)
 
-	i: int
-	MAX_COLLISIONS_AT_ONCE :: 8
+	if ignore_cache {
+		for &other_obj, i in phys_world.objects {
+			id := index_to_id(i)
+			if 
+				id == obj_id || .No_Collisions in other_obj.flags
+			{ continue }
+			if obj.collide_with_layers & other_obj.collision_layers == {} do continue
 
-	cols := make([]Physics_Object_Id, MAX_COLLISIONS_AT_ONCE)
+			if layers & other_obj.collision_layers == {} do continue
+			// the shortest length of a line such that these objects may be touching
+			// (i think... am too tired to properly work this out (tracing a line from centre to 'furthest' corner))
+			min_dist := rect_diagonal(phys_obj_bounding_box(obj))/2 + rect_diagonal(phys_obj_bounding_box(&other_obj))/2
+			
+			if linalg.length(phys_obj_world_pos(obj) - phys_obj_world_pos(&other_obj)) > min_dist do continue
 
-	for pair in phys_world.collisions {
-		bigger, smaller := pair[0], pair[1]
-		// TODO: spatially partition collisions if this gets too slow
-		if i >= MAX_COLLISIONS_AT_ONCE {
-			log.error(
-				"Object collides more than", 
-				MAX_COLLISIONS_AT_ONCE, 
-				"times, the rest are ignored"
-			)
-			continue
-		}
-		if smaller == obj_id {
-			cols[i] = bigger
-			i += 1
-		}
-		if bigger == obj_id {
-			cols[i] = smaller
-			i += 1
-		}
-	}
-
-	if i != 0 {
-		for i in 0..=i {
-			other_obj := phys_obj(cols[i])
 			pos: Vec2;
 			if set_pos == MARKER_VEC2 do pos = transform_to_world(obj).pos;
 			else {
@@ -484,14 +493,64 @@ get_all_collisions_in_world :: proc(
 			obj_rect.xy = pos - obj_rect.zw / 2;
 
 			r1 := transmute(rl.Rectangle) obj_rect;
-			r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(other_obj);
+			r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(&other_obj);
+			if check_phys_objects_collide(obj_id, id, first_set_pos = pos) {
+				collision_rect := rl_rectangle_to_rect(rl.GetCollisionRec(r1, r2));
+				append(&rects, collision_rect)
+				append(&objs, &other_obj)
 
-			collision_rect := rl_rectangle_to_rect(rl.GetCollisionRec(r1, r2));
-			append(&rects, collision_rect)
-			append(&objs, other_obj)
+				any_hits = true
+			}
 		}
-		any_hits = true
-		return
+	}
+	else {
+		i: int
+		MAX_COLLISIONS_AT_ONCE :: 8
+
+		cols := make([]Physics_Object_Id, MAX_COLLISIONS_AT_ONCE)
+
+		for pair in phys_world.collisions {
+			bigger, smaller := pair[0], pair[1]
+			// TODO: spatially partition collisions if this gets too slow
+			if i >= MAX_COLLISIONS_AT_ONCE {
+				log.error(
+					"Object collides more than", 
+					MAX_COLLISIONS_AT_ONCE, 
+					"times, the rest are ignored"
+				)
+				continue
+			}
+			if smaller == obj_id {
+				cols[i] = bigger
+				i += 1
+			}
+			if bigger == obj_id {
+				cols[i] = smaller
+				i += 1
+			}
+		}
+
+		if i != 0 {
+			for i in 0..<i {
+				other_obj := phys_obj(cols[i])
+				pos: Vec2;
+				if set_pos == MARKER_VEC2 do pos = transform_to_world(obj).pos;
+				else {
+					pos = set_pos;
+				}
+				obj_rect := aabb_obj_to_world_rect(obj);
+				obj_rect.xy = pos - obj_rect.zw / 2;
+
+				r1 := transmute(rl.Rectangle) obj_rect;
+				r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(other_obj);
+
+				collision_rect := rl_rectangle_to_rect(rl.GetCollisionRec(r1, r2));
+				append(&rects, collision_rect)
+				append(&objs, other_obj)
+			}
+			any_hits = true
+			return
+		}
 	}
 
 	// if obj_id in phys_world.collisions {
@@ -518,46 +577,12 @@ get_all_collisions_in_world :: proc(
 	// else {
 		
 	// }
-
-	any_hits = false
-	if true do return
-
-	for &other_obj, i in phys_world.objects {
-		if 
-			i == obj_id || .No_Collisions in other_obj.flags
-		{ continue }
-		if obj.collide_with_layers & other_obj.collision_layers == {} do continue
-
-		if layers & other_obj.collision_layers == {} do continue
-		// the shortest length of a line such that these objects may be touching
-		// (i think... am too tired to properly work this out (tracing a line from centre to 'furthest' corner))
-		min_dist := rect_diagonal(phys_obj_bounding_box(obj))/2 + rect_diagonal(phys_obj_bounding_box(&other_obj))/2
-		
-		if linalg.length(phys_obj_world_pos(obj) - phys_obj_world_pos(&other_obj)) > min_dist do continue
-
-		pos: Vec2;
-		if set_pos == MARKER_VEC2 do pos = transform_to_world(obj).pos;
-		else {
-			pos = set_pos;
-		}
-		obj_rect := aabb_obj_to_world_rect(obj);
-		obj_rect.xy = pos - obj_rect.zw / 2;
-
-		r1 := transmute(rl.Rectangle) obj_rect;
-		r2 := transmute(rl.Rectangle) aabb_obj_to_world_rect(&other_obj);
-		if check_phys_objects_collide(obj_id, i, first_set_pos = pos) {
-			collision_rect := rl_rectangle_to_rect(rl.GetCollisionRec(r1, r2));
-			append(&rects, collision_rect)
-			append(&objs, &other_obj)
-
-			any_hits = true
-		}
-	}
-
+	
 	return
 }
 
-update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
+update_physics_object :: proc(obj_idx: int, world: ^Physics_World, dt: f32) {
+	obj_id := index_to_id(obj_idx)
 	obj := phys_obj(obj_id);
 	pos := transform_to_world(obj).pos;
 	if Physics_Object_Flag.Non_Kinematic in obj.flags || .Trigger in obj.flags {
@@ -719,7 +744,7 @@ update_physics_object :: proc(obj_id: int, world: ^Physics_World, dt: f32) {
 	obj.vel = next_vel;
 }
 
-phys_obj_grounded :: proc(obj_id: int) -> bool {
+phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool {
 	ok: bool;
 	obj := phys_obj(obj_id);
 	centre := phys_obj_centre(obj);
@@ -734,6 +759,9 @@ Physics_World :: struct #no_copy {
 	initialised: bool,
 	collision_placeholder: Physics_Object_Id, // used for casting rect
 	collisions: [dynamic][2]Physics_Object_Id,
+	// prevent collisions after a reinit by adding this to every Phys_Obj_Id
+	// and subtracting it on selection
+	generation: int,
 	// timestep: f32,
 }
 
@@ -749,6 +777,10 @@ initialise_phys_world :: proc() {
 }
 
 reinit_phys_world :: proc() {
+	phys_world.generation += len(phys_world.objects)
+
+	log.infof("Physics world generation: %i", phys_world.generation)
+
 	clear(&phys_world.objects)
 	clear(&phys_world.collisions)
 	phys_world.collision_placeholder = add_phys_object_aabb(
@@ -790,7 +822,7 @@ add_phys_object_aabb :: proc(
 		collide_with_layers = collide_with,
 	};
 
-	id = len(phys_world.objects);
+	id = index_to_id(len(phys_world.objects));
 	
 	append(&phys_world.objects, obj);
 	

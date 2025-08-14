@@ -1,2 +1,3 @@
 main: src/main.odin
-	odin run src -out:bin/main
+	odin build src -out:bin/main
+	./bin/main

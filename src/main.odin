@@ -70,7 +70,6 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 // TODO: GET RID GET RID GET RID OMG
 dir_tex: Texture_Id
 
-
 main :: proc() {	
 	when DEBUG {
 		initialise_debugging();
@@ -109,8 +108,8 @@ main :: proc() {
 	initialise_portal_handler();
 	defer free_portal_handler();
 
-	test_gobj := obj_cube_new(get_screen_centre())
-	test_obj := game_obj(test_gobj, Cube).obj
+	// test_gobj := obj_cube_new(get_screen_centre())
+	// test_obj := game_obj(test_gobj, Cube).obj
 
 	// portal_handler.portals.x.state += {.Alive};
 	// portal_handler.portals.y.state += {.Alive};
@@ -122,10 +121,6 @@ main :: proc() {
 	}
 
 	run_physics := true
-
-	a := add_phys_object_aabb(scale=Vec2(40), flags= {.Non_Kinematic, .No_Gravity, .Trigger});
-	papi := &phys_obj(a).local;
-	b := add_phys_object_aabb(pos=Vec2(50), scale=Vec2(40), parent=papi, flags= {.Non_Kinematic, .No_Gravity, .Trigger});
 
 	follow_player: bool = true;
 
@@ -163,19 +158,12 @@ main :: proc() {
 		// 	draw_phys_obj(i);
 		// }
 
-		// an_obj := phys_obj(a);
-		// bb := phys_obj_bounding_box(an_obj);
-		// draw_rectangle(bb.xy, bb.zw, col=Colour{100, 0, 0, 255});
-		// draw_rectangle_transform(an_obj, phys_obj_to_rect(an_obj));
-
 		// ------------ DRAWING ------------
 		draw_tilemap(state_level().tilemap, {0., 0.});
 		draw_portals(selected_portal);
 		render_game_objects(camera)
 
-		// draw_phys_obj(a);
-		// draw_phys_obj(b);
-		draw_phys_obj(test_obj, texture=dir_tex, colour=Colour(255));
+		// draw_phys_obj(test_obj, texture=dir_tex, colour=Colour(255));
 		// ------------   END   ------------
 
 		// ------------ UPDATING ------------
