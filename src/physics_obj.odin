@@ -112,10 +112,12 @@ vec_abs :: proc(vec: [$N]$T) -> (abs: [N]T) {
 phys_obj_from_id :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
 	if len(phys_world.objects) <= cast(int) id - phys_world.generation || cast(int) id - phys_world.generation < 0 || cast(int) id - phys_world.generation == -1 {
 		if int(id) <= phys_world.generation {
-			log.panicf("Physics object that was deleted was used: %i", id)
+			return nil, false
+			// log.panicf("Physics object that was deleted was used: %i", id)
 		}
 		else {
-			log.panicf("invalid phys obj id used: %i", id);
+			return nil, false
+			// log.panicf("invalid phys obj id used: %i", id);
 		}
 	}
 	obj := &phys_world.objects[cast(int)id - phys_world.generation];

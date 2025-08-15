@@ -10,6 +10,9 @@ import "core:strconv"
 import "core:os"
 import "core:fmt"
 import "core:log"
+import "core:strings"
+
+import "base:runtime"
 
 import vmem "core:mem/virtual"
 
@@ -109,11 +112,11 @@ Tilemap_Object_Type :: enum {
 
 Tilemap_Class :: struct {
 	classname: string,
-	json_value: json.Object,
+	// TODO: make []u8
+	json_data: string,
 }
 
 Tilemap_Object_Property :: union {
-	json.Value,
 	Tilemap_Class,
 	Tilemap_Object_Id, // for links
 	string,
@@ -184,19 +187,29 @@ get_tile_tileset :: proc(tilemap: ^Tilemap, tile: Tile) -> (set: ^Tileset, idx: 
 	return &tilemap.tilesets[idx], idx
 }
 
-tilemap_parse_property :: proc(property: Tilemap_Json_Property) -> (prop: Tilemap_Object_Property, ok: bool) {
+tilemap_parse_property :: proc(arena: runtime.Allocator, property: Tilemap_Json_Property) -> (prop: Tilemap_Object_Property, ok: bool) {
 	ok = true
 	switch property.type {
 	case "class":
-		// TODO: parse known classes here using propertytype identifier
+		builda, alloc_err := strings.builder_make(len=0, cap=0, allocator = arena)
+		if alloc_err != nil {
+			log.panicf("%v", alloc_err)
+		}
+
+		opt: json.Marshal_Options
+
+		err := json.marshal_to_builder(&builda, property.value, &opt)		
+		if err != nil {
+			log.panicf("Failed to marshal json value (impossible): %v", property.value)
+		}
 		prop = Tilemap_Class{
 			classname = property.propertytype,
-			json_value = property.value.(json.Object)
+			json_data = strings.to_string(builda)
 		}
 	case "string":
 		prop = property.value.(string)
 	case "color", "file", "float", "int", "bool":
-		prop = property.value
+		unimplemented("More data types for top level object properties")
 	case "object":
 		prop = cast(Tilemap_Object_Id)(property.value.(i64))
 	case:
@@ -275,7 +288,7 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 				obj.type = tilemap_obj_type_from_string(object.type)
 
 				for property in object.properties {
-					obj.properties[property.name] = tilemap_parse_property(property) or_continue
+					obj.properties[property.name] = tilemap_parse_property(arena, property) or_continue
 				}
 
 				objects[obj_i] = obj
@@ -291,7 +304,7 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 			lyr.pos = [2]f32{layer.x, layer.y}
 			lyr.width, lyr.height = layer.width, layer.height
 			for prop in layer.properties {
-				lyr.properties[prop.name] = tilemap_parse_property(prop) or_continue
+				lyr.properties[prop.name] = tilemap_parse_property(arena, prop) or_continue
 			}
 			lyr.opacity = layer.opacity
 			lyr.visible = layer.visible

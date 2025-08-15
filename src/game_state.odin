@@ -66,7 +66,7 @@ initialise_game_state :: proc() {
 
 free_game_state :: proc() {
 	delete(game_state.objects)
-	// TODO: free queues
+	queue.destroy(&game_state.messages)
 }
 
 game_load_level_from_tilemap :: proc(path: string) {
@@ -103,6 +103,8 @@ game_load_level_from_tilemap :: proc(path: string) {
 
 game_init_level :: proc() {
 	assert(game_state.initialised && game_state.current_level != nil)
+
+	log.info(game_state.current_level)
 
 	obj_trigger_new(.Level_Exit)
 }
@@ -162,7 +164,6 @@ update_game_state :: proc(dt: f32) {
 		if should_delete do append(&to_delete, i)
 	}
 
-	// TODO: work out which order best here
 	for _ in 0..<GAMESTATE_MESSAGES_PER_FRAME {
 		message := queue.pop_back_safe(&game_state.messages) or_break
 
@@ -209,14 +210,15 @@ Game_Object_Id :: distinct int
 GAME_OBJECT_INVALID :: Game_Object_Id(-1)
 
 
-Condition_Type :: enum {
-	Always_Active,
-	On_Event,
-}
+// Condition_Type :: enum {
+// 	Always_Active,
+// 	On_Event,
+// }
 
 Condition :: struct {
-	type: Condition_Type,
-	event_name: string,
+	type: string,
+	channel: string,
+	event: string,
 	override: bool,
 }
 
@@ -224,27 +226,34 @@ condition_true :: proc(cond: Condition) -> bool {
 	if cond.override do return true
 
 	switch cond.type {
-	case .Always_Active:
+	case "always":
 		return true
-	case .On_Event:
+	case "event":
 		unimplemented()
 	}
 	return false
 }
 
 Level_Feature_Common :: struct {
-	pos, facing, dims: Vec2,
+	pos, dims, facing: Vec2,
+}
+
+Level_Exit :: struct {
+	using common: Level_Feature_Common,
+	next_level: string,
+}
+
+Level_Entrance :: struct {
+	using common: Level_Feature_Common,
 }
 
 Cube_Button :: struct {
 	using common: Level_Feature_Common,
 	event: string,
 	channel: Game_Event_Type,
-	obj: Physics_Object_Id,
 }
 
 Cube :: struct {
-	obj: Physics_Object_Id,
 }
 
 Portal_Fixture :: struct {
@@ -257,7 +266,6 @@ SLIDING_DOOR_SPEED_MS :: f32(1.0)
 
 Sliding_Door :: struct {
 	using common: Level_Feature_Common,
-	obj: Physics_Object_Id,
 	condition: Condition,
 	open_percent: f32,
 	open: bool,
@@ -270,7 +278,6 @@ G_Trigger_Type :: enum {
 
 G_Trigger :: struct {
 	type: G_Trigger_Type,
-	obj: Physics_Object_Id,
 	// TODO: callback?
 }
 
@@ -308,7 +315,6 @@ obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = door,
-		// TODO: on_event instead for the logic stuff
 		on_update = sliding_door_update,
 		on_event = sliding_door_event_recv,
 		on_render = door_render,
@@ -463,7 +469,7 @@ sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bo
 	obj := phys_obj(game_obj(self).obj.?)
 
 	origin := door.pos
-	target := door.pos + door.dims * door.facing 
+	target := door.pos + door.dims * transmute(Vec2)door.facing 
 
 	if door.open {
 		door.open_percent += SLIDING_DOOR_SPEED_MS * dt
@@ -485,7 +491,7 @@ sliding_door_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
 	case Logic_Event:
 		door := game_obj(self, Sliding_Door)
-		if event.name == door.condition.event_name {
+		if event.name == door.condition.event {
 			door.open = payload.activated
 		}
 	}
@@ -495,8 +501,8 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
 	case Logic_Event:
 		self := game_obj(self, Portal_Fixture)
-		portal_goto(self.portal, self.pos, self.facing)
-		if event.name == self.condition.event_name do self.condition.override = payload.activated
+		portal_goto(self.portal, self.pos, transmute(Vec2)self.facing)
+		if event.name == self.condition.event do self.condition.override = payload.activated
 	}
 }
 

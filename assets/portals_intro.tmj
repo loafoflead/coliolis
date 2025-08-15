@@ -38,9 +38,138 @@
          "name":"markers",
          "objects":[
                 {
-                 "height":64,
-                 "id":8,
+                 "height":0,
+                 "id":36,
+                 "name":"ptl1",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
+                 "properties":[
+                        {
+                         "name":"class",
+                         "propertytype":"Portal_Fixture",
+                         "type":"class",
+                         "value":
+                            {
+                             "activation_condition":"{\"type\":\"always\"}",
+                             "condition":
+                                {
+                                 "activated_when":"always",
+                                 "type":"always"
+                                },
+                             "facing":
+                                {
+                                 "y":-1
+                                },
+                             "facing_y":-1,
+                             "link":21,
+                             "portal":1
+                            }
+                        }],
+                 "rotation":-90,
+                 "type":"func",
+                 "visible":true,
+                 "width":0,
+                 "x":416,
+                 "y":416
+                }, 
+                {
+                 "height":0,
+                 "id":37,
+                 "name":"ptl2",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
+                 "properties":[
+                        {
+                         "name":"class",
+                         "propertytype":"Portal_Fixture",
+                         "type":"class",
+                         "value":
+                            {
+                             "activation_condition":"{\"type\":\"always\"}",
+                             "condition":
+                                {
+                                 "activated_when":"always",
+                                 "type":"always"
+                                },
+                             "facing":
+                                {
+                                 "y":-1
+                                },
+                             "facing_y":-1,
+                             "link":21,
+                             "portal":2
+                            }
+                        }],
+                 "rotation":90,
+                 "type":"func",
+                 "visible":true,
+                 "width":0,
+                 "x":608,
+                 "y":32
+                }, 
+                {
+                 "height":0,
+                 "id":38,
                  "name":"Entry",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
                  "properties":[
                         {
                          "name":"class",
@@ -48,20 +177,41 @@
                          "type":"class",
                          "value":
                             {
-                             "facing_y":1
+
                             }
                         }],
                  "rotation":90,
                  "type":"func",
                  "visible":true,
-                 "width":128,
-                 "x":160,
-                 "y":0
+                 "width":0,
+                 "x":128,
+                 "y":32
                 }, 
                 {
-                 "height":64,
-                 "id":10,
+                 "height":0,
+                 "id":39,
                  "name":"Exit",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
                  "properties":[
                         {
                          "name":"class",
@@ -72,70 +222,12 @@
                              "next_level":"cube_intro.tmj"
                             }
                         }],
-                 "rotation":0,
-                 "type":"func",
-                 "visible":true,
-                 "width":128,
-                 "x":928,
-                 "y":320
-                }, 
-                {
-                 "height":0,
-                 "id":19,
-                 "name":"ptl1",
-                 "point":true,
-                 "properties":[
-                        {
-                         "name":"class",
-                         "propertytype":"Portal_Fixture",
-                         "type":"class",
-                         "value":
-                            {
-                             "activation_condition":"{\"type\":\"always\"}",
-                             "condition":
-                                {
-                                 "activated_when":"{\"type\":\"always\"}"
-                                },
-                             "facing_y":-1,
-                             "link":21,
-                             "portal":1
-                            }
-                        }],
-                 "rotation":0,
+                 "rotation":180,
                  "type":"func",
                  "visible":true,
                  "width":0,
-                 "x":384,
-                 "y":416
-                }, 
-                {
-                 "height":0,
-                 "id":21,
-                 "name":"ptl2",
-                 "point":true,
-                 "properties":[
-                        {
-                         "name":"class",
-                         "propertytype":"Portal_Fixture",
-                         "type":"class",
-                         "value":
-                            {
-                             "activation_condition":"{\"type\":\"always\"}",
-                             "condition":
-                                {
-                                 "activated_when":"{\"type\":\"always\"}"
-                                },
-                             "facing_y":1,
-                             "link":19,
-                             "portal":2
-                            }
-                        }],
-                 "rotation":0,
-                 "type":"func",
-                 "visible":true,
-                 "width":0,
-                 "x":608,
-                 "y":32
+                 "x":992,
+                 "y":352
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -144,7 +236,7 @@
          "y":0
         }],
  "nextlayerid":6,
- "nextobjectid":22,
+ "nextobjectid":40,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.2",

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="22">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="40">
  <editorsettings>
   <export target="portals_intro.tmj" format="json"/>
  </editorsettings>
@@ -49,16 +49,61 @@
 </data>
  </layer>
  <objectgroup id="3" name="markers">
-  <object id="8" name="Entry" type="func" x="160" y="0" width="128" height="64" rotation="90">
+  <object id="36" name="ptl1" type="func" x="416" y="416" rotation="-90">
    <properties>
-    <property name="class" type="class" propertytype="Entry_Chute">
+    <property name="class" type="class" propertytype="Portal_Fixture">
      <properties>
-      <property name="facing_y" type="int" value="1"/>
+      <property name="activation_condition" value="{&quot;type&quot;:&quot;always&quot;}"/>
+      <property name="condition" type="class" propertytype="Condition">
+       <properties>
+        <property name="activated_when" value="always"/>
+        <property name="type" value="always"/>
+       </properties>
+      </property>
+      <property name="facing" type="class">
+       <properties>
+        <property name="y" type="int" value="-1"/>
+       </properties>
+      </property>
+      <property name="facing_y" type="qlonglong" value="-1"/>
+      <property name="link" type="qlonglong" value="21"/>
+      <property name="portal" type="int" value="1"/>
      </properties>
     </property>
    </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
-  <object id="10" name="Exit" type="func" x="928" y="320" width="128" height="64">
+  <object id="37" name="ptl2" type="func" x="608" y="32" rotation="90">
+   <properties>
+    <property name="class" type="class" propertytype="Portal_Fixture">
+     <properties>
+      <property name="activation_condition" value="{&quot;type&quot;:&quot;always&quot;}"/>
+      <property name="condition" type="class" propertytype="Condition">
+       <properties>
+        <property name="activated_when" value="always"/>
+        <property name="type" value="always"/>
+       </properties>
+      </property>
+      <property name="facing" type="class">
+       <properties>
+        <property name="y" type="int" value="-1"/>
+       </properties>
+      </property>
+      <property name="facing_y" type="qlonglong" value="-1"/>
+      <property name="link" type="qlonglong" value="21"/>
+      <property name="portal" type="int" value="2"/>
+     </properties>
+    </property>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="38" name="Entry" type="func" x="128" y="32" rotation="90">
+   <properties>
+    <property name="class" type="class" propertytype="Entry_Chute"/>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="39" name="Exit" type="func" x="992" y="352" rotation="180">
    <properties>
     <property name="class" type="class" propertytype="Exit_Chute">
      <properties>
@@ -66,42 +111,7 @@
      </properties>
     </property>
    </properties>
-  </object>
-  <object id="19" name="ptl1" type="func" x="384" y="416">
-   <properties>
-    <property name="class" type="class" propertytype="Portal_Fixture">
-     <properties>
-      <property name="activation_condition" value="{&quot;type&quot;:&quot;always&quot;}"/>
-      <property name="condition" type="class" propertytype="Condition">
-       <properties>
-        <property name="activated_when" value="{&quot;type&quot;:&quot;always&quot;}"/>
-       </properties>
-      </property>
-      <property name="facing_y" type="float" value="-1"/>
-      <property name="link" type="object" value="21"/>
-      <property name="portal" type="int" value="1"/>
-     </properties>
-    </property>
-   </properties>
-   <point/>
-  </object>
-  <object id="21" name="ptl2" type="func" x="608" y="32">
-   <properties>
-    <property name="class" type="class" propertytype="Portal_Fixture">
-     <properties>
-      <property name="activation_condition" value="{&quot;type&quot;:&quot;always&quot;}"/>
-      <property name="condition" type="class" propertytype="Condition">
-       <properties>
-        <property name="activated_when" value="{&quot;type&quot;:&quot;always&quot;}"/>
-       </properties>
-      </property>
-      <property name="facing_y" type="float" value="1"/>
-      <property name="link" type="object" value="19"/>
-      <property name="portal" type="int" value="2"/>
-     </properties>
-    </property>
-   </properties>
-   <point/>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
  </objectgroup>
 </map>

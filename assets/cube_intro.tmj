@@ -27,48 +27,6 @@
          "objects":[
                 {
                  "height":64,
-                 "id":1,
-                 "name":"Entry",
-                 "properties":[
-                        {
-                         "name":"class",
-                         "propertytype":"Entry_Chute",
-                         "type":"class",
-                         "value":
-                            {
-                             "facing_y":1
-                            }
-                        }],
-                 "rotation":90,
-                 "type":"func",
-                 "visible":true,
-                 "width":128,
-                 "x":160,
-                 "y":0
-                }, 
-                {
-                 "height":64,
-                 "id":2,
-                 "name":"Exit",
-                 "properties":[
-                        {
-                         "name":"class",
-                         "propertytype":"Exit_Chute",
-                         "type":"class",
-                         "value":
-                            {
-
-                            }
-                        }],
-                 "rotation":0,
-                 "type":"func",
-                 "visible":true,
-                 "width":128,
-                 "x":512,
-                 "y":384
-                }, 
-                {
-                 "height":64,
                  "id":3,
                  "name":"door",
                  "properties":[
@@ -81,9 +39,14 @@
                              "condition":
                                 {
                                  "activated_by":5,
-                                 "activated_when":"{\"type\":\"event\"}",
+                                 "activated_when":"event",
                                  "channel":"Logic",
-                                 "event":"door"
+                                 "event":"door",
+                                 "type":"event"
+                                },
+                             "facing":
+                                {
+                                 "x":1
                                 },
                              "facing_x":1
                             }
@@ -97,9 +60,113 @@
                 }, 
                 {
                  "height":0,
-                 "id":5,
+                 "id":7,
+                 "name":"Entry",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
+                 "properties":[
+                        {
+                         "name":"class",
+                         "propertytype":"Entry_Chute",
+                         "type":"class",
+                         "value":
+                            {
+
+                            }
+                        }],
+                 "rotation":90,
+                 "type":"func",
+                 "visible":true,
+                 "width":0,
+                 "x":96,
+                 "y":32
+                }, 
+                {
+                 "height":0,
+                 "id":11,
+                 "name":"Exit",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
+                 "properties":[
+                        {
+                         "name":"class",
+                         "propertytype":"Exit_Chute",
+                         "type":"class",
+                         "value":
+                            {
+                             "next_level":""
+                            }
+                        }],
+                 "rotation":180,
+                 "type":"func",
+                 "visible":true,
+                 "width":0,
+                 "x":576,
+                 "y":416
+                }, 
+                {
+                 "height":0,
+                 "id":12,
                  "name":"btn",
-                 "point":true,
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
                  "properties":[
                         {
                          "name":"class",
@@ -108,15 +175,19 @@
                          "value":
                             {
                              "channel":"Logic",
-                             "event":"door"
+                             "event":"door",
+                             "facing":
+                                {
+                                 "y":-1
+                                }
                             }
                         }],
-                 "rotation":0,
+                 "rotation":270,
                  "type":"func",
                  "visible":true,
                  "width":0,
                  "x":416,
-                 "y":223
+                 "y":224
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -125,7 +196,7 @@
          "y":0
         }],
  "nextlayerid":3,
- "nextobjectid":7,
+ "nextobjectid":13,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.2",

@@ -4,6 +4,7 @@ import rl "thirdparty/raylib";
 
 import "core:os";
 import "core:math/linalg";
+import "core:math"
 import "core:log"
 
 PORTAL_EXIT_SPEED_BOOST :: 10;
@@ -38,7 +39,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	assert(portal > 0 && portal < 3)
 
 	og := Vec3{pos.x, pos.y, 0}
-	pt := og + Vec3{facing.x, facing.y, 0}
+	pt := og + Vec3{math.round(facing.x), math.round(facing.y), 0}
 	quat := linalg.quaternion_look_at(og, pt, Z_AXIS)
 
 	x, y, z := linalg.euler_angles_xyz_from_quaternion(quat)
@@ -47,7 +48,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	obj := phys_obj(portal_handler.portals[portal - 1].obj)
 
 	setrot(obj, Rad(ang))
-	if facing.x == 0 {
+	if math.round(facing.x) == 0 {
 		if facing.y < 0 {
 			rotate(obj, Rad(linalg.PI))
 		} else {
