@@ -23,6 +23,30 @@ rect_to_points :: proc(rect: Rect) -> [4]Vec2 {
 	}
 }
 
+draw_polygon_convex :: proc(
+	pos: Vec2,
+	rot: f32,
+	vertices: []Vec2,
+	colour: Colour = Colour(255),
+) {
+	vertices := vertices
+	for &vert in vertices {
+		vert += pos
+		vert = world_pos_to_screen_pos(camera, vert)
+		// TODO: rot
+	}
+
+	rlgl.Begin(rlgl.QUADS);
+        rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
+        rlgl.Normal3f(0, 0, 1); // TODO: find out what this does
+
+    	for vert, i in vertices {
+        	// rlgl.TexCoord2f(uv[i].x, uv[i].y);
+        	rlgl.Vertex2f(vert.x, vert.y);
+        }
+    rlgl.End();
+}
+
 draw_rectangle_transform :: proc(
 		transform: ^Transform, 
 		rect: Rect, 

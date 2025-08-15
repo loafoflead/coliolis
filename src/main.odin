@@ -18,7 +18,7 @@ import "tiled";
 game_state  	: Game_State
 camera 			: Camera2D
 resources 		: Resources
-phys_world  	: Physics_World
+physics  		: Physics
 timers  		: Timer_Handler
 portal_handler 	: Portal_Handler
 
@@ -70,21 +70,101 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 // TODO: GET RID GET RID GET RID OMG
 dir_tex: Texture_Id
 
-main :: proc() {	
+main :: proc() {
+
+	rl.InitWindow(window_width, window_height, "yeah")
+	rl.SetTargetFPS(60)
+	// Note: neccessary so that sprites flipped by portal travel get rendered
+	rlgl.DisableBackfaceCulling()
+	rl.SetWindowState({.WINDOW_RESIZABLE})
+
 	when DEBUG {
 		initialise_debugging();
 		context.logger = log.create_console_logger() // TODO: free? or not?
 	}
 
-	initialise_camera();
+	initialise_camera()
 
 	// TODO: make this not a global?
-	initialise_resources();
-	defer free_resources();
+	initialise_resources()
+	defer free_resources()
 
-	initialise_phys_world();
-	defer free_phys_world();
+	initialise_phys_world()
+	defer free_phys_world()
 
+	mouse_last_pos: Vec2;
+	selected: Physics_Object_Id = -1;
+	og_flags: bit_set[Physics_Object_Flag];
+
+	dragging: bool;
+	drag_og: Vec2;
+
+	debug_mode: bool = true
+
+	follow_player := false
+
+	for !rl.WindowShouldClose() {
+		dt := rl.GetFrameTime()
+
+		update_phys_world()
+		rl.BeginDrawing()
+		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))
+
+		draw_phys_world()
+		
+		rl.EndDrawing()
+
+when DEBUG {
+		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
+
+		if debug_mode {
+			any_selected := false
+			selected_obj:^Physics_Object = nil
+			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
+				obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos());
+				if ok && .Fixed not_in obj.flags {
+					og_flags = obj.flags;
+					obj.flags |= {.Non_Kinematic, .Fixed};
+					selected = obj_id;
+				}
+			}
+			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
+				selected_obj.flags = og_flags;
+				selected_obj.vel = (get_world_mouse_pos() - mouse_last_pos) * 100;
+				// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
+				selected = -1;
+			}
+			if any_selected {
+				// FIXME: doesn't work with parent transforms
+				setpos(selected_obj, get_world_mouse_pos());
+				mouse_last_pos = get_world_mouse_pos();
+			}
+
+			if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
+				dragging = true;
+				drag_og = camera.pos + get_mouse_pos() / camera.zoom;
+				follow_player = false;
+			}
+			if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
+				dragging = false;
+			}
+			if dragging {
+				camera.pos = drag_og - (get_mouse_pos() / camera.zoom);
+			}
+
+			mouse_move := rl.GetMouseWheelMove();
+			if mouse_move != 0 {
+				camera.zoom += mouse_move * 0.1;
+			}
+
+			if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
+		}
+
+} // when DEBUG
+	}
+}
+
+_ :: proc() {
 	initialise_timers();
 	defer free_timers();
 
@@ -168,7 +248,7 @@ main :: proc() {
 
 		// ------------ UPDATING ------------
 
-		if run_physics || rl.IsKeyPressed(rl.KeyboardKey.U) do update_phys_world(dt);
+		// if run_physics || rl.IsKeyPressed(rl.KeyboardKey.U) do update_phys_world(dt);
 		if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics
 
 		update_game_state(dt)
@@ -292,7 +372,7 @@ main :: proc() {
 		}
 		if collision.hit {
 			draw_line(collision.point.xy, collision.point.xy + collision.normal.xy * 100, Colour{1 = 255, 3 = 255})
-			draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
+			// draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
 		}
 		// setrot(phys_obj(portal_handler.portals[selected_portal].obj), Rad(-spin))
 

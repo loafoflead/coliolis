@@ -13,6 +13,7 @@ You will need the [Odin compiler](https://odin-lang.org/docs/install/) in your P
 ## Prerequisites:
 
 - You need clang to compile Odin on Linux, on Debian that's: ```apt install clang```, but I imagine it's much the same for different package maangers.
+- Box2d vendor needs to be built, need curl, cmake, TODO better explain
 - The game uses Odin's vendored Raylib bindings, which are expected to be in the ```src/thirdparty/raylib``` folder. In order to build the project you need to copy the vendored raylib from your installation of Odin to this folder, like so (on Linux, on Windows you may prefer to use the file manager):
 
 ```

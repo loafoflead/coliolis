@@ -67,7 +67,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 }
 
 initialise_portal_handler :: proc() {
-	if !phys_world.initialised do panic("Must initialise physics world before initialising portals");
+	if !physics.initialised do panic("Must initialise physics world before initialising portals");
 	if !timers.initialised do panic("Must initialise timers before initialising portals");
 
 	for &ptl in portal_handler.portals {
