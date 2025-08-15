@@ -1,13 +1,17 @@
 package main;
 
 import "core:log"
+import "core:c/libc"
+import "core:fmt"
 import "core:math"
 import rl "thirdparty/raylib"
 
 import b2d "thirdparty/box2d"
 
-Physics_Object_Id :: distinct int; 
-PHYS_OBJ_INVALID :: Physics_Object_Id(-1)
+import "base:runtime"
+
+Physics_Object_Id :: b2d.BodyId; 
+PHYS_OBJ_INVALID :: Physics_Object_Id{}
 
 PHYSICS_TIMESTEP :: f32(1.0/60.0)
 PHYSICS_SUBSTEPS :: 2
@@ -65,7 +69,7 @@ Physics_Object_Flag :: enum u32 {
 
 Physics :: struct #no_copy {
 	world: b2d.WorldId,
-	bodies: [dynamic]b2d.BodyId,
+	bodies: [dynamic]Physics_Object_Id,
 	// objects: [dynamic]Physics_Object,
 	initialised: bool,
 	// collision_placeholder: Physics_Object_Id, // used for casting rect
@@ -96,6 +100,7 @@ initialise_phys_world :: proc() {
 	body_def.type = b2d.BodyType.dynamicBody
 	body_def.position = Vec2{0, 4}
 	body_id := b2d.CreateBody(physics.world, body_def)
+	log.info(body_id)
 	append(&physics.bodies, body_id)
 
 	dynamic_box := b2d.MakeBox(1, 1)
@@ -119,17 +124,20 @@ b2d_to_rl_pos :: proc(pos: Vec2) -> Vec2 {
 	return Vec2{pos.x, -pos.y}
 }
 
+rl_pos_to_b2d :: proc(pos: Vec2) -> Vec2 {
+	return Vec2{pos.x, -pos.y}
+}
+
 draw_phys_world :: proc() {
 	MAX_SHAPES :: 2
 
 	shapes := make([]b2d.ShapeId, MAX_SHAPES)
 
 	for body_id in physics.bodies {
-		pos := b2d_to_rl_pos(b2d.Body_GetPosition(body_id))
-		rot := b2d.Body_GetRotation(body_id)
 		shapes := b2d.Body_GetShapes(body_id, shapes)
 		polygon := b2d.Shape_GetPolygon(shapes[0])
-		draw_polygon_convex(pos, rot = math.atan2(rot.s, rot.c), vertices = polygon.vertices[:])
+		transform := b2d.Body_GetTransform(body_id)
+		draw_polygon_convex(transform, vertices = polygon.vertices[:])
 		// draw_rectangle(pos, scale={2, 2}, rot= math.atan2(rot.s, rot.c))
 	}
 }
@@ -267,11 +275,35 @@ update_phys_world :: proc() {
 phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool { return false}
 
 point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL, exclude: []Physics_Object_Id = {}, ignore_triggers := true) -> (
-	collided_with: ^Physics_Object = nil, 
-	collided_with_id: Physics_Object_Id = -1,
+	collided_with: Physics_Object_Id = {},
 	success: bool = false
 )
-{ return }
+{
+	point := rl_pos_to_b2d(point)
+	body: Physics_Object_Id
+	// OK, this is weird and complicated, because it seems to be designed by a c++ wizard,
+	// this function returns false when it wants to stop the qry,
+	// which is what we want bc we just want whatever object it gives us first,
+	// and its our job to accumulate the results into an array or a map
+	// using the ctx variable. cripes.
+	get_res := proc "c" (shape: b2d.ShapeId, data: rawptr) -> bool {
+		body := b2d.Shape_GetBody(shape)
+		data := cast(^Physics_Object_Id) data
+		data ^= body
+		return false
+	}
+	aabb := b2d.AABB {
+		lowerBound = point - Vec2(0.1),
+		upperBound = point + Vec2(0.1),
+	}
+	filtre := b2d.DefaultQueryFilter()
+	result := b2d.World_OverlapAABB(physics.world, aabb, filtre, fcn = get_res, ctx = &body)
+	// result := b2d.World_CastRayClosest(physics.world, point, point, filter = {}) 
+	if body != PHYS_OBJ_INVALID {
+		return body, true
+	}
+	return {}, false
+}
 
 cast_ray_in_world :: proc(og, dir: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL) -> (rl.RayCollision, bool) { return {}, false }
 

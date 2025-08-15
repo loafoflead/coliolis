@@ -3,6 +3,8 @@ package main;
 import rlgl "thirdparty/raylib/rlgl";
 import rl "thirdparty/raylib";
 
+import b2d "thirdparty/box2d"
+
 UV_FULL_IMAGE : [4]Vec2 : {
 	{0,0},
 	{0, 1},
@@ -24,14 +26,14 @@ rect_to_points :: proc(rect: Rect) -> [4]Vec2 {
 }
 
 draw_polygon_convex :: proc(
-	pos: Vec2,
-	rot: f32,
+	transform: b2d.Transform,
 	vertices: []Vec2,
 	colour: Colour = Colour(255),
 ) {
 	vertices := vertices
 	for &vert in vertices {
-		vert += pos
+		vert = b2d.TransformPoint(transform, vert)
+		vert.y = -vert.y
 		vert = world_pos_to_screen_pos(camera, vert)
 		// TODO: rot
 	}

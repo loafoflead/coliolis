@@ -2,6 +2,7 @@ package main;
 
 import rl "thirdparty/raylib";
 import rlgl "thirdparty/raylib/rlgl"
+import b2d "thirdparty/box2d"
 import "core:math";
 import "core:fmt";
 import "core:mem";
@@ -93,8 +94,13 @@ main :: proc() {
 	defer free_phys_world()
 
 	mouse_last_pos: Vec2;
-	selected: Physics_Object_Id = -1;
-	og_flags: bit_set[Physics_Object_Flag];
+	mouse_ptr_body_def := b2d.DefaultBodyDef()
+
+	mouse_ptr_body := b2d.CreateBody(physics.world, mouse_ptr_body_def)
+	mouse_joint: b2d.JointId
+
+	selected: Maybe(Physics_Object_Id);
+	og_ty: b2d.BodyType;
 
 	dragging: bool;
 	drag_og: Vec2;
@@ -118,25 +124,32 @@ when DEBUG {
 		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
 
 		if debug_mode {
-			any_selected := false
-			selected_obj:^Physics_Object = nil
+			selected_id, any_selected := selected.?
 			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
-				obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos());
-				if ok && .Fixed not_in obj.flags {
-					og_flags = obj.flags;
-					obj.flags |= {.Non_Kinematic, .Fixed};
+				obj_id, ok := point_collides_in_world(get_world_mouse_pos());
+				log.info(obj_id)
+				if ok {
+					og_ty = b2d.Body_GetType(obj_id)
+					b2d.Body_SetType(obj_id, b2d.BodyType.staticBody)
 					selected = obj_id;
+
+					def := b2d.DefaultMouseJointDef()
+					def.bodyIdA = mouse_ptr_body
+					def.bodyIdB = obj_id
+					def.target = get_world_mouse_pos()
+					def.collideConnected = false
+
+					mouse_joint = b2d.CreateMouseJoint(physics.world, def)
 				}
 			}
 			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
-				selected_obj.flags = og_flags;
-				selected_obj.vel = (get_world_mouse_pos() - mouse_last_pos) * 100;
-				// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
-				selected = -1;
+				b2d.Body_SetType(selected_id, og_ty)
+				b2d.Body_SetLinearVelocity(selected_id, (get_world_mouse_pos() - mouse_last_pos) * 100)
+
+				selected = nil;
 			}
 			if any_selected {
-				// FIXME: doesn't work with parent transforms
-				setpos(selected_obj, get_world_mouse_pos());
+				b2d.Body_SetTransform(mouse_ptr_body, get_world_mouse_pos(), b2d.Body_GetRotation(mouse_ptr_body))
 				mouse_last_pos = get_world_mouse_pos();
 			}
 
@@ -205,7 +218,7 @@ _ :: proc() {
 	follow_player: bool = true;
 
 	mouse_last_pos: Vec2;
-	selected: Physics_Object_Id = -1;
+	selected: Physics_Object_Id;
 	og_flags: bit_set[Physics_Object_Flag];
 
 	dragging: bool;
@@ -293,7 +306,7 @@ _ :: proc() {
 
 		if rl.IsKeyPressed(rl.KeyboardKey.LEFT_CONTROL) do follow_player = true;
 
-		if !dragging && selected == -1 && follow_player {
+		if !dragging && follow_player {
 			camera.pos = player_obj.pos
 			// delta := 0.05 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos)
 			// camera.pos += delta//0.01 * ((player_obj.pos - get_screen_centre()) * camera.zoom - camera.pos);
@@ -377,52 +390,52 @@ _ :: proc() {
 		// setrot(phys_obj(portal_handler.portals[selected_portal].obj), Rad(-spin))
 
 
-when DEBUG {
-		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
+// when DEBUG {
+// 		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
 
-		if debug_mode {
-			selected_obj, any_selected := phys_obj(selected);
-			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
-				obj, obj_id, ok := point_collides_in_world(get_world_mouse_pos());
-				if ok && .Fixed not_in obj.flags {
-					og_flags = obj.flags;
-					obj.flags |= {.Non_Kinematic, .Fixed};
-					selected = obj_id;
-				}
-			}
-			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
-				selected_obj.flags = og_flags;
-				selected_obj.vel = (get_world_mouse_pos() - mouse_last_pos) * 100;
-				// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
-				selected = -1;
-			}
-			if any_selected {
-				// FIXME: doesn't work with parent transforms
-				setpos(selected_obj, get_world_mouse_pos());
-				mouse_last_pos = get_world_mouse_pos();
-			}
+// 		if debug_mode {
+// 			selected_obj, any_selected := phys_obj(selected);
+// 			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
+// 				obj_id, ok := point_collides_in_world(get_world_mouse_pos());
+// 				if ok && .Fixed not_in obj.flags {
+// 					og_flags = obj.flags;
+// 					obj.flags |= {.Non_Kinematic, .Fixed};
+// 					selected = obj_id;
+// 				}
+// 			}
+// 			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
+// 				selected_obj.flags = og_flags;
+// 				selected_obj.vel = (get_world_mouse_pos() - mouse_last_pos) * 100;
+// 				// selected.flags ~= u32(Physics_Object_Flag.Non_Kinematic);
+// 				selected = {};
+// 			}
+// 			if any_selected {
+// 				// FIXME: doesn't work with parent transforms
+// 				setpos(selected_obj, get_world_mouse_pos());
+// 				mouse_last_pos = get_world_mouse_pos();
+// 			}
 
-			if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
-				dragging = true;
-				drag_og = camera.pos + get_mouse_pos() / camera.zoom;
-				follow_player = false;
-			}
-			if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
-				dragging = false;
-			}
-			if dragging {
-				camera.pos = drag_og - (get_mouse_pos() / camera.zoom);
-			}
+// 			if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
+// 				dragging = true;
+// 				drag_og = camera.pos + get_mouse_pos() / camera.zoom;
+// 				follow_player = false;
+// 			}
+// 			if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
+// 				dragging = false;
+// 			}
+// 			if dragging {
+// 				camera.pos = drag_og - (get_mouse_pos() / camera.zoom);
+// 			}
 
-			mouse_move := rl.GetMouseWheelMove();
-			if mouse_move != 0 {
-				camera.zoom += mouse_move * 0.1;
-			}
+// 			mouse_move := rl.GetMouseWheelMove();
+// 			if mouse_move != 0 {
+// 				camera.zoom += mouse_move * 0.1;
+// 			}
 
-			if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
-		}
+// 			if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
+// 		}
 
-} // when DEBUG
+// } // when DEBUG
 		
 		rl.EndDrawing();
 	}
