@@ -15,7 +15,7 @@ Camera2D :: struct {
 
 initialise_camera :: proc() {
 	camera.scale = {f32(window_width), f32(window_height)};
-	camera.zoom = 2;
+	camera.zoom = 10;
 }
 
 camera_rect :: proc(camera: Camera2D) -> rl.Rectangle {

@@ -130,26 +130,39 @@ when DEBUG {
 				log.info(obj_id)
 				if ok {
 					og_ty = b2d.Body_GetType(obj_id)
-					b2d.Body_SetType(obj_id, b2d.BodyType.staticBody)
-					selected = obj_id;
+					log.info(og_ty)
+					if og_ty != b2d.BodyType.staticBody {
+						// b2d.Body_SetType(obj_id, b2d.BodyType.dynamicBody)
+						selected = obj_id;
 
-					def := b2d.DefaultMouseJointDef()
-					def.bodyIdA = mouse_ptr_body
-					def.bodyIdB = obj_id
-					def.target = get_world_mouse_pos()
-					def.collideConnected = false
+						def := b2d.DefaultMouseJointDef()
+						def.bodyIdA = mouse_ptr_body
+						def.bodyIdB = obj_id
+						def.maxForce = 100000000
+						// def.hertz = 0.00000001
+						def.target = b2d.Body_GetPosition(obj_id)
+						def.collideConnected = false
 
-					mouse_joint = b2d.CreateMouseJoint(physics.world, def)
+						mouse_joint = b2d.CreateMouseJoint(physics.world, def)
+					}
 				}
 			}
 			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
-				b2d.Body_SetType(selected_id, og_ty)
-				b2d.Body_SetLinearVelocity(selected_id, (get_world_mouse_pos() - mouse_last_pos) * 100)
+				b2d.DestroyJoint(mouse_joint)
+				mouse_joint = b2d.nullJointId
+				// b2d.Body_SetType(selected_id, og_ty)
+				// b2d.Body_SetLinearVelocity(selected_id, (get_world_mouse_pos() - mouse_last_pos) * 100)
 
 				selected = nil;
 			}
 			if any_selected {
-				b2d.Body_SetTransform(mouse_ptr_body, get_world_mouse_pos(), b2d.Body_GetRotation(mouse_ptr_body))
+				if b2d.Joint_IsValid(mouse_joint) {
+					b2d.MouseJoint_SetTarget(
+						mouse_joint, 
+						rl_to_b2d_pos(get_world_mouse_pos())
+					)
+				}
+				// b2d.Body_SetTransform(mouse_ptr_body, get_world_mouse_pos(), b2d.Body_GetRotation(mouse_ptr_body))
 				mouse_last_pos = get_world_mouse_pos();
 			}
 

@@ -124,7 +124,7 @@ b2d_to_rl_pos :: proc(pos: Vec2) -> Vec2 {
 	return Vec2{pos.x, -pos.y}
 }
 
-rl_pos_to_b2d :: proc(pos: Vec2) -> Vec2 {
+rl_to_b2d_pos :: proc(pos: Vec2) -> Vec2 {
 	return Vec2{pos.x, -pos.y}
 }
 
@@ -140,6 +140,9 @@ draw_phys_world :: proc() {
 		draw_polygon_convex(transform, vertices = polygon.vertices[:])
 		// draw_rectangle(pos, scale={2, 2}, rot= math.atan2(rot.s, rot.c))
 	}
+
+	debug_cfg := b2d.DefaultDebugDraw()
+	b2d.World_Draw(physics.world, &debug_cfg)
 }
 
 phys_obj_from_id :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
@@ -279,7 +282,7 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = 
 	success: bool = false
 )
 {
-	point := rl_pos_to_b2d(point)
+	point := rl_to_b2d_pos(point)
 	body: Physics_Object_Id
 	// OK, this is weird and complicated, because it seems to be designed by a c++ wizard,
 	// this function returns false when it wants to stop the qry,
@@ -289,6 +292,7 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = 
 	get_res := proc "c" (shape: b2d.ShapeId, data: rawptr) -> bool {
 		body := b2d.Shape_GetBody(shape)
 		data := cast(^Physics_Object_Id) data
+		b2d.Body_SetAwake(body, true)
 		data ^= body
 		return false
 	}
