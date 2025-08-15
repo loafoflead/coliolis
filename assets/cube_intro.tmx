@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="13">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="14">
  <editorsettings>
   <export target="cube_intro.tmj" format="json"/>
  </editorsettings>
@@ -74,6 +74,23 @@
       <property name="channel" propertytype="Event_Channels" value="Logic"/>
       <property name="event" value="door"/>
       <property name="facing" type="class"/>
+     </properties>
+    </property>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="13" name="spwner" type="func" x="224" y="32" rotation="90">
+   <properties>
+    <property name="class" type="class" propertytype="Cube_Spawner">
+     <properties>
+      <property name="condition" type="class" propertytype="Condition">
+       <properties>
+        <property name="channel" propertytype="Event_Channels" value="Logic"/>
+        <property name="event" value="door"/>
+        <property name="run_once" type="bool" value="true"/>
+        <property name="type" value="event"/>
+       </properties>
+      </property>
      </properties>
     </property>
    </properties>

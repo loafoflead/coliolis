@@ -39,7 +39,7 @@ Game_State :: struct {
 	event_subscribers: map[Game_Object_Id]Game_Event_Set,
 }
 
-Game_Object_Type :: union{G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door, Cube}
+Game_Object_Type :: union{Cube_Spawner, G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door, Cube}
 
 Game_Object :: struct {
 	on_collide: Game_Object_On_Collide_Function,
@@ -220,18 +220,19 @@ Condition :: struct {
 	channel: string,
 	event: string,
 	override: bool,
+	run_once: bool,
 }
 
-condition_true :: proc(cond: Condition) -> bool {
-	if cond.override do return true
+condition_true :: proc(cond: Condition) -> (ret: bool) {
+	if cond.override do ret = true
 
 	switch cond.type {
 	case "always":
-		return true
+		ret = true
 	case "event":
 		unimplemented()
 	}
-	return false
+	return
 }
 
 Level_Feature_Common :: struct {
@@ -256,13 +257,18 @@ Cube_Button :: struct {
 Cube :: struct {
 }
 
+Cube_Spawner :: struct {
+	using common: Level_Feature_Common,
+	condition: Condition,
+}
+
 Portal_Fixture :: struct {
 	using common: Level_Feature_Common,
 	condition: Condition,
 	portal: i32,
 }
 
-SLIDING_DOOR_SPEED_MS :: f32(1.0)
+SLIDING_DOOR_SPEED_MS :: f32(5.0)
 
 Sliding_Door :: struct {
 	using common: Level_Feature_Common,
@@ -296,6 +302,7 @@ obj_cube_new :: proc(pos: Vec2) -> (id: Game_Object_Id) {
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = cube,
+		on_render = game_obj_collider_render,
 	})
 	pair_physics(id, obj)
 
@@ -349,6 +356,20 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 	return // id
 }
 
+obj_cube_spawner_new :: proc(spwner: Cube_Spawner) -> (id: Game_Object_Id) {
+	assert(game_state.initialised)
+
+	id = Game_Object_Id(len(game_state.objects))
+	append(&game_state.objects, Game_Object {
+		data = spwner,
+		// TODO: on_event instead for the logic stuff
+		on_event = spawner_recv_event,
+	})
+	events_subscribe(id, {.Logic})
+
+	return // id
+}
+
 
 obj_prtl_frame_new :: proc(fixture: Portal_Fixture) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
@@ -392,6 +413,7 @@ obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_
 			type = type,
 		},
 		on_collide = trigger_on_collide,
+		on_render = trigger_render,
 	})
 	pair_physics(id, trueobj)
 
@@ -501,12 +523,30 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
 	case Logic_Event:
 		self := game_obj(self, Portal_Fixture)
-		portal_goto(self.portal, self.pos, transmute(Vec2)self.facing)
+		// portal_goto(self.portal, self.pos, transmute(Vec2)self.facing)
 		if event.name == self.condition.event do self.condition.override = payload.activated
 	}
 }
 
+spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
+	#partial switch payload in event.payload {
+	case Logic_Event:
+		self := game_obj(self, Cube_Spawner)
+		// TODO: hack, fix how condition works generally because it has
+		// nothing to do with events...
+		if event.name == self.condition.event && self.condition.override != true {
+			obj_cube_new(self.pos + self.facing * 32)
+			self.condition.override = true
+		}
+	}
+}
 
+
+game_obj_collider_render :: proc(self: Game_Object_Id, _: Camera2D) {
+	gobj := game_obj(self)
+
+	draw_phys_obj(gobj.obj.?)
+}
 
 trigger_render :: proc(self: Game_Object_Id, _: Camera2D) {
 	gobj := game_obj(self)

@@ -678,13 +678,13 @@ update_physics_object :: proc(obj_idx: int, world: ^Physics_World, dt: f32) {
 				sign := -1.0 if move_back.y < 0.0 else f32(1.0);
 				move_back.y = collision_rect.w * sign;
 				if collision_rect.w > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.y {
-					if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.y) > MIN_SPEED {
-						next_vel.y = tangent.y * obj_dot.y + normal.y * obj_momentum
-						other_obj.vel.y = tangent.y * other_obj_dot.y + normal.y * other_obj_momentum
-					}
-					else {
+					// if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.y) > MIN_SPEED {
+					// 	next_vel.y = tangent.y * obj_dot.y + normal.y * obj_momentum
+					// 	other_obj.vel.y = tangent.y * other_obj_dot.y + normal.y * other_obj_momentum
+					// }
+					// else {
 						next_vel.y = 0; //-next_vel.y;
-					}
+					// }
 				}
 
 				move_back.x = 0.0;
@@ -695,13 +695,13 @@ update_physics_object :: proc(obj_idx: int, world: ^Physics_World, dt: f32) {
 				sign := -1.0 if move_back.x < 0.0 else f32(1.0);
 				move_back.x = collision_rect.z * sign;
 				if collision_rect.z > COLLISION_OVERLAP_FOR_BRAKING_THRESHOLD.x {
-					if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.x) > MIN_SPEED {
-						next_vel.x = tangent.x * obj_dot.x + normal.x * obj_momentum
-						other_obj.vel.x = tangent.x * other_obj_dot.x + normal.x * other_obj_momentum
-					}
-					else {
+					// if .Non_Kinematic not_in other_obj.flags && math.abs(next_vel.x) > MIN_SPEED {
+					// 	next_vel.x = tangent.x * obj_dot.x + normal.x * obj_momentum
+					// 	other_obj.vel.x = tangent.x * other_obj_dot.x + normal.x * other_obj_momentum
+					// }
+					// else {
 						next_vel.x = 0; //-next_vel.y;
-					}
+					// }
 				}
 
 				move_back.y = 0.0;

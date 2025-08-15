@@ -29,7 +29,7 @@ debug_print: bool = false;
 // --------------   END   --------------
 
 BACKGROUND_COLOUR :: 0x181818;
-TILEMAP :: "portals_intro.tmj" // "portals_intro.tmj"
+TILEMAP :: "cube_intro.tmj" // "portals_intro.tmj"
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
@@ -226,11 +226,15 @@ main :: proc() {
 		}
 		
 
-		if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
-			pointer = get_world_mouse_pos();
+		// if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
+		// 	pointer = get_world_mouse_pos();
+		// }
+		// else if rl.IsKeyPressed(rl.KeyboardKey.C) do pointer = get_world_screen_centre();
+		// draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.05, 0.05});
+
+		if rl.IsKeyPressed(rl.KeyboardKey.C) {
+			obj_cube_new(get_world_mouse_pos())
 		}
-		else if rl.IsKeyPressed(rl.KeyboardKey.C) do pointer = get_world_screen_centre();
-		draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.05, 0.05});
 
 		click: int
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) do click = 1
