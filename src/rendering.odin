@@ -33,7 +33,7 @@ draw_polygon_convex :: proc(
 	vertices := vertices
 	for &vert in vertices {
 		vert = b2d.TransformPoint(transform, vert)
-		vert.y = -vert.y
+		vert = b2d_to_rl_pos(vert)
 		vert = world_pos_to_screen_pos(camera, vert)
 		// TODO: rot
 	}

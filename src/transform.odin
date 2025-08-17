@@ -88,11 +88,11 @@ setrot :: proc(transform: ^Transform, radians: Rad) {
 	// ..  	  ..	  .. ..
 	// 0 	  0 	  0  0
 	rads := f32(radians)
-	transform.mat[0,0] = math.cos(rads)
-	transform.mat[1,0] = -math.sin(rads)
+	transform.mat[0][0] = math.cos(rads)
+	transform.mat[1][0] = -math.sin(rads)
 
-	transform.mat[1,1] = math.cos(rads)
-	transform.mat[0,1] = math.sin(rads)
+	transform.mat[1][1] = math.cos(rads)
+	transform.mat[0][1] = math.sin(rads)
 	transform_align(transform)
 }
 

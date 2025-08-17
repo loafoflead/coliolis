@@ -85,7 +85,7 @@ game_load_level_from_tilemap :: proc(path: string) {
 
 	// fmt.printfln("%#v", tilemap(test_map))
 	generate_static_physics_for_tilemap(tmap)
-	// generate_kill_triggers_for_tilemap(tmap)
+	generate_kill_triggers_for_tilemap(tmap)
 	lvl, any_found := level_features_from_tilemap(tmap)
 
 	// if !any_found {
@@ -97,7 +97,7 @@ game_load_level_from_tilemap :: proc(path: string) {
 
 	player_gobj_id := obj_player_new(dir_tex)
 	player := game_obj(player_gobj_id, Player)
-	b2d.Body_SetTransform(player.obj, state_get_player_spawn(), {1, 0})
+	phys_obj_goto(player.obj, state_get_player_spawn())
 	game_state.player = player_gobj_id
 
 	game_init_level()

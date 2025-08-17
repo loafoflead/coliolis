@@ -77,6 +77,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 
 	for &object in tm.objects {
 		object.pos -= Vec2(32/2)
+		// object.pos = rl_to_b2d_pos(object.pos)
 		if object.type == .Func {
 			for name, prop in object.properties {
 				#partial switch value in prop {
@@ -95,28 +96,28 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 						features.level_exit = object.pos
 						err = json.unmarshal_string(value.json_data, &exit, allocator = arena)
 						features.next_level = exit.next_level
-					/*case "Portal_Fixture"	:
+					case "Portal_Fixture"	:
 						frame: Portal_Fixture
 						err = json.unmarshal_string(value.json_data, &frame, allocator = arena)
 						frame.pos, frame.dims, frame.facing = object.pos, object.dims, angle_to_dir(object.rot)
 						obj_prtl_frame_new(frame)
-					case "Cube_Button":
-						btn: Cube_Button
-						err = json.unmarshal_string(value.json_data, &btn, allocator = arena)
-						btn.pos, btn.dims, btn.facing = object.pos, object.dims, angle_to_dir(object.rot)
-						obj_cube_btn_new(btn)
-					case "Cube_Spawner":
-						spwnr: Cube_Spawner
-						err = json.unmarshal_string(value.json_data, &spwnr, allocator = arena)
-						spwnr.pos, spwnr.dims, spwnr.facing = object.pos, object.dims, angle_to_dir(object.rot)
-						obj_cube_spawner_new(spwnr)
-					case "Sliding_Door":
-						door : Sliding_Door
-						err = json.unmarshal_string(value.json_data, &door, allocator = arena)
-						door.pos = object.pos + object.dims/2
-						door.dims, door.facing = object.dims, angle_to_dir(object.rot)
-						obj_sliding_door_new(door)
-*/					case:
+					// case "Cube_Button":
+					// 	btn: Cube_Button
+					// 	err = json.unmarshal_string(value.json_data, &btn, allocator = arena)
+					// 	btn.pos, btn.dims, btn.facing = object.pos, object.dims, angle_to_dir(object.rot)
+					// 	obj_cube_btn_new(btn)
+					// case "Cube_Spawner":
+					// 	spwnr: Cube_Spawner
+					// 	err = json.unmarshal_string(value.json_data, &spwnr, allocator = arena)
+					// 	spwnr.pos, spwnr.dims, spwnr.facing = object.pos, object.dims, angle_to_dir(object.rot)
+					// 	obj_cube_spawner_new(spwnr)
+					// case "Sliding_Door":
+					// 	door : Sliding_Door
+					// 	err = json.unmarshal_string(value.json_data, &door, allocator = arena)
+					// 	door.pos = object.pos + object.dims/2
+					// 	door.dims, door.facing = object.dims, angle_to_dir(object.rot)
+					// 	obj_sliding_door_new(door)
+					case:
 						log.warnf("Unknown object class '%s'", value.classname)
 						continue
 					}

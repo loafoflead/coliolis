@@ -30,7 +30,8 @@ debug_print: bool = false;
 // --------------   END   --------------
 
 BACKGROUND_COLOUR :: 0x181818;
-TILEMAP :: "cube_intro.tmj" // "portals_intro.tmj"
+TILEMAP :: "portals_intro.tmj"
+	//"cube_intro.tmj" 
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
@@ -137,8 +138,8 @@ main :: proc() {
 
 		update_phys_world()
 		update_game_state(dt)
-		// update_portals(test_obj);
-		// update_portals(physics.bodies[1])
+		// update_portals();
+		update_portals(physics.bodies[1])
 		update_timers(dt)
 
 
@@ -149,6 +150,7 @@ main :: proc() {
 		draw_phys_world()
 		draw_portals(selected_portal);
 		render_game_objects(camera)
+		// draw_texture(dir_tex, pos=rl_to_b2d_pos(get_world_mouse_pos()), scale=0.1)
 
 
 
@@ -228,6 +230,26 @@ when DEBUG {
 			}
 			if dragging {
 				camera.pos = drag_og - (get_mouse_pos() / camera.zoom);
+			}
+
+			portal_obj := portal_handler.portals[selected_portal].obj
+
+			if rl.IsKeyPressed(rl.KeyboardKey.F) {
+				log.info("flibbin")
+				// trans := phys_obj_transform(portal_obj)
+				// log.infof("before: %#v",trans)
+				// ntrans := transform_flip_2(trans)
+				// log.infof("during: %#v",ntrans)
+				// phys_obj_set_transform(portal_obj, ntrans)
+				// // trans ^= ntrans
+				// // phys_obj_transform_sync(portal_obj)
+				// log.infof("after: %#v", phys_obj_transform(portal_obj))
+				// log.infof("%#v", trans)
+				// rotate(trans, linalg.PI/2)
+				// log.infof("%#v", trans)
+				// phys_obj_transform_sync(portal_obj)
+				// log.infof("%#v", phys_obj_transform(portal_obj))
+				phys_obj_transform(portal_obj) ^= transform_flip(phys_obj_transform(portal_obj));
 			}
 
 			mouse_move := rl.GetMouseWheelMove();

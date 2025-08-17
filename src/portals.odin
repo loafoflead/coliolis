@@ -11,7 +11,7 @@ import "core:fmt"
 
 PORTAL_EXIT_SPEED_BOOST :: 1;
 
-PORTAL_WIDTH, PORTAL_HEIGHT :: f32(3), f32(10)
+PORTAL_WIDTH, PORTAL_HEIGHT :: f32(30), f32(100)
 
 Portal_State :: enum {
 	Connected,
@@ -40,6 +40,8 @@ portal_dims :: proc() -> Vec2 {
 portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	assert(portal > 0 && portal < 3)
 
+	facing :Vec2 = {1, 0} if portal == 1 else {-1, 0}
+
 	og := Vec3{pos.x, pos.y, 0}
 	pt := og + Vec3{math.round(facing.x), math.round(facing.y), 0}
 	quat := linalg.quaternion_look_at(og, pt, Z_AXIS)
@@ -47,24 +49,54 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	x, y, z := linalg.euler_angles_xyz_from_quaternion(quat)
 	ang := z + linalg.PI/2
 
-	obj := phys_obj(portal_handler.portals[portal - 1].obj)
+	obj_id := portal_handler.portals[portal - 1].obj
 
-	setrot(obj, Rad(ang))
-	if math.round(facing.x) == 0 {
+	phys_obj_goto(obj_id, pos, facing)
+	phys_obj_transform_sync_from_body(obj_id, sync_rotation=false)
+	transform := phys_obj_transform(obj_id)
+	setrot(transform, Rad(ang))
+	// phys_obj_transform(obj_id, sync_rotation=true)
+	// phys_obj_transform(obj_id) ^= transform_flip(phys_obj_transform(obj_id))
+	if math.round(facing.y) != 0 {
+		// up (for raylib)
 		if facing.y < 0 {
-			rotate(obj, Rad(linalg.PI))
-		} else {
-			obj.local = transform_flip(obj)
+			// do nothing
+		}
+		else {
+			flup := transform_flip_vert(phys_obj_transform(obj_id))
+			phys_obj_set_transform(obj_id, flup)
 		}
 	}
-	else if facing.x < 0 {
-		rotate(obj, Rad(linalg.PI))
-	}
-	else {
-		obj.local = transform_flip(obj)
+	if math.round(facing.x) != 0 {
+		if facing.x < 0 {
+			rotate(transform, Rad(linalg.PI))
+		}
 	}
 
-	setpos(obj, pos)
+	// if math.round(facing.x) == 0 {
+	// 	if facing.y > 0 {
+	// 		phys_obj_rotate(obj_id, Rad(-linalg.PI))
+	// 	} else {
+	// 		flup := transform_flip(phys_obj_transform(obj_id))
+	// 		phys_obj_set_transform(obj_id, flup)
+	// 		// log.infof("%#v", phys_obj_transform(obj_id))
+	// 		// phys_obj_transform(obj_id) ^= transform_flip(phys_obj_transform(obj_id))
+	// 		// log.infof("%#v", phys_obj_transform(obj_id))
+	// 	}
+	// }
+	// else if facing.x < 0 {
+	// 	phys_obj_rotate(obj_id, Rad(linalg.PI))
+	// }
+	// else {
+	// 	flup := transform_flip(phys_obj_transform(obj_id))
+	// 	phys_obj_set_transform(obj_id, flup)
+	// 	// phys_obj_transform(obj_id) ^= transform_flip(phys_obj_transform(obj_id))
+	// }
+	// phys_obj_transform(obj_id, sync_rotation=true)
+
+	// phys_obj_transform_sync(obj_id)
+
+	// phys_obj_transform(obj_id, sync_rotation=true)
 	portal_handler.portals[portal - 1].state += {.Alive}
 }
 
@@ -78,7 +110,7 @@ initialise_portal_handler :: proc() {
 		ptl.obj = PHYS_OBJ_INVALID
 	}
 
-	prtl_col_layers := Collision_Set{.L0}
+	prtl_col_layers := COLLISION_LAYERS_ALL//Collision_Set{.L0}
 
 	portal_handler.portals.x.obj = add_phys_object_aabb(
 		pos = Vec2 {5, 0},
@@ -130,7 +162,7 @@ initialise_portal_handler :: proc() {
 	};
 
 	portal_handler.teleported_timer = 
-		create_named_timer("portal_tp", 0.1, flags={.Update_Automatically});
+		create_named_timer("portal_tp", 1.0, flags={.Update_Automatically});
 }
 free_portal_handler :: proc() {}
 
@@ -181,15 +213,15 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 			log.info("got a boy")
 			portal.occupant = collided;
 
-			// shape := phys_obj_shape(collided)
-			// cur_filter := b2d.Shape_GetFilter(shape)
-			// collides := transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits
-			// belongs := transmute(bit_set[Collision_Layer; u64])cur_filter.categoryBits
-			// portal.occupant_layers = collides
-			// b2d.Shape_SetFilter(shape, b2d.Filter {
-			// 	categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
-			// 	maskBits = transmute(u64)Collision_Set{.L0},
-			// })
+			shape := phys_obj_shape(collided)
+			cur_filter := b2d.Shape_GetFilter(shape)
+			collides := transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits
+			belongs := transmute(bit_set[Collision_Layer; u64])cur_filter.categoryBits
+			portal.occupant_layers = collides
+			b2d.Shape_SetFilter(shape, b2d.Filter {
+				categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
+				maskBits = transmute(u64)Collision_Set{.L0},
+			})
 
 			// 	shape, phys_shape_filter(
 			// 	{},
@@ -284,7 +316,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		// debug_log("%v", obj.collide_with_layers)
 
 		to_occupant_centre := occupant_trans.pos - portal_trans.pos;
-		side := linalg.dot(to_occupant_centre, transform_forward(portal_trans));
+		side := linalg.dot(to_occupant_centre, -transform_forward(portal_trans));
 
 		other_portal := &portal_handler.portals[1 if i == 0 else 0];
 		other_portal_trans := phys_obj_transform(other_portal.obj)
@@ -313,12 +345,13 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		// ntr.pos += other_portal_obj.pos;
 
 		if side >= 0 && portal.occupant_last_side < 0 {
+			fmt.println("teleportin")
 			reset_timer("portal_tp");
 			other_portal.occupant = occupant_id;
 			other_portal.occupant_layers = portal.occupant_layers;
 
 			new_vel := normalize(ntr.pos - portal.occupant_last_new_pos) * (linalg.length(b2d.Body_GetLinearVelocity(occupant_id)) + PORTAL_EXIT_SPEED_BOOST);
-			new_vel = rl_to_b2d_pos(new_vel)
+			new_vel.y = -new_vel.y
 			new_pos := rl_to_b2d_pos(ntr.pos);
 
 			b2d.Body_SetTransform(occupant_id, new_pos, transmute(b2d.Rot)angle_to_dir(ntr.rot))

@@ -42,6 +42,10 @@ PHYSICS_SUBSTEPS :: 2
 
 DEFAULT_FRICTION :: f32(0.01)
 
+B2D_SCALE_FACTOR :: f64(1.0/10.0)
+
+GRAVITY :: Vec2{0, -10}
+
 Collision_Layer :: enum u64 {
 	Default,
 	Portal_Surface,
@@ -102,6 +106,7 @@ Physics_Object_Flag :: enum u32 {
 	Trigger,				// collide but don't physics
 	Fixed,					// used outside of the physics world to mark objects as no-touch
 	Invisible_To_Triggers,  // self explanatory...(?)
+	Fixed_Rotation,			// no rotation
 
 	Weigh_Down_Buttons,		// yeah... need to put this somewhere else eventually (bet I will never fix it)
 }
@@ -126,6 +131,7 @@ initialise_phys_world :: proc() {
 	arena := vmem.arena_allocator(&physics.arena)
 
 	world_def := b2d.DefaultWorldDef() 
+	world_def.gravity = GRAVITY
 	physics.world = b2d.CreateWorld(world_def)
 
 	physics.bodies = make([dynamic]Physics_Object_Id, allocator = arena)
@@ -171,11 +177,11 @@ initialise_phys_world :: proc() {
 }
 
 b2d_to_rl_pos :: proc(pos: Vec2) -> Vec2 {
-	return Vec2{pos.x, -pos.y}
+	return Vec2{f32(f64(pos.x) / B2D_SCALE_FACTOR), -f32(f64(pos.y) / B2D_SCALE_FACTOR)}
 }
 
 rl_to_b2d_pos :: proc(pos: Vec2) -> Vec2 {
-	return Vec2{pos.x, -pos.y}
+	return Vec2{f32(f64(pos.x) * B2D_SCALE_FACTOR), -f32(f64(pos.y) * B2D_SCALE_FACTOR)}
 }
 
 draw_phys_world :: proc() {
@@ -185,40 +191,79 @@ draw_phys_world :: proc() {
 	defer delete(shapes)
 
 	for body_id in physics.bodies {
-		shapes := b2d.Body_GetShapes(body_id, shapes)
-		polygon := b2d.Shape_GetPolygon(shapes[0])
-		transform := b2d.Body_GetTransform(body_id)
-		draw_polygon_convex(transform, vertices = polygon.vertices[:])
-		draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + transmute(Vec2)transform.q / camera.zoom * 50, Colour{2..<4=255})
-		right := linalg.matrix2_rotate_f32(linalg.PI/2) * transmute(Vec2)transform.q
-		draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + right / camera.zoom * 50, Colour{1=255, 3 = 255})
+		draw_phys_obj(body_id)
+		// shapes := b2d.Body_GetShapes(body_id, shapes)
+		// polygon := b2d.Shape_GetPolygon(shapes[0])
+		// transform := b2d.Body_GetTransform(body_id)
+		// draw_polygon_convex(transform, vertices = polygon.vertices[:])
+		// draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + transmute(Vec2)transform.q / camera.zoom * 50, Colour{2..<4=255})
+		// right := linalg.matrix2_rotate_f32(linalg.PI/2) * transmute(Vec2)transform.q
+		// draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + right / camera.zoom * 50, Colour{1=255, 3 = 255})
 		// draw_rectangle(pos, scale={2, 2}, rot= math.atan2(rot.s, rot.c))
 	}
 }
 
 phys_obj_data :: proc(id: Physics_Object_Id) -> (^Phys_Body_Data, bool) #optional_ok {
 	raw := b2d.Body_GetUserData(id)
-	if raw == nil do log.panicf("here") //return nil, false
+	if raw == nil do log.panicf("Tried to access obj data where none existed") //return nil, false
 
 	return cast(^Phys_Body_Data)raw, true
+}
+
+phys_obj_goto :: proc(id: Physics_Object_Id, pos: Vec2 = MARKER_VEC2, rot:= MARKER_VEC2) {
+	pos := rl_to_b2d_pos(pos)
+	dir: b2d.Rot
+	if pos == MARKER_VEC2 do pos = b2d.Body_GetPosition(id)
+	
+	if rot == MARKER_VEC2 do dir = b2d.Body_GetRotation(id)
+	else do dir = transmute(b2d.Rot)rot
+
+	b2d.Body_SetTransform(id, pos, dir)
+}
+
+// TODO: make less dookie
+phys_obj_rotate :: proc(id: Physics_Object_Id, rot: Rad) {
+	cur := b2d.Body_GetRotation(id)
+	nrot := transmute(b2d.Rot)b2d.RotateVector(transmute(b2d.Rot)angle_to_dir(rot), transmute(Vec2)cur)
+	b2d.Body_SetTransform(id, b2d.Body_GetPosition(id), nrot)
 }
 
 /// Gets the transform while also populating it with current position and 
 /// Z-axis rotations for this body
 phys_obj_transform :: proc(id: Physics_Object_Id) -> (t: ^Transform, ok: bool) #optional_ok {
 	data := phys_obj_data(id) or_return
-	b2d_pos := b2d.Body_GetPosition(id)
-	b2d_rot := b2d.Body_GetRotation(id)
 	t = &data.transform
-	// Z-axis (what our physics rotations are around)
-	// cos(theta) -sin(theta)
-	// sin(theta)  cos(theta)
-	t.mat[0, 0] = b2d_rot.c; t.mat[0, 1] = -b2d_rot.s
-	t.mat[1, 0] = b2d_rot.s; t.mat[1, 1] =  b2d_rot.c
-
-	t.mat[0, 3] = b2d_pos.x; t.mat[1, 3] = -b2d_pos.y
-	transform_align(t)
+	ok = true
 	return
+}
+
+phys_obj_set_transform :: proc(id: Physics_Object_Id, transform: Transform) {
+	data := phys_obj_data(id)
+	data.transform = transform
+}
+
+phys_obj_transform_sync_from_body :: proc(id: Physics_Object_Id, sync_rotation := false) {
+	t := phys_obj_transform(id)
+
+	b2d_pos := b2d.Body_GetPosition(id)
+	if sync_rotation {
+		b2d_rot := b2d.Body_GetRotation(id)
+		// Z-axis (what our physics rotations are around)
+		// cos(theta) -sin(theta)
+		// sin(theta)  cos(theta)
+		t.mat[0][0] =  b2d_rot.c; t.mat[1][0] = -b2d_rot.s
+		t.mat[0][1] =  b2d_rot.s; t.mat[1][1] =  b2d_rot.c
+	}
+
+	pos := b2d_to_rl_pos(b2d_pos)
+
+	t.mat[3][0] =pos.x; t.mat[3][1] = pos.y
+	transform_align(t)
+}
+
+phys_obj_transform_apply_to_body :: proc(id: Physics_Object_Id) {
+	transform := phys_obj_transform(id)
+	b2d.Body_SetTransform(id, rl_to_b2d_pos({transform.mat[3][0], transform.mat[3][1]}), {transform.mat[0][0], transform.mat[0][1]})
 }
 
 phys_obj_pos :: proc(id: Physics_Object_Id) -> Vec2 {
@@ -278,7 +323,7 @@ reinit_phys_world :: proc() {
 	arena := vmem.arena_allocator(&physics.arena)
 
 	world_def := b2d.DefaultWorldDef()
-	world_def.gravity = Vec2{0, -100}
+	world_def.gravity = GRAVITY
 	// TODO: delete the old one? check if it increments the generation
 	physics.world = b2d.CreateWorld(world_def)
 
@@ -313,6 +358,7 @@ add_phys_object_aabb :: proc(
 	on_collision_enter: Phys_Collide_Callback = nil, 
 	on_collision_exit : Phys_Collide_Callback = nil,
 	friction: f32 = DEFAULT_FRICTION,
+	can_rotate: bool = false,
 	game_obj: Maybe(Game_Object_Id) = nil,
 	parent: ^Transform = nil,
 	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
@@ -361,14 +407,28 @@ add_phys_object_aabb :: proc(
 		body_def.type = b2d.BodyType.dynamicBody
 	}
 
-	body_def.fixedRotation = true
+	if .Fixed_Rotation in flags {
+		body_def.fixedRotation = true
+	}
 
 	body_id := b2d.CreateBody(physics.world, body_def)
 	append(&physics.bodies, body_id)
 
+	to_f64 := proc(v: Vec2) -> [2]f64 {
+		return {f64(v.x), f64(v.y)}
+	}
+	to_f32 := proc(v: [2]f64) -> Vec2 {
+		return {f32(v.x), f32(v.y)}
+	}
+
+	log.info(scale)
+	double := to_f64(scale) / 2 * B2D_SCALE_FACTOR
+	log.info(double)
+	scale := to_f32(double)
+
 	// NOTE: MakeBox uses half extents (the number u give is half of the full size)
 	// but my api evolved with full scale, so this is just for me
-	body_box := b2d.MakeBox(scale.x / 2, scale.y / 2)
+	body_box := b2d.MakeBox(scale.x, scale.y)
 	body_shape := b2d.DefaultShapeDef()
 
 	if .Invisible_To_Triggers not_in flags {
@@ -465,8 +525,8 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u6
 		return false
 	}
 	aabb := b2d.AABB {
-		lowerBound = point - Vec2(0.1),
-		upperBound = point + Vec2(0.1),
+		lowerBound = point - Vec2(0.001),
+		upperBound = point + Vec2(0.001),
 	}
 	filtre := b2d.DefaultQueryFilter()
 	filtre.maskBits = transmute(u64)COLLISION_LAYERS_ALL
@@ -483,12 +543,32 @@ cast_ray_in_world :: proc(og, dir: Vec2, layers: bit_set[Collision_Layer; u64] =
 
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect { return {} }
 
-draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}, texture := TEXTURE_INVALID) {
-	shape_buf := [4]b2d.ShapeId {}
+draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), texture := TEXTURE_INVALID) {
+	shape_buf := [4]b2d.ShapeId{}
+
 	shapes := b2d.Body_GetShapes(obj_id, shape_buf[:])
 	polygon := b2d.Shape_GetPolygon(shapes[0])
-	transform := b2d.Body_GetTransform(obj_id)
-	draw_polygon_convex(transform, vertices = polygon.vertices[:], colour = colour)
+	b2d_transform := b2d.Body_GetTransform(obj_id)
+	draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:], colour=colour)
+
+	phys_obj_transform_sync_from_body(obj_id, sync_rotation=false)
+	trans := phys_obj_transform(obj_id)
+
+	end := trans.pos + transform_forward(trans) * 50 / camera.zoom;
+	draw_line(trans.pos, end);
+	// right arrow
+	end = trans.pos + transform_right(trans) * 50 / camera.zoom;
+	draw_line(trans.pos, end, colour=Colour{0, 0, 255, 255});
+
+	// draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + transmute(Vec2)transform.q / camera.zoom * 50, Colour{2..<4=255})
+	// right := linalg.matrix2_rotate_f32(linalg.PI/2) * transmute(Vec2)transform.q
+	// draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + right / camera.zoom * 50, Colour{0=255, 3 = 255})
+
+	// shape_buf := [4]b2d.ShapeId {}
+	// shapes := b2d.Body_GetShapes(obj_id, shape_buf[:])
+	// polygon := b2d.Shape_GetPolygon(shapes[0])
+	// transform := b2d.Body_GetTransform(obj_id)
+	// draw_polygon_convex(transform, vertices = polygon.vertices[:], colour = colour)
 }
 
 check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id, first_set_pos := MARKER_VEC2) -> bool {
