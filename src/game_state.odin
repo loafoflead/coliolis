@@ -406,7 +406,8 @@ obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_
 				pos = state_level().level_exit,
 				scale = {32*4, 32*2},
 				flags = {.Non_Kinematic, .No_Gravity, .Fixed, .Trigger},
-				collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS
+				collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+				on_collision_enter = trigger_on_collide,
 			)
 		}
 	}
@@ -416,7 +417,6 @@ obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_
 		data = G_Trigger {
 			type = type,
 		},
-		on_collide = trigger_on_collide,
 		on_render = trigger_render,
 	})
 	pair_physics(id, trueobj)
@@ -463,8 +463,10 @@ cube_btn_exit :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics
 	})	
 }
 
-trigger_on_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
-	trigger, ok := game_state.objects[int(self)].data.(G_Trigger)
+trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
+	log.info(phys_obj_data(self))
+	log.info(game_state.objects[phys_obj_data(self).game_object.?])
+	trigger, ok := phys_obj_gobj(self, G_Trigger)
 	assert(ok)
 
 	switch trigger.type {
@@ -473,9 +475,11 @@ trigger_on_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Ph
 			game_load_level_from_tilemap(state_level().next_level)
 		}
 	case .Kill:
-		other_obj.vel = 0
-		setpos(other_obj, state_get_player_spawn())
-		log.info("Player hit death trigger")
+		if collided == game_obj(game_state.player, Player).obj {
+			b2d.Body_SetLinearVelocity(collided, Vec2(0))
+			phys_obj_goto(collided, state_get_player_spawn())
+			log.info("Player hit death trigger")
+		}
 	}
 }
 

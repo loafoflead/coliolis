@@ -40,8 +40,6 @@ portal_dims :: proc() -> Vec2 {
 portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	assert(portal > 0 && portal < 3)
 
-	facing :Vec2 = {1, 0} if portal == 1 else {-1, 0}
-
 	og := Vec3{pos.x, pos.y, 0}
 	pt := og + Vec3{math.round(facing.x), math.round(facing.y), 0}
 	quat := linalg.quaternion_look_at(og, pt, Z_AXIS)
@@ -240,12 +238,12 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 
 	if occupied && collided == occupant_id {
 		log.info("let him go")
-		// shape := phys_obj_shape(occupant_id)
-		// cur_filter := b2d.Shape_GetFilter(shape)
-		// b2d.Shape_SetFilter(shape, b2d.Filter {
-		// 	categoryBits = cur_filter.categoryBits,//transmute(u64)portal.occupant_layers,
-		// 	maskBits = transmute(u64)portal.occupant_layers,
-		// })
+		shape := phys_obj_shape(occupant_id)
+		cur_filter := b2d.Shape_GetFilter(shape)
+		b2d.Shape_SetFilter(shape, b2d.Filter {
+			categoryBits = cur_filter.categoryBits,//transmute(u64)portal.occupant_layers,
+			maskBits = transmute(u64)portal.occupant_layers,
+		})
 
 		// 	phys_shape_filter(
 		// 	transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits,

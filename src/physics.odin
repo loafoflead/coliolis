@@ -203,6 +203,15 @@ draw_phys_world :: proc() {
 	}
 }
 
+phys_obj_gobj :: proc(id: Physics_Object_Id, $T: typeid) -> (gobj: ^T, ok: bool) {
+	data := phys_obj_data(id) or_return
+	gobj_id, found := data.game_object.?
+
+	gobj, ok = game_obj(gobj_id, T)
+
+	return
+}
+
 phys_obj_data :: proc(id: Physics_Object_Id) -> (^Phys_Body_Data, bool) #optional_ok {
 	raw := b2d.Body_GetUserData(id)
 	if raw == nil do log.panicf("Tried to access obj data where none existed") //return nil, false
@@ -421,9 +430,7 @@ add_phys_object_aabb :: proc(
 		return {f32(v.x), f32(v.y)}
 	}
 
-	log.info(scale)
 	double := to_f64(scale) / 2 * B2D_SCALE_FACTOR
-	log.info(double)
 	scale := to_f32(double)
 
 	// NOTE: MakeBox uses half extents (the number u give is half of the full size)

@@ -6,8 +6,8 @@ import "core:math/ease";
 import rl "thirdparty/raylib"
 import b2d "thirdparty/box2d"
 
-PLAYER_HORIZ_ACCEL :: 100.0; // newtons???
-PLAYER_JUMP_STR :: 10_000.0; // idk
+PLAYER_HORIZ_ACCEL :: 10.0; // newtons???
+PLAYER_JUMP_STR :: 100.0; // idk
 
 PLAYER_WIDTH :: 32;
 PLAYER_HEIGHT :: 32;
@@ -47,7 +47,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 		mass = kg(PLAYER_WEIGHT_KG), 
 		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
 		flags = {.Drag_Exception, .Weigh_Down_Buttons},
-		friction = 1
+		friction = 0.5
 	);
 	player.texture = texture;
 
