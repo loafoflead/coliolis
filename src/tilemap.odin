@@ -95,7 +95,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 						features.level_exit = object.pos
 						err = json.unmarshal_string(value.json_data, &exit, allocator = arena)
 						features.next_level = exit.next_level
-					case "Portal_Fixture"	:
+					/*case "Portal_Fixture"	:
 						frame: Portal_Fixture
 						err = json.unmarshal_string(value.json_data, &frame, allocator = arena)
 						frame.pos, frame.dims, frame.facing = object.pos, object.dims, angle_to_dir(object.rot)
@@ -116,7 +116,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 						door.pos = object.pos + object.dims/2
 						door.dims, door.facing = object.dims, angle_to_dir(object.rot)
 						obj_sliding_door_new(door)
-					case:
+*/					case:
 						log.warnf("Unknown object class '%s'", value.classname)
 						continue
 					}

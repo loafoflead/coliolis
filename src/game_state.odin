@@ -1,5 +1,7 @@
 package main
 
+import b2d "thirdparty/box2d"
+
 import "core:log"
 import "core:container/queue"
 import "core:slice"
@@ -83,19 +85,19 @@ game_load_level_from_tilemap :: proc(path: string) {
 
 	// fmt.printfln("%#v", tilemap(test_map))
 	generate_static_physics_for_tilemap(tmap)
-	generate_kill_triggers_for_tilemap(tmap)
+	// generate_kill_triggers_for_tilemap(tmap)
 	lvl, any_found := level_features_from_tilemap(tmap)
 
-	if !any_found {
-		log.error("Failed to load level features from tilemap", path)
-		return
-	}
+	// if !any_found {
+	// 	log.error("Failed to load level features from tilemap", path)
+	// 	return
+	// }
 	lvl.tilemap = tmap
 	game_state.current_level = lvl
 
 	player_gobj_id := obj_player_new(dir_tex)
 	player := game_obj(player_gobj_id, Player)
-	setpos(phys_obj(player.obj), state_get_player_spawn())
+	b2d.Body_SetTransform(player.obj, state_get_player_spawn(), {1, 0})
 	game_state.player = player_gobj_id
 
 	game_init_level()
@@ -153,7 +155,7 @@ game_obj :: proc{get_game_obj, get_game_obj_data}
 @(private)
 pair_physics :: proc(gobj: Game_Object_Id, phobj: Physics_Object_Id) {
 	game_obj(gobj).obj = phobj
-	phys_obj(phobj).linked_game_object = gobj
+	phys_obj_data(phobj).game_object = gobj
 }
 
 update_game_state :: proc(dt: f32) {
@@ -190,12 +192,14 @@ update_game_state :: proc(dt: f32) {
 
 game_obj_col_enter :: proc(gobj_id, other_gobj: Game_Object_Id, obj, other_obj: Physics_Object_Id) {
 	gobj := game_obj(gobj_id)
-	if gobj.on_collide_enter != nil do (gobj.on_collide_enter)(gobj_id, other_gobj, phys_obj(obj), phys_obj(other_obj))
+	log.error("deprecated: game_obj_col_enter")
+	// if gobj.on_collide_enter != nil do (gobj.on_collide_enter)(gobj_id, other_gobj, phys_obj(obj), phys_obj(other_obj))
 }
 
 game_obj_col_exit :: proc(gobj_id, other_gobj: Game_Object_Id, obj, other_obj: Physics_Object_Id) {
 	gobj := game_obj(gobj_id)
-	if gobj.on_collide_exit != nil do (gobj.on_collide_exit)(gobj_id, other_gobj, phys_obj(obj), phys_obj(other_obj))
+	log.error("deprecated: game_obj_col_enter")
+	// if gobj.on_collide_exit != nil do (gobj.on_collide_exit)(gobj_id, other_gobj, phys_obj(obj), phys_obj(other_obj))
 }
 
 
@@ -427,7 +431,7 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 		on_update = update_player,
 		on_render = draw_player,
 	})
-	phys_obj(game_state.objects[int(id)].data.(Player).obj).linked_game_object = id
+	phys_obj_data(game_state.objects[int(id)].data.(Player).obj).game_object = id
 	game_state.player = id
 
 	return id

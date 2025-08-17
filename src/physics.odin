@@ -40,7 +40,7 @@ PHYS_OBJ_INVALID :: Physics_Object_Id{}
 PHYSICS_TIMESTEP :: f32(1.0/60.0)
 PHYSICS_SUBSTEPS :: 2
 
-DEFAULT_FRICTION :: f32(0.3)
+DEFAULT_FRICTION :: f32(0.01)
 
 Collision_Layer :: enum u64 {
 	Default,
@@ -93,7 +93,8 @@ Phys_Body_Data :: struct {
 }
 
 Physics_Object_Flag :: enum u32 {
-	Non_Kinematic, 			// not updated by physics world
+	Non_Kinematic, 			// not updated by physics world (b2d.staticBody)
+	Non_Dynamic, 			// solved but no forces applied by physics world (b2d.kinematicBody)
 	No_Velocity_Dampening, 	// unaffected by damping
 	No_Collisions, 			// doesn't collide
 	No_Gravity,				// unaffected by gravity
@@ -129,8 +130,8 @@ initialise_phys_world :: proc() {
 
 	physics.bodies = make([dynamic]Physics_Object_Id, allocator = arena)
 
-	add_phys_object_aabb(pos = {0, -10}, scale={50, 10}, flags = {.Non_Kinematic})
-	add_phys_object_aabb(pos = {0, 4}, scale={1, 1}, flags = {})
+	// add_phys_object_aabb(pos = {0, -10}, scale={50, 10}, flags = {.Non_Kinematic})
+	// add_phys_object_aabb(pos = {0, 4}, scale={1, 1}, flags = {})
 
 	// ground_body_def := b2d.DefaultBodyDef()
 	// ground_body_def.position = Vec2{0, -10}
@@ -188,9 +189,9 @@ draw_phys_world :: proc() {
 		polygon := b2d.Shape_GetPolygon(shapes[0])
 		transform := b2d.Body_GetTransform(body_id)
 		draw_polygon_convex(transform, vertices = polygon.vertices[:])
-		draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + transmute(Vec2)transform.q * camera.zoom, Colour{2..<4=255})
+		draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + transmute(Vec2)transform.q / camera.zoom * 50, Colour{2..<4=255})
 		right := linalg.matrix2_rotate_f32(linalg.PI/2) * transmute(Vec2)transform.q
-		draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + right * camera.zoom, Colour{1=255, 3 = 255})
+		draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + right / camera.zoom * 50, Colour{1=255, 3 = 255})
 		// draw_rectangle(pos, scale={2, 2}, rot= math.atan2(rot.s, rot.c))
 	}
 }
@@ -218,6 +219,10 @@ phys_obj_transform :: proc(id: Physics_Object_Id) -> (t: ^Transform, ok: bool) #
 	t.mat[0, 3] = b2d_pos.x; t.mat[1, 3] = -b2d_pos.y
 	transform_align(t)
 	return
+}
+
+phys_obj_pos :: proc(id: Physics_Object_Id) -> Vec2 {
+	return b2d.Body_GetPosition(id)
 }
 
 phys_obj_shape :: proc(id: Physics_Object_Id) -> b2d.ShapeId {
@@ -270,6 +275,15 @@ phys_obj_world_pos :: proc(obj: ^Physics_Object) -> Vec2 {
 
 
 reinit_phys_world :: proc() {
+	arena := vmem.arena_allocator(&physics.arena)
+
+	world_def := b2d.DefaultWorldDef()
+	world_def.gravity = Vec2{0, -100}
+	// TODO: delete the old one? check if it increments the generation
+	physics.world = b2d.CreateWorld(world_def)
+
+	clear(&physics.bodies)
+	// physics.bodies = make([dynamic]Physics_Object_Id, allocator = arena)
 	// phys_world.generation += len(phys_world.objects)
 
 	// log.infof("Physics world generation: %i", phys_world.generation)
@@ -298,6 +312,7 @@ add_phys_object_aabb :: proc(
 	acc:   Vec2 = Vec2{},
 	on_collision_enter: Phys_Collide_Callback = nil, 
 	on_collision_exit : Phys_Collide_Callback = nil,
+	friction: f32 = DEFAULT_FRICTION,
 	game_obj: Maybe(Game_Object_Id) = nil,
 	parent: ^Transform = nil,
 	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
@@ -317,10 +332,11 @@ add_phys_object_aabb :: proc(
 	// 	collision_layers = collision_layers,
 	// 	collide_with_layers = collide_with,
 	// };
+	arena := vmem.arena_allocator(&physics.arena)
 
 	body_def := b2d.DefaultBodyDef()
-	body_def.position = pos
-	arena := vmem.arena_allocator(&physics.arena)
+	body_def.position = rl_to_b2d_pos(pos)
+
 	data := new(Phys_Body_Data, allocator = arena)
 	data.transform = transform_new(body_def.position, 0)
 
@@ -338,6 +354,9 @@ add_phys_object_aabb :: proc(
 	if .Non_Kinematic in flags || .Fixed in flags {
 		body_def.type = b2d.BodyType.staticBody
 	}
+	else if .Non_Dynamic in flags {
+		body_def.type = b2d.BodyType.kinematicBody
+	}
 	else {
 		body_def.type = b2d.BodyType.dynamicBody
 	}
@@ -347,7 +366,9 @@ add_phys_object_aabb :: proc(
 	body_id := b2d.CreateBody(physics.world, body_def)
 	append(&physics.bodies, body_id)
 
-	body_box := b2d.MakeBox(scale.x, scale.y)
+	// NOTE: MakeBox uses half extents (the number u give is half of the full size)
+	// but my api evolved with full scale, so this is just for me
+	body_box := b2d.MakeBox(scale.x / 2, scale.y / 2)
 	body_shape := b2d.DefaultShapeDef()
 
 	if .Invisible_To_Triggers not_in flags {
@@ -369,7 +390,10 @@ add_phys_object_aabb :: proc(
 		.Drag_Exception in flags || 
 		.Weigh_Down_Buttons in flags
 	{
-		log.warn("TODO: remove/replace old flags")
+		log.warnf(
+			"TODO: remove/replace old flags: %v",
+			flags & {.No_Velocity_Dampening, .No_Collisions, .Drag_Exception, .Weigh_Down_Buttons}
+		)
 	}
 	
 	body_shape.density = 1
@@ -377,12 +401,11 @@ add_phys_object_aabb :: proc(
 	// how fucking hard is it to just name things clearly :|
 	body_shape.filter = b2d.Filter {
 		// https://forum.odin-lang.org/t/how-to-abstract-a-c-bit-fields-with-odins-bit-set/523/2
-		categoryBits = 1,//transmute(u64)collision_layers,
-		maskBits = 1,//transmute(u64)collide_with,
+		categoryBits = transmute(u64)collision_layers,
+		maskBits = transmute(u64)collide_with,
 		groupIndex = 0,
 	}
 	// log.info(collision_layers, transmute(u64)collision_layers)
-	log.info(body_shape)
 
 	_ = b2d.CreatePolygonShape(body_id, body_shape, body_box)
 
@@ -417,7 +440,10 @@ update_phys_world :: proc() {
 }
 
 
-phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool { return false}
+phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool {
+	pos := phys_obj_pos(obj_id)
+	return cast_box_in_world(pos + Vec2{0, player_dims().y/2}, player_dims()/2, rot=Rad(0))
+}
 
 point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, exclude: []Physics_Object_Id = {}, ignore_triggers := true) -> (
 	collided_with: Physics_Object_Id = {},
@@ -511,4 +537,29 @@ phys_obj_centre :: proc(obj: ^Physics_Object) -> Vec2 {
 	return pos;
 }
 
-cast_box_in_world :: proc(centre, dimensions: Vec2, rot: Rad, exclude: []Physics_Object_Id = {}, layers := COLLISION_LAYERS_ALL) -> bool { return false }
+cast_box_in_world :: proc(centre, dimensions: Vec2, rot: Rad, exclude: []Physics_Object_Id = {}, layers := COLLISION_LAYERS_ALL) -> bool {
+	rect := b2d.MakeBox(dimensions.x/2, dimensions.y/2)
+	// verts := slice.from_ptr(rect.vertices[:], int(rect.count))
+	aabb := b2d.ComputePolygonAABB(rect, b2d.Transform {p = centre, q = {1, 0}})
+	diagonal := linalg.length(aabb.upperBound - aabb.lowerBound)
+	shape_prxy := b2d.MakeProxy(
+		rect.vertices[:],
+		radius = diagonal
+	)
+	filter := b2d.DefaultQueryFilter()
+	if len(exclude) != 0 do log.warn("TODO: support filtering in box cast")
+	if layers != COLLISION_LAYERS_ALL do log.warn("TODO: support collision layer filtering in box cast")
+	if rot != Rad(0) do log.warn("TODO: support rotated box casts")
+
+	collided := false
+	callback := proc "c" (_: b2d.ShapeId, _: Vec2, _: Vec2, fraction: f32, ctx: rawptr) -> f32 {
+		hit := cast(^bool)ctx
+		hit ^= true
+		return fraction
+	}
+	tree := b2d.World_CastShape(physics.world, shape_prxy, centre, filter, callback, ctx = &collided)
+	// TODO: could prob use the tree to check how many cols but will keep this for when i add layer checks etc..
+	if collided do return true
+
+	return false
+}

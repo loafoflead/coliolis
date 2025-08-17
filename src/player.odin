@@ -4,9 +4,10 @@ import "core:math"
 import "core:math/ease";
 
 import rl "thirdparty/raylib"
+import b2d "thirdparty/box2d"
 
-PLAYER_HORIZ_ACCEL :: 20_000.0; // pixels per second
-PLAYER_JUMP_STR :: 300.0; // idk
+PLAYER_HORIZ_ACCEL :: 100.0; // newtons???
+PLAYER_JUMP_STR :: 10_000.0; // idk
 
 PLAYER_WIDTH :: 32;
 PLAYER_HEIGHT :: 32;
@@ -30,6 +31,10 @@ Player :: struct {
 	portals_unlocked: int,
 }
 
+player_dims :: proc() -> Vec2 {
+	return {PLAYER_WIDTH, PLAYER_HEIGHT}
+}
+
 player_feet :: proc(player: ^Player) -> Vec2 {
 	obj := phys_obj(player.obj);
 	return obj.pos + Vec2 {0, PLAYER_HEIGHT / 2 - 2};
@@ -42,7 +47,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 		mass = kg(PLAYER_WEIGHT_KG), 
 		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
 		flags = {.Drag_Exception, .Weigh_Down_Buttons},
-		collide_with = {.Default},
+		friction = 1
 	);
 	player.texture = texture;
 
@@ -57,7 +62,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 
 update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	player := game_obj(player, Player)
-	player_obj:=phys_obj(player.obj);
+	player_obj := player.obj
 
 	move: f32 = 0.0;
 	if rl.IsKeyDown(rl.KeyboardKey.D) {
@@ -75,7 +80,14 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	}
 	if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
 		if player.jumping && !is_timer_done(&player.jump_timer) {
-			player_obj.vel.y = -PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current));
+			impulse := Vec2 {
+				0,
+				-PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current))
+			}
+			b2d.Body_ApplyLinearImpulseToCenter(player_obj, rl_to_b2d_pos(impulse), wake=true)
+			// b2d.Body_SetLinearVelocity(
+			// 	player_obj, rl_to_b2d_pos(new_vel)
+			// )
 			update_timer(&player.jump_timer, dt);
 		}
 	}
@@ -93,7 +105,9 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		player.in_air = true;
 	}
 
+PLAYER_STEPPING_UP :: false
 
+when PLAYER_STEPPING_UP {
 	if move != 0.0 && is_timer_done(&player.step_timer) {
 		dir := Vec2 { move, 0 };
 		ahead_of_feet := player_feet(player) + dir * 20;
@@ -117,13 +131,6 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		}
 	}
 
-	if move != 0.0 && is_timer_done(&player.step_timer) {
-		player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
-	}
-	else {
-		player_obj.acc.x = 0.0;
-	}
-
 	if !is_timer_done(&player.step_timer) {
 		player_obj.pos = player.lerp_origin + (player.lerp_target - player.lerp_origin) * ease.ease(ease.Ease.Circular_In, timer_fraction(&player.step_timer)); 
 		update_timer(&player.step_timer, dt);
@@ -131,14 +138,24 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 
 	if is_timer_just_done(&player.step_timer) {
 		player_obj.flags -= {.Non_Kinematic, .No_Collisions}
-		update_timer(&player.step_timer, dt);			
+		update_timer(&player.step_timer, dt);
 	}
+}
 
-	if rl.IsKeyDown(rl.KeyboardKey.G) {
-		rotate(player_obj, 0.01);
+	if move != 0.0 && is_timer_done(&player.step_timer) {
+		// b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, wake = true)
+		new_vel := b2d.Body_GetLinearVelocity(player_obj)
+		new_vel.x = move * PLAYER_HORIZ_ACCEL
+		b2d.Body_SetLinearVelocity(player_obj, new_vel)
+		// player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
 	}
-	else if rl.IsKeyDown(rl.KeyboardKey.H) {
-		rotate(player_obj, -0.01);
+	else {
+		cur_vel := b2d.Body_GetLinearVelocity(player_obj)
+		force := Vec2{
+			cur_vel.x,
+			0
+		}
+		b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * PLAYER_HORIZ_ACCEL * 60), wake=false)
 	}
 
 	if rl.IsKeyPressed(rl.KeyboardKey.L) do player.portals_unlocked += 1
@@ -164,11 +181,11 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 
 draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
 	player := game_obj(player, Player)
-	obj:=phys_obj(player.obj);
+	// obj:=phys_obj(player.obj);
 	
 	// r := phys_obj_to_rect(obj).zw;
 	draw_phys_obj(player.obj);
-	draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);
+	// draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);
 	// draw_texture(player.texture, obj.pos, pixel_scale=phys_obj_to_rect(obj).zw);	
 	// draw_rectangle(obj.pos - r/2, r);	
 }

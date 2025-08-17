@@ -102,6 +102,14 @@ main :: proc() {
 	initialise_portal_handler();
 	defer free_portal_handler();
 
+	five_w, ok := load_texture("5W.png")
+	if !ok do os.exit(1)
+
+	dir_tex, ok = load_texture("nesw_sprite.png")
+	if !ok do os.exit(1)
+
+	game_load_level_from_tilemap(TILEMAP)
+
 	for &p in portal_handler.portals do p.state += {.Alive}
 
 	selected_portal: int
@@ -130,7 +138,7 @@ main :: proc() {
 		update_phys_world()
 		update_game_state(dt)
 		// update_portals(test_obj);
-		update_portals(physics.bodies[1])
+		// update_portals(physics.bodies[1])
 		update_timers(dt)
 
 
@@ -140,7 +148,7 @@ main :: proc() {
 
 		draw_phys_world()
 		draw_portals(selected_portal);
-
+		render_game_objects(camera)
 
 
 
@@ -170,7 +178,7 @@ when DEBUG {
 						def := b2d.DefaultMouseJointDef()
 						def.bodyIdA = mouse_ptr_body
 						def.bodyIdB = obj_id
-						def.maxForce = 100000
+						def.maxForce = 10000000
 						def.target = b2d.Body_GetPosition(obj_id)
 						def.collideConnected = false
 
@@ -229,6 +237,7 @@ when DEBUG {
 
 			if rl.IsKeyPressed(rl.KeyboardKey.K) do b2d.Body_SetTransform(portal_handler.portals[0].obj, get_b2d_world_mouse_pos(), {1, 0})
 			if rl.IsKeyPressed(rl.KeyboardKey.L) do b2d.Body_SetTransform(portal_handler.portals[1].obj, get_b2d_world_mouse_pos(), {1, 0})
+			if rl.IsKeyPressed(rl.KeyboardKey.T) do b2d.Body_SetTransform(game_obj(game_state.player, Player).obj, get_b2d_world_mouse_pos(), {1, 0})
 
 			if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
 		}
