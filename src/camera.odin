@@ -44,3 +44,7 @@ get_world_screen_centre :: proc() -> Vec2 {
 get_world_mouse_pos :: proc() -> Vec2 {
 	return ((camera.pos - camera.scale / camera.zoom / 2) + get_mouse_pos() / camera.zoom);
 }
+
+get_b2d_world_mouse_pos :: proc() -> Vec2 {
+	return rl_to_b2d_pos(get_world_mouse_pos())
+}

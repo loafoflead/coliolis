@@ -1,5 +1,7 @@
 package main;
 
+import b2d "thirdparty/box2d"
+
 import "core:math/linalg";
 import "core:math";
 
@@ -29,6 +31,26 @@ Transform :: struct {
 	mat: Mat4x4,
 	// TODO: this pointer is invalidated if the parent is updated... :(
 	parent: ^Transform,
+}
+
+angle_to_dir_deg :: proc(degrees: f32) -> Vec2 {
+	return Vec2{math.cos(linalg.to_radians(degrees)), math.sin(linalg.to_radians(degrees))}
+}
+
+angle_to_dir_rad :: proc(rads: Rad) -> Vec2 {
+	return Vec2{math.cos(f32(rads)), math.sin(f32(rads))}
+}
+
+angle_to_dir :: proc{angle_to_dir_deg, angle_to_dir_rad}
+
+b2d_to_mat4 :: proc(transform: b2d.Transform) -> Mat4x4 {
+	matr := Mat4x4 {
+		transform.q.c, -transform.q.s, 0, transform.p.x,
+		transform.q.s, transform.q.c,  0, -transform.p.y,
+		0, 0, 						   1, 			  0,
+		0, 0, 						   0,			  1,
+	}
+	return matr
 }
 
 transform_new :: proc(pos: Vec2, rot: Rad, parent: ^Transform = nil) -> Transform {

@@ -1,15 +1,17 @@
 package main;
 
-import rl "thirdparty/raylib";
+import rl "thirdparty/raylib"
+import b2d "thirdparty/box2d"
 
 import "core:os";
 import "core:math/linalg";
 import "core:math"
 import "core:log"
+import "core:fmt"
 
-PORTAL_EXIT_SPEED_BOOST :: 10;
+PORTAL_EXIT_SPEED_BOOST :: 1;
 
-PORTAL_WIDTH, PORTAL_HEIGHT :: f32(30), f32(100)
+PORTAL_WIDTH, PORTAL_HEIGHT :: f32(3), f32(10)
 
 Portal_State :: enum {
 	Connected,
@@ -20,7 +22,7 @@ Portal :: struct {
 	obj: Physics_Object_Id,
 	state: bit_set[Portal_State],
 	occupant: Maybe(Physics_Object_Id),
-	occupant_layers: bit_set[Collision_Layer],
+	occupant_layers: bit_set[Collision_Layer; u64],
 	occupant_last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
 	occupant_last_new_pos: Vec2,
 }
@@ -76,43 +78,51 @@ initialise_portal_handler :: proc() {
 		ptl.obj = PHYS_OBJ_INVALID
 	}
 
+	prtl_col_layers := Collision_Set{.L0}
+
 	portal_handler.portals.x.obj = add_phys_object_aabb(
+		pos = Vec2 {5, 0},
 		scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},
-		collision_layers = {},
+		on_collision_enter = prtl_collide_begin,
+		on_collision_exit = prtl_collide_end,
+		collision_layers = prtl_col_layers,
 		collide_with = COLLISION_LAYERS_ALL,
 	);
 	portal_handler.portals.y.obj = add_phys_object_aabb(
+		pos = Vec2 {5, 0},
 		scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},
-		collision_layers = {},
+		on_collision_enter = prtl_collide_begin,
+		on_collision_exit = prtl_collide_end,
+		collision_layers = prtl_col_layers,
 		collide_with = COLLISION_LAYERS_ALL,
 	);
 	portal_handler.edge_colliders = {
 		add_phys_object_aabb(
 			pos = {0, -50},
-			scale = Vec2 { 20.0, 10.0 },
+			scale = Vec2 { 2.0, 1.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
 			collide_with = {},
 		),
 		add_phys_object_aabb(
 			pos = {0, 50},
-			scale = Vec2 { 20.0, 10.0 },
+			scale = Vec2 { 2.0, 1.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
 			collide_with = {},
 		),
 		add_phys_object_aabb(
 			pos = {10, -60},
-			scale = Vec2 { 10.0, 10.0 },
+			scale = Vec2 { 1.0, 1.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
 			collide_with = {},
 		),
 		add_phys_object_aabb(
 			pos = {10, 60},
-			scale = Vec2 { 10.0, 10.0 },
+			scale = Vec2 { 1.0, 1.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
 			collide_with = {},
@@ -154,6 +164,66 @@ draw_portals :: proc(selected_portal: int) {
 	}
 }
 
+portal_from_phys_id :: proc(id: Physics_Object_Id) -> (^Portal, bool) #optional_ok {
+	for &ptl in portal_handler.portals {
+		if ptl.obj == id do return &ptl, true
+	}
+	return nil, false
+}
+
+prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
+	portal := portal_from_phys_id(self)
+	occupant_id, occupied := portal.occupant.?;
+
+	if !occupied && is_timer_done("portal_tp") {
+		ty := b2d.Body_GetType(collided)
+		if ty != b2d.BodyType.staticBody {
+			log.info("got a boy")
+			portal.occupant = collided;
+
+			// shape := phys_obj_shape(collided)
+			// cur_filter := b2d.Shape_GetFilter(shape)
+			// collides := transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits
+			// belongs := transmute(bit_set[Collision_Layer; u64])cur_filter.categoryBits
+			// portal.occupant_layers = collides
+			// b2d.Shape_SetFilter(shape, b2d.Filter {
+			// 	categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
+			// 	maskBits = transmute(u64)Collision_Set{.L0},
+			// })
+
+			// 	shape, phys_shape_filter(
+			// 	{},
+			// 	collides,
+			// ))
+		}
+	}
+	else {
+		log.info("TODO: implement more than one portalgoer")
+	}
+}
+
+prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
+	portal := portal_from_phys_id(self)
+	occupant_id, occupied := portal.occupant.?;
+
+	if occupied && collided == occupant_id {
+		log.info("let him go")
+		// shape := phys_obj_shape(occupant_id)
+		// cur_filter := b2d.Shape_GetFilter(shape)
+		// b2d.Shape_SetFilter(shape, b2d.Filter {
+		// 	categoryBits = cur_filter.categoryBits,//transmute(u64)portal.occupant_layers,
+		// 	maskBits = transmute(u64)portal.occupant_layers,
+		// })
+
+		// 	phys_shape_filter(
+		// 	transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits,
+		// 	portal.occupant_layers, 
+		// ))
+
+		portal.occupant = nil;
+		set_timer_done("portal_tp");
+	}
+}
 
 // TODO: make player a global?
 update_portals :: proc(collider: Physics_Object_Id) {
@@ -173,51 +243,56 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 		occupant_id, occupied := portal.occupant.?;
 
-		collided := check_phys_objects_collide(portal.obj, collider);
-		if collided && !occupied && is_timer_done("portal_tp") {
-			obj := phys_obj(collider);
-			if .Fixed not_in obj.flags {
-				portal.occupant = collider;
-				portal.occupant_layers = obj.collide_with_layers;
-				obj.collide_with_layers = {.L0};
-			}
-		}
-		else {
-			if occupied && !collided {
-				obj := phys_obj(occupant_id);
-				obj.collide_with_layers = portal.occupant_layers;
-				obj.collide_with_layers -= {.L0}
-				portal.occupant = nil;
-				set_timer_done("portal_tp");
-			}
-		}
+		// collided := check_phys_objects_collide(portal.obj, collider);
+		// if collided && !occupied && is_timer_done("portal_tp") {
+		// 	ty := b2d.Body_GetType(collider)
+		// 	if ty != b2d.BodyType.staticBody {
+		// 		portal.occupant = collider;
+
+		// 		shape := phys_obj_shape(collider)
+		// 		cur_filter := b2d.Shape_GetFilter(shape)
+		// 		portal.occupant_layers = transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits;
+		// 		b2d.Shape_SetFilter(shape, phys_shape_filter(transmute(bit_set[Collision_Layer; u64])cur_filter.categoryBits, {.L0}))
+		// 	}
+		// }
+		// else {
+		// 	if occupied && !collided {
+		// 		shape := phys_obj_shape(collider)
+		// 		cur_filter := b2d.Shape_GetFilter(shape)
+		// 		b2d.Shape_SetFilter(shape, phys_shape_filter(transmute(bit_set[Collision_Layer; u64])cur_filter.categoryBits, portal.occupant_layers))
+
+		// 		portal.occupant = nil;
+		// 		set_timer_done("portal_tp");
+		// 	}
+		// }
 
 		if !occupied do continue;
 
 
-		portal_obj := phys_obj(portal.obj);
-
-		for edge in portal_handler.edge_colliders {
-			phys_obj(edge).parent = portal_obj	
-		}
+		// for edge in portal_handler.edge_colliders {
+		// 	phys_obj(edge).parent = portal_obj	
+		// }
 
 		if !is_timer_done("portal_tp") do continue;
 
-		obj := phys_obj(occupant_id);
+		occupant_trans := phys_obj_transform(occupant_id)
+		portal_trans := phys_obj_transform(portal.obj)
+
+		// log.infof("%#v", occupant_trans)
 		// debug_log("%v", obj.collide_with_layers, timed=false);
 
 		// debug_log("%v", obj.collide_with_layers)
 
-		to_occupant_centre := obj.pos - phys_obj_centre(portal_obj);
-		side := linalg.dot(to_occupant_centre, -transform_forward(portal_obj));
+		to_occupant_centre := occupant_trans.pos - portal_trans.pos;
+		side := linalg.dot(to_occupant_centre, transform_forward(portal_trans));
 
 		other_portal := &portal_handler.portals[1 if i == 0 else 0];
-		other_portal_obj := phys_obj(other_portal.obj);
+		other_portal_trans := phys_obj_transform(other_portal.obj)
 
 		using linalg;
-		oportal_mat := other_portal_obj.mat;
-		portal_mat := portal_obj.mat;
-		obj_mat := obj.mat;
+		oportal_mat := other_portal_trans.mat;
+		portal_mat := portal_trans.mat;
+		obj_mat := occupant_trans.mat;
 
 		// mirror := Mat4x4 {
 		// 	-1, 0,  0, 0,
@@ -242,10 +317,16 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			other_portal.occupant = occupant_id;
 			other_portal.occupant_layers = portal.occupant_layers;
 
-			obj.vel = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.vel) + PORTAL_EXIT_SPEED_BOOST);
+			new_vel := normalize(ntr.pos - portal.occupant_last_new_pos) * (linalg.length(b2d.Body_GetLinearVelocity(occupant_id)) + PORTAL_EXIT_SPEED_BOOST);
+			new_vel = rl_to_b2d_pos(new_vel)
+			new_pos := rl_to_b2d_pos(ntr.pos);
+
+			b2d.Body_SetTransform(occupant_id, new_pos, transmute(b2d.Rot)angle_to_dir(ntr.rot))
+			// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
+			b2d.Body_SetLinearVelocity(occupant_id, new_vel)
 			// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
 			// transform_reset_rotation_plane(&ntr);
-			obj.local = ntr;
+			// obj.local = ntr;
 			// setpos(obj, ntr.pos);
 
 			// obj.collide_with_layers = portal.occupant_layers;

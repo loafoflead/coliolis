@@ -93,6 +93,19 @@ main :: proc() {
 	initialise_phys_world()
 	defer free_phys_world()
 
+	initialise_timers();
+	defer free_timers();
+
+	initialise_game_state()
+	defer free_game_state()
+
+	initialise_portal_handler();
+	defer free_portal_handler();
+
+	for &p in portal_handler.portals do p.state += {.Alive}
+
+	selected_portal: int
+
 	mouse_last_pos: Vec2;
 	mouse_ptr_body_def := b2d.DefaultBodyDef()
 
@@ -100,6 +113,7 @@ main :: proc() {
 	mouse_joint: b2d.JointId
 
 	selected: Maybe(Physics_Object_Id);
+	selected_is_static: bool
 	og_ty: b2d.BodyType;
 
 	dragging: bool;
@@ -112,12 +126,31 @@ main :: proc() {
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 
+
 		update_phys_world()
+		update_game_state(dt)
+		// update_portals(test_obj);
+		update_portals(physics.bodies[1])
+		update_timers(dt)
+
+
+
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))
 
 		draw_phys_world()
-		
+		draw_portals(selected_portal);
+
+
+
+
+
+
+
+
+
+
+
 		rl.EndDrawing()
 
 when DEBUG {
@@ -130,7 +163,6 @@ when DEBUG {
 				log.info(obj_id)
 				if ok {
 					og_ty = b2d.Body_GetType(obj_id)
-					log.info(og_ty)
 					if og_ty != b2d.BodyType.staticBody {
 						// b2d.Body_SetType(obj_id, b2d.BodyType.dynamicBody)
 						selected = obj_id;
@@ -138,28 +170,40 @@ when DEBUG {
 						def := b2d.DefaultMouseJointDef()
 						def.bodyIdA = mouse_ptr_body
 						def.bodyIdB = obj_id
-						def.maxForce = 100000000
-						// def.hertz = 0.00000001
+						def.maxForce = 100000
 						def.target = b2d.Body_GetPosition(obj_id)
 						def.collideConnected = false
 
 						mouse_joint = b2d.CreateMouseJoint(physics.world, def)
+						selected_is_static = false
+					}
+					else {
+						selected_is_static = true
+						selected = obj_id
 					}
 				}
 			}
 			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
-				b2d.DestroyJoint(mouse_joint)
-				mouse_joint = b2d.nullJointId
-				// b2d.Body_SetType(selected_id, og_ty)
-				// b2d.Body_SetLinearVelocity(selected_id, (get_world_mouse_pos() - mouse_last_pos) * 100)
+				if b2d.Joint_IsValid(mouse_joint) {
+					log.info("goop")
+					b2d.DestroyJoint(mouse_joint)
+					mouse_joint = b2d.nullJointId
+				}
+				// if !selected_is_static {
+					// b2d.Body_SetLinearVelocity(selected_id, (get_world_mouse_pos() - mouse_last_pos) * 100)
+				// }
 
 				selected = nil;
 			}
 			if any_selected {
-				if b2d.Joint_IsValid(mouse_joint) {
+				mpos := get_b2d_world_mouse_pos()
+				if selected_is_static {
+					b2d.Body_SetTransform(selected_id, mpos, {1, 0})
+				}
+				else if b2d.Joint_IsValid(mouse_joint) {
 					b2d.MouseJoint_SetTarget(
-						mouse_joint, 
-						rl_to_b2d_pos(get_world_mouse_pos())
+						mouse_joint,
+						rl_to_b2d_pos(get_world_mouse_pos()),
 					)
 				}
 				// b2d.Body_SetTransform(mouse_ptr_body, get_world_mouse_pos(), b2d.Body_GetRotation(mouse_ptr_body))
@@ -183,6 +227,9 @@ when DEBUG {
 				camera.zoom += mouse_move * 0.1;
 			}
 
+			if rl.IsKeyPressed(rl.KeyboardKey.K) do b2d.Body_SetTransform(portal_handler.portals[0].obj, get_b2d_world_mouse_pos(), {1, 0})
+			if rl.IsKeyPressed(rl.KeyboardKey.L) do b2d.Body_SetTransform(portal_handler.portals[1].obj, get_b2d_world_mouse_pos(), {1, 0})
+
 			if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
 		}
 
@@ -191,12 +238,7 @@ when DEBUG {
 }
 
 _ :: proc() {
-	initialise_timers();
-	defer free_timers();
-
-	initialise_game_state()
-	defer free_game_state()
-
+	
 	rl.InitWindow(window_width, window_height, "yeah")
 	rl.SetTargetFPS(60)
 	// Note: neccessary so that sprites flipped by portal travel get rendered
@@ -210,9 +252,6 @@ _ :: proc() {
 	if !ok do os.exit(1)
 
 	game_load_level_from_tilemap(TILEMAP)
-
-	initialise_portal_handler();
-	defer free_portal_handler();
 
 	// test_gobj := obj_cube_new(get_screen_centre())
 	// test_obj := game_obj(test_gobj, Cube).obj

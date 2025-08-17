@@ -31,9 +31,7 @@ Condition_Json :: struct {
 	event_name: string,
 }
 
-angle_to_dir :: proc(degrees: f32) -> Vec2 {
-	return Vec2{math.cos(linalg.to_radians(degrees)), math.sin(linalg.to_radians(degrees))}
-}
+
 
 facing_from_json :: proc(json_value: json.Value) -> Vec2 {
 	log.info(json_value)

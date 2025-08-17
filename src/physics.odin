@@ -1,14 +1,38 @@
 package main;
 
+// https://www.iforce2d.net/b2dtut/sensors
+
+
 import "core:log"
 import "core:c/libc"
 import "core:fmt"
 import "core:math"
+import "core:math/linalg"
+import "core:slice"
+import vmem "core:mem/virtual"
 import rl "thirdparty/raylib"
 
 import b2d "thirdparty/box2d"
 
 import "base:runtime"
+
+import "core:c"
+
+// BINDINGS 
+// Get the touching contact data for a shape. The provided shapeId will be either shapeIdA or shapeIdB on the contact data.
+
+// i'm going to leave this here, because it's possibly the dumbest thing in the universe
+// a function which, when the shape provided is a sensor, will return every single collision 
+// that sensor has, with *other senors*.
+// there is also a function that returns the shape's collisions with normal colliders, which is
+// disabled for sensors.
+// pure, genius
+@(require_results)
+Shape_GetSensorOverlaps :: proc "c" (shapeId: b2d.ShapeId, shapes_buf: []b2d.ShapeId) -> []b2d.ShapeId {
+	n := b2d.Shape_GetSensorOverlaps(shapeId, raw_data(shapes_buf), c.int(len(shapes_buf)))
+	return shapes_buf[:n]
+}
+// 
 
 Physics_Object_Id :: b2d.BodyId; 
 PHYS_OBJ_INVALID :: Physics_Object_Id{}
@@ -16,15 +40,18 @@ PHYS_OBJ_INVALID :: Physics_Object_Id{}
 PHYSICS_TIMESTEP :: f32(1.0/60.0)
 PHYSICS_SUBSTEPS :: 2
 
-Collision_Layer :: enum {
+DEFAULT_FRICTION :: f32(0.3)
+
+Collision_Layer :: enum u64 {
 	Default,
 	Portal_Surface,
 	L0, L1,
 }
-COLLISION_LAYERS_ALL: bit_set[Collision_Layer] : {.Default, .Portal_Surface, .L0, .L1};
+Collision_Set :: bit_set[Collision_Layer; u64]
+COLLISION_LAYERS_ALL: bit_set[Collision_Layer; u64] : {.Default, .Portal_Surface, .L0, .L1};
 
-PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer] { .Default }
-PHYS_OBJ_DEFAULT_COLLISION_LAYERS 	  :: bit_set[Collision_Layer] { .Default }
+PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer; u64] { .Default }
+PHYS_OBJ_DEFAULT_COLLISION_LAYERS 	  :: bit_set[Collision_Layer; u64] { .Default }
 
 PHYS_OBJ_DEFAULT_FLAGS :: bit_set[Physics_Object_Flag] {}
 
@@ -55,6 +82,16 @@ Physics_Object :: struct {
 	linked_game_object: Maybe(Game_Object_Id),
 }
 
+Phys_Collide_Callback :: #type proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId)
+
+Phys_Body_Data :: struct {
+	game_object: Maybe(Game_Object_Id),
+	transform: Transform,
+	on_collision_enter: Phys_Collide_Callback,
+	on_collision_exit: Phys_Collide_Callback,
+	// TODO: on_collide_enter callback?
+}
+
 Physics_Object_Flag :: enum u32 {
 	Non_Kinematic, 			// not updated by physics world
 	No_Velocity_Dampening, 	// unaffected by damping
@@ -63,6 +100,7 @@ Physics_Object_Flag :: enum u32 {
 	Drag_Exception, 		// use drag values for the player 
 	Trigger,				// collide but don't physics
 	Fixed,					// used outside of the physics world to mark objects as no-touch
+	Invisible_To_Triggers,  // self explanatory...(?)
 
 	Weigh_Down_Buttons,		// yeah... need to put this somewhere else eventually (bet I will never fix it)
 }
@@ -70,6 +108,8 @@ Physics_Object_Flag :: enum u32 {
 Physics :: struct #no_copy {
 	world: b2d.WorldId,
 	bodies: [dynamic]Physics_Object_Id,
+
+	arena: vmem.Arena,
 	// objects: [dynamic]Physics_Object,
 	initialised: bool,
 	// collision_placeholder: Physics_Object_Id, // used for casting rect
@@ -82,33 +122,42 @@ Physics :: struct #no_copy {
 
 
 initialise_phys_world :: proc() {
+	arena := vmem.arena_allocator(&physics.arena)
+
 	world_def := b2d.DefaultWorldDef() 
 	physics.world = b2d.CreateWorld(world_def)
 
-	ground_body_def := b2d.DefaultBodyDef()
-	ground_body_def.position = Vec2{0, -10}
+	physics.bodies = make([dynamic]Physics_Object_Id, allocator = arena)
 
-	ground_id := b2d.CreateBody(physics.world, ground_body_def)
-	append(&physics.bodies, ground_id)
+	add_phys_object_aabb(pos = {0, -10}, scale={50, 10}, flags = {.Non_Kinematic})
+	add_phys_object_aabb(pos = {0, 4}, scale={1, 1}, flags = {})
 
-	ground_box := b2d.MakeBox(50, 10)
+	// ground_body_def := b2d.DefaultBodyDef()
+	// ground_body_def.position = Vec2{0, -10}
 
-	ground_shape_def := b2d.DefaultShapeDef()
-	_ = b2d.CreatePolygonShape(ground_id, ground_shape_def, ground_box)
+	// ground_id := b2d.CreateBody(physics.world, ground_body_def)
+	// append(&physics.bodies, ground_id)
 
-	body_def := b2d.DefaultBodyDef()
-	body_def.type = b2d.BodyType.dynamicBody
-	body_def.position = Vec2{0, 4}
-	body_id := b2d.CreateBody(physics.world, body_def)
-	log.info(body_id)
-	append(&physics.bodies, body_id)
+	// ground_box := b2d.MakeBox(50, 10)
 
-	dynamic_box := b2d.MakeBox(1, 1)
-	shape_def := b2d.DefaultShapeDef()
-	shape_def.density = 1
-	shape_def.material.friction = 0.3
+	// ground_shape_def := b2d.DefaultShapeDef()
+	// _ = b2d.CreatePolygonShape(ground_id, ground_shape_def, ground_box)
 
-	_ = b2d.CreatePolygonShape(body_id, shape_def, dynamic_box)
+	// body_def := b2d.DefaultBodyDef()
+	// body_def.type = b2d.BodyType.dynamicBody
+	// body_def.position = Vec2{0, 4}
+	// body_id := b2d.CreateBody(physics.world, body_def)
+	// log.info(body_id)
+	// append(&physics.bodies, body_id)
+
+	// dynamic_box := b2d.MakeBox(1, 1)
+	// shape_def := b2d.DefaultShapeDef()
+	// shape_def.density = 1
+	// shape_def.material.friction = 0.3
+	// shape_def.enableSensorEvents = true
+	// log.info(shape_def)
+
+	// _ = b2d.CreatePolygonShape(body_id, shape_def, dynamic_box)
 	
 	// phys_world.objects = make([dynamic]Physics_Object, 0, 10);
 	// phys_world.collisions = make([dynamic][2]Physics_Object_Id)
@@ -117,7 +166,7 @@ initialise_phys_world :: proc() {
 	// 	flags = {.Non_Kinematic, .Fixed, .Trigger},
 	// 	collision_layers = {.Default},
 	// )
-	// phys_world.initialised = true;
+	physics.initialised = true;
 }
 
 b2d_to_rl_pos :: proc(pos: Vec2) -> Vec2 {
@@ -132,17 +181,57 @@ draw_phys_world :: proc() {
 	MAX_SHAPES :: 2
 
 	shapes := make([]b2d.ShapeId, MAX_SHAPES)
+	defer delete(shapes)
 
 	for body_id in physics.bodies {
 		shapes := b2d.Body_GetShapes(body_id, shapes)
 		polygon := b2d.Shape_GetPolygon(shapes[0])
 		transform := b2d.Body_GetTransform(body_id)
 		draw_polygon_convex(transform, vertices = polygon.vertices[:])
+		draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + transmute(Vec2)transform.q * camera.zoom, Colour{2..<4=255})
+		right := linalg.matrix2_rotate_f32(linalg.PI/2) * transmute(Vec2)transform.q
+		draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + right * camera.zoom, Colour{1=255, 3 = 255})
 		// draw_rectangle(pos, scale={2, 2}, rot= math.atan2(rot.s, rot.c))
 	}
+}
 
-	debug_cfg := b2d.DefaultDebugDraw()
-	b2d.World_Draw(physics.world, &debug_cfg)
+phys_obj_data :: proc(id: Physics_Object_Id) -> (^Phys_Body_Data, bool) #optional_ok {
+	raw := b2d.Body_GetUserData(id)
+	if raw == nil do log.panicf("here") //return nil, false
+
+	return cast(^Phys_Body_Data)raw, true
+}
+
+/// Gets the transform while also populating it with current position and 
+/// Z-axis rotations for this body
+phys_obj_transform :: proc(id: Physics_Object_Id) -> (t: ^Transform, ok: bool) #optional_ok {
+	data := phys_obj_data(id) or_return
+	b2d_pos := b2d.Body_GetPosition(id)
+	b2d_rot := b2d.Body_GetRotation(id)
+	t = &data.transform
+	// Z-axis (what our physics rotations are around)
+	// cos(theta) -sin(theta)
+	// sin(theta)  cos(theta)
+	t.mat[0, 0] = b2d_rot.c; t.mat[0, 1] = -b2d_rot.s
+	t.mat[1, 0] = b2d_rot.s; t.mat[1, 1] =  b2d_rot.c
+
+	t.mat[0, 3] = b2d_pos.x; t.mat[1, 3] = -b2d_pos.y
+	transform_align(t)
+	return
+}
+
+phys_obj_shape :: proc(id: Physics_Object_Id) -> b2d.ShapeId {
+	shape_buf := [4]b2d.ShapeId {}
+
+	return b2d.Body_GetShapes(id, shape_buf[0:1])[0]
+}
+
+phys_shape_filter :: proc(belong_to_layers: bit_set[Collision_Layer; u64], collide_with := COLLISION_LAYERS_ALL) -> b2d.Filter {
+	return b2d.Filter {
+		maskBits = transmute(u64) collide_with,
+		categoryBits = transmute(u64) belong_to_layers,
+		groupIndex = 0
+	}
 }
 
 phys_obj_from_id :: proc(id: Physics_Object_Id) -> (^Physics_Object, bool) #optional_ok {
@@ -197,6 +286,7 @@ reinit_phys_world :: proc() {
 
 free_phys_world :: proc() {
 	b2d.DestroyWorld(physics.world);
+	vmem.arena_destroy(&physics.arena)
 	physics.initialised = false;
 }
 
@@ -206,30 +296,97 @@ add_phys_object_aabb :: proc(
 	pos:   Vec2 = Vec2{},
 	vel:   Vec2 = Vec2{},
 	acc:   Vec2 = Vec2{},
+	on_collision_enter: Phys_Collide_Callback = nil, 
+	on_collision_exit : Phys_Collide_Callback = nil,
 	game_obj: Maybe(Game_Object_Id) = nil,
 	parent: ^Transform = nil,
 	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
-	collision_layers: bit_set[Collision_Layer] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
-	collide_with: bit_set[Collision_Layer] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
+	collision_layers: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+	collide_with: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
 ) -> (id: Physics_Object_Id)
 {
-	local := transform_new(pos, rot=0, parent=parent);
-	obj := Physics_Object {
-		vel = vel, 
-		acc = acc, 
-		local = local,
-		mass = mass, 
-		flags = flags,
-		linked_game_object = game_obj,
-		collider = cast(AABB) scale,
-		collision_layers = collision_layers,
-		collide_with_layers = collide_with,
-	};
+	// local := transform_new(pos, rot=0, parent=parent);
+	// obj := Physics_Object {
+	// 	vel = vel, 
+	// 	acc = acc, 
+	// 	local = local,
+	// 	mass = mass, 
+	// 	flags = flags,
+	// 	linked_game_object = game_obj,
+	// 	collider = cast(AABB) scale,
+	// 	collision_layers = collision_layers,
+	// 	collide_with_layers = collide_with,
+	// };
 
-	// id = index_to_id(len(phys_world.objects));
+	body_def := b2d.DefaultBodyDef()
+	body_def.position = pos
+	arena := vmem.arena_allocator(&physics.arena)
+	data := new(Phys_Body_Data, allocator = arena)
+	data.transform = transform_new(body_def.position, 0)
+
+	if gobj, valid := game_obj.?; valid {
+		data.game_object = gobj
+	}
+
+	body_def.userData = data
+	// body_def.gravity_scale = mass
+
+	if .No_Gravity in flags {
+		body_def.gravityScale = 0
+	}
+
+	if .Non_Kinematic in flags || .Fixed in flags {
+		body_def.type = b2d.BodyType.staticBody
+	}
+	else {
+		body_def.type = b2d.BodyType.dynamicBody
+	}
+
+	body_def.fixedRotation = true
+
+	body_id := b2d.CreateBody(physics.world, body_def)
+	append(&physics.bodies, body_id)
+
+	body_box := b2d.MakeBox(scale.x, scale.y)
+	body_shape := b2d.DefaultShapeDef()
+
+	if .Invisible_To_Triggers not_in flags {
+		body_shape.enableSensorEvents = true
+	}
+	if .Trigger in flags {
+		body_shape.isSensor = true
+
+		phys_obj_data(body_id).on_collision_enter = on_collision_enter
+		phys_obj_data(body_id).on_collision_exit = on_collision_exit
+	}
+	else if on_collision_enter != nil || on_collision_exit != nil {
+		log.error("Object that was not a Trigger (b2d.Sensor) was passed with on_collision_enter/exit procs, not yet supported")
+	}
+
+	if 
+		.No_Velocity_Dampening in flags || 
+		.No_Collisions in flags || 
+		.Drag_Exception in flags || 
+		.Weigh_Down_Buttons in flags
+	{
+		log.warn("TODO: remove/replace old flags")
+	}
 	
-	// append(&phys_world.objects, obj);
-	id = PHYS_OBJ_INVALID
+	body_shape.density = 1
+	body_shape.material.friction = DEFAULT_FRICTION
+	// how fucking hard is it to just name things clearly :|
+	body_shape.filter = b2d.Filter {
+		// https://forum.odin-lang.org/t/how-to-abstract-a-c-bit-fields-with-odins-bit-set/523/2
+		categoryBits = 1,//transmute(u64)collision_layers,
+		maskBits = 1,//transmute(u64)collide_with,
+		groupIndex = 0,
+	}
+	// log.info(collision_layers, transmute(u64)collision_layers)
+	log.info(body_shape)
+
+	_ = b2d.CreatePolygonShape(body_id, body_shape, body_box)
+
+	id = body_id
 	
 	return;
 }
@@ -237,47 +394,32 @@ add_phys_object_aabb :: proc(
 update_phys_world :: proc() {
 	b2d.World_Step(physics.world, PHYSICS_TIMESTEP, PHYSICS_SUBSTEPS)
 
-	// previous := make([][2]Physics_Object_Id, len(phys_world.collisions))
-	// copy(previous[:], phys_world.collisions[:])
-	
-	// clear(&phys_world.collisions)
+	sensor_events := b2d.World_GetSensorEvents(physics.world)
 
-	// cache_next_step_collisions(dt)
-
-	// if len(phys_world.collisions) != len(previous) {
-		// for i in 0..<len(phys_world.collisions) {
-		// 	// gained an element
-		// 	col := phys_world.collisions[i]
-		// 	if !slice.contains(previous, col) {
-		// 		obj_link, link1 := phys_obj(col[0]).linked_game_object.?
-		// 		other_obj_link, link2 := phys_obj(col[1]).linked_game_object.?
-		// 		if link1 && link2 {
-		// 			game_obj_col_enter(obj_link, other_obj_link, col[0], col[1])
-		// 		}
-		// 	}
-		// }
-		// for i in 0..<len(previous) {
-		// 	// lost an element
-		// 	col := previous[i]
-		// 	if !slice.contains(phys_world.collisions[:], col) {
-		// 		obj_link, link1 := phys_obj(col[0]).linked_game_object.?
-		// 		other_obj_link, link2 := phys_obj(col[1]).linked_game_object.?
-		// 		if link1 && link2 {
-		// 			game_obj_col_exit(obj_link, other_obj_link, col[0], col[1])
-		// 		}
-		// 	}
-		// }
-	// }
-
-	// for _, i in phys_world.objects {
-	// 	update_physics_object(i, &phys_world, dt);
-	// }
+	begin_events := slice.from_ptr(sensor_events.beginEvents, int(sensor_events.beginCount))
+	for event in begin_events {
+		body := b2d.Shape_GetBody(event.sensorShapeId)
+		data := phys_obj_data(body)
+		if data.on_collision_enter != nil {
+			other_body := b2d.Shape_GetBody(event.visitorShapeId)
+			(data.on_collision_enter)(body, other_body, event.sensorShapeId, event.visitorShapeId)
+		}
+	}
+	end_events := slice.from_ptr(sensor_events.endEvents, int(sensor_events.endCount))
+	for event in end_events {
+		body := b2d.Shape_GetBody(event.sensorShapeId)
+		data := phys_obj_data(body)
+		if data.on_collision_exit != nil {
+			other_body := b2d.Shape_GetBody(event.visitorShapeId)
+			(data.on_collision_exit)(body, other_body, event.sensorShapeId, event.visitorShapeId)
+		}
+	}
 }
 
 
 phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool { return false}
 
-point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL, exclude: []Physics_Object_Id = {}, ignore_triggers := true) -> (
+point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, exclude: []Physics_Object_Id = {}, ignore_triggers := true) -> (
 	collided_with: Physics_Object_Id = {},
 	success: bool = false
 )
@@ -301,6 +443,8 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = 
 		upperBound = point + Vec2(0.1),
 	}
 	filtre := b2d.DefaultQueryFilter()
+	filtre.maskBits = transmute(u64)COLLISION_LAYERS_ALL
+	filtre.categoryBits = transmute(u64)COLLISION_LAYERS_ALL
 	result := b2d.World_OverlapAABB(physics.world, aabb, filtre, fcn = get_res, ctx = &body)
 	// result := b2d.World_CastRayClosest(physics.world, point, point, filter = {}) 
 	if body != PHYS_OBJ_INVALID {
@@ -309,13 +453,58 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer] = 
 	return {}, false
 }
 
-cast_ray_in_world :: proc(og, dir: Vec2, layers: bit_set[Collision_Layer] = COLLISION_LAYERS_ALL) -> (rl.RayCollision, bool) { return {}, false }
+cast_ray_in_world :: proc(og, dir: Vec2, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL) -> (rl.RayCollision, bool) { return {}, false }
 
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect { return {} }
 
-draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}, texture := TEXTURE_INVALID) {}
+draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour{}, texture := TEXTURE_INVALID) {
+	shape_buf := [4]b2d.ShapeId {}
+	shapes := b2d.Body_GetShapes(obj_id, shape_buf[:])
+	polygon := b2d.Shape_GetPolygon(shapes[0])
+	transform := b2d.Body_GetTransform(obj_id)
+	draw_polygon_convex(transform, vertices = polygon.vertices[:], colour = colour)
+}
 
-check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id, first_set_pos := MARKER_VEC2) -> bool { return false }
+check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id, first_set_pos := MARKER_VEC2) -> bool {
+	shape_buf := [4]b2d.ShapeId {}
+
+	first_shape_a := b2d.Body_GetShapes(obj1id, shape_buf[0:1])[0]
+	first_shape_b := b2d.Body_GetShapes(obj2id, shape_buf[2:3])[0]
+
+	if b2d.Shape_IsSensor(first_shape_a) {
+		log.panicf("don't bother")
+		// sensor_events := b2d.World_GetSensorEvents(physics.world)
+
+		// slice := slice.from_ptr(sensor_events.beginEvents, int(sensor_events.beginCount))
+		// for event in slice {
+		// 	TODO: use collision layers instead of sensors because they seem to be 
+		// 	the most poorly designed thing ever seen on earth
+		// 	log.info(event)
+		// 	if event.sensorShapeId == first_shape_a && event.visitorShapeId == first_shape_b {
+		// 		log.warn("This sucks")
+		// 		return true
+		// 	}
+		// }
+		// overlaps_buf := [4]b2d.ShapeId{}
+		// overlaps := Shape_GetSensorOverlaps(first_shape_a, overlaps_buf[:])
+		// // contact_buf := [4]b2d.ContactData {}
+		// // contacts := b2d.Shape_GetContactData(first_shape_a, contact_buf[:])
+		// log.infof("overlaps: %v, searching for %v", len(overlaps), first_shape_b)
+		// for cntct in overlaps {
+		// 	if cntct == first_shape_b do return true
+		// 	// if cntct.shapeIdB == first_shape_b || cntct.shapeIdA == first_shape_b do return true
+		// }
+	}
+	else {
+		contact_buf := [4]b2d.ContactData {}
+		contacts := b2d.Body_GetContactData(obj1id, contact_buf[:])
+		for contact in contacts {
+			if contact.shapeIdB == first_shape_b || contact.shapeIdA == first_shape_b do return true
+		}
+	}
+
+	return false
+}
 
 phys_obj_centre :: proc(obj: ^Physics_Object) -> Vec2 {
 	pos := phys_obj_world_pos(obj);
