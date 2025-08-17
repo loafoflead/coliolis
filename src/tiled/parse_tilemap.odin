@@ -140,9 +140,8 @@ Tile 	   :: distinct uint
 
 import "core:mem"
 
-free_tilemap :: proc(tilemap: Tilemap) {
-	log.error("can't free??? WHY?? ", tilemap.arena)
-	// vmem.arena_destroy()
+free_tilemap :: proc(tilemap: ^Tilemap) {
+	vmem.arena_destroy(&tilemap.arena)
 }
 
 tile_from_id :: proc(id: uint) -> Tile {

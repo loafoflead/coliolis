@@ -331,6 +331,8 @@ phys_obj_world_pos :: proc(obj: ^Physics_Object) -> Vec2 {
 reinit_phys_world :: proc() {
 	arena := vmem.arena_allocator(&physics.arena)
 
+	b2d.DestroyWorld(physics.world)
+	
 	world_def := b2d.DefaultWorldDef()
 	world_def.gravity = GRAVITY
 	// TODO: delete the old one? check if it increments the generation

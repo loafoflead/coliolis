@@ -208,7 +208,6 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 	if !occupied && is_timer_done("portal_tp") {
 		ty := b2d.Body_GetType(collided)
 		if ty != b2d.BodyType.staticBody {
-			log.info("got a boy")
 			portal.occupant = collided;
 
 			shape := phys_obj_shape(collided)
@@ -237,7 +236,6 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 	occupant_id, occupied := portal.occupant.?;
 
 	if occupied && collided == occupant_id {
-		log.info("let him go")
 		shape := phys_obj_shape(occupant_id)
 		cur_filter := b2d.Shape_GetFilter(shape)
 		b2d.Shape_SetFilter(shape, b2d.Filter {

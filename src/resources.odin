@@ -27,7 +27,7 @@ initialise_resources :: proc() {
 free_resources :: proc() {
 	delete(resources.textures);
 	// TODO: check if the xml library requires unloading
-	for tilemap in resources.tilemaps do tiled.free_tilemap(tilemap)
+	for &tilemap in resources.tilemaps do tiled.free_tilemap(&tilemap)
 	delete(resources.tilemaps);
 }
 

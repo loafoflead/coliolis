@@ -464,15 +464,16 @@ cube_btn_exit :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics
 }
 
 trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
-	log.info(phys_obj_data(self))
-	log.info(game_state.objects[phys_obj_data(self).game_object.?])
 	trigger, ok := phys_obj_gobj(self, G_Trigger)
 	assert(ok)
 
 	switch trigger.type {
 	case .Level_Exit:
-		if state_level().next_level != "" {
-			game_load_level_from_tilemap(state_level().next_level)
+		if collided == game_obj(game_state.player, Player).obj {
+			log.info("Player hit level exit")
+			if state_level().next_level != "" {
+				game_load_level_from_tilemap(state_level().next_level)
+			}
 		}
 	case .Kill:
 		if collided == game_obj(game_state.player, Player).obj {
