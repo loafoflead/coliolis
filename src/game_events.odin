@@ -31,7 +31,6 @@ Collision :: struct {
 }
 
 Game_Object_Message_Payload :: union {
-	Collision,
 }
 
 Game_Object_Message :: struct {
@@ -52,8 +51,6 @@ inform_game_object :: proc(obj: Game_Object_Id, payload: Game_Object_Message_Pay
 	gobj := game_obj(obj)
 
 	switch data in payload {
-	case Collision:
-		if gobj.on_collide != nil do (gobj.on_collide)(obj, data.other, data.self_obj, data.other_obj)
 	}
 }
 

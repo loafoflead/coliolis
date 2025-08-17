@@ -40,7 +40,7 @@ PHYS_OBJ_INVALID :: Physics_Object_Id{}
 PHYSICS_TIMESTEP :: f32(1.0/60.0)
 PHYSICS_SUBSTEPS :: 2
 
-DEFAULT_FRICTION :: f32(0.01)
+DEFAULT_FRICTION :: f32(1)
 
 B2D_SCALE_FACTOR :: f64(1.0/10.0)
 
@@ -107,6 +107,7 @@ Physics_Object_Flag :: enum u32 {
 	Fixed,					// used outside of the physics world to mark objects as no-touch
 	Invisible_To_Triggers,  // self explanatory...(?)
 	Fixed_Rotation,			// no rotation
+	Never_Sleep,			// never sleep
 
 	Weigh_Down_Buttons,		// yeah... need to put this somewhere else eventually (bet I will never fix it)
 }
@@ -203,14 +204,27 @@ draw_phys_world :: proc() {
 	}
 }
 
-phys_obj_gobj :: proc(id: Physics_Object_Id, $T: typeid) -> (gobj: ^T, ok: bool) {
-	data := phys_obj_data(id) or_return
+phys_obj_gobj_typed :: proc(id: Physics_Object_Id, $T: typeid) -> (gobj: ^T, game_object: ^Game_Object) {
+	data := phys_obj_data(id)
+	ok: bool
 	gobj_id, found := data.game_object.?
 
 	gobj, ok = game_obj(gobj_id, T)
+	game_object, ok = game_obj(gobj_id)
 
 	return
 }
+
+phys_obj_gobj_untyped :: proc(id: Physics_Object_Id) -> (game_object: ^Game_Object, ok: bool) #optional_ok {
+	data := phys_obj_data(id) or_return
+	gobj_id, found := data.game_object.?
+
+	game_object, ok = game_obj(gobj_id)
+
+	return
+}
+
+phys_obj_gobj :: proc{phys_obj_gobj_typed, phys_obj_gobj_untyped}
 
 phys_obj_data :: proc(id: Physics_Object_Id) -> (^Phys_Body_Data, bool) #optional_ok {
 	raw := b2d.Body_GetUserData(id)
@@ -332,7 +346,7 @@ reinit_phys_world :: proc() {
 	arena := vmem.arena_allocator(&physics.arena)
 
 	b2d.DestroyWorld(physics.world)
-	
+
 	world_def := b2d.DefaultWorldDef()
 	world_def.gravity = GRAVITY
 	// TODO: delete the old one? check if it increments the generation
@@ -393,6 +407,10 @@ add_phys_object_aabb :: proc(
 
 	body_def := b2d.DefaultBodyDef()
 	body_def.position = rl_to_b2d_pos(pos)
+
+	if .Never_Sleep in flags {
+		body_def.enableSleep = false
+	}
 
 	data := new(Phys_Body_Data, allocator = arena)
 	data.transform = transform_new(body_def.position, 0)
@@ -465,7 +483,9 @@ add_phys_object_aabb :: proc(
 		)
 	}
 	
-	body_shape.density = 1
+	// density = mass/volume
+	volume := scale.x * scale.y
+	body_shape.density = (mass / volume) if mass != 0 else 1 
 	body_shape.material.friction = DEFAULT_FRICTION
 	// how fucking hard is it to just name things clearly :|
 	body_shape.filter = b2d.Filter {

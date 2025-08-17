@@ -7,12 +7,12 @@ import rl "thirdparty/raylib"
 import b2d "thirdparty/box2d"
 
 PLAYER_HORIZ_ACCEL :: 10.0; // newtons???
-PLAYER_JUMP_STR :: 100.0; // idk
+PLAYER_JUMP_STR :: 10000.0; // idk
 
 PLAYER_WIDTH :: 32;
 PLAYER_HEIGHT :: 32;
 
-PLAYER_WEIGHT_KG :: 3;
+PLAYER_WEIGHT :: 60;
 
 PLAYER_STEP_UP_HEIGHT :: 20;
 
@@ -44,9 +44,9 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	player: Player;
 	player.obj = add_phys_object_aabb(
 		pos = get_screen_centre(), 
-		mass = kg(PLAYER_WEIGHT_KG), 
+		mass = PLAYER_WEIGHT, 
 		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
-		flags = {.Drag_Exception, .Weigh_Down_Buttons, .Fixed_Rotation},
+		flags = {.Fixed_Rotation, .Never_Sleep},
 		friction = 0.5,
 	);
 	player.texture = texture;
@@ -82,13 +82,15 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		if player.jumping && !is_timer_done(&player.jump_timer) {
 			impulse := Vec2 {
 				0,
-				-PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current))
+				-PLAYER_JUMP_STR
+				// -PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current))
 			}
 			b2d.Body_ApplyLinearImpulseToCenter(player_obj, rl_to_b2d_pos(impulse), wake=true)
 			// b2d.Body_SetLinearVelocity(
 			// 	player_obj, rl_to_b2d_pos(new_vel)
 			// )
-			update_timer(&player.jump_timer, dt);
+			// set_timer_done(&player.jump_timer)
+			// update_timer(&player.jump_timer, dt);
 		}
 	}
 	else {
@@ -155,7 +157,7 @@ when PLAYER_STEPPING_UP {
 			cur_vel.x,
 			0
 		}
-		b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * PLAYER_HORIZ_ACCEL * 60), wake=false)
+		b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * PLAYER_HORIZ_ACCEL * 60 * PLAYER_WEIGHT), wake=false)
 	}
 
 	if rl.IsKeyPressed(rl.KeyboardKey.L) do player.portals_unlocked += 1

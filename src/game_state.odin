@@ -43,14 +43,18 @@ Game_State :: struct {
 
 Game_Object_Type :: union{Cube_Spawner, G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door, Cube}
 
-Game_Object :: struct {
-	on_collide: Game_Object_On_Collide_Function,
-	on_collide_enter: Game_Object_On_Collide_Function,
-	on_collide_exit: Game_Object_On_Collide_Function,
+Game_Object_Flags :: enum {
+	Weigh_Down_Buttons,
+}
 
+Game_Object_Flagset :: bit_set[Game_Object_Flags; u32]
+
+Game_Object :: struct {
 	on_update: Game_Object_On_Update_Function,
 	on_render: Game_Object_Render_Function,
 	on_event: Game_Object_Event_Recv_Function,
+
+	flags: Game_Object_Flagset,
 
 	// Add here any new game object types
 	data: Game_Object_Type,
@@ -252,10 +256,14 @@ Level_Entrance :: struct {
 	using common: Level_Feature_Common,
 }
 
+CUBE_BTN_PRESSED :: 1.3
+// TODO: store people weighing it down?
 Cube_Button :: struct {
 	using common: Level_Feature_Common,
 	event: string,
 	channel: Game_Event_Type,
+	joint: b2d.JointId,
+	pressed: bool,
 }
 
 Cube :: struct {
@@ -277,8 +285,8 @@ SLIDING_DOOR_SPEED_MS :: f32(5.0)
 Sliding_Door :: struct {
 	using common: Level_Feature_Common,
 	condition: Condition,
-	open_percent: f32,
 	open: bool,
+	open_percent: f32,
 }
 
 G_Trigger_Type :: enum {
@@ -296,9 +304,10 @@ obj_cube_new :: proc(pos: Vec2) -> (id: Game_Object_Id) {
 
 	obj := add_phys_object_aabb(
 		pos = pos,
-		mass = kg(3),
+		mass = 50,
 		scale = {32, 32},
 		flags = {.Weigh_Down_Buttons},
+		friction = 1
 	)
 
 	cube: Cube
@@ -319,9 +328,12 @@ obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 	obj := add_phys_object_aabb(
 		pos = door.pos,
 		scale = door.dims,
-		flags = {.Non_Kinematic, .No_Gravity},
-		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS
+		flags = {.Non_Kinematic},
+		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+		// collide_with = {}
 	)
+
+	door := door
 
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
@@ -340,20 +352,62 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
 
 	obj := add_phys_object_aabb(
-		pos = btn.pos,
+		pos = btn.pos - btn.dims * btn.facing - Vec2{0, 16},
 		// TODO: rot
 		scale = {32*2, 20},
-		flags = {.Non_Kinematic, .No_Gravity, .Trigger},
-		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS
+		flags = {.Fixed_Rotation},
+		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+		on_collision_enter = cube_btn_collide,
+		on_collision_exit = cube_btn_exit,
 	)
+
+	btn := btn
+
+	anchor_def := b2d.DefaultBodyDef()
+	anchor_def.position = rl_to_b2d_pos(btn.pos - btn.dims * btn.facing - Vec2{0, 16})
+	origin_anchor := b2d.CreateBody(physics.world, anchor_def)
+
+	// target := btn.pos + btn.dims * -btn.facing
+
+	prism_joint_def := b2d.DefaultPrismaticJointDef()
+
+	// The first attached body
+	prism_joint_def.bodyIdA = origin_anchor
+	// The local anchor point relative to bodyA's origin
+	prism_joint_def.localAnchorA = anchor_def.position
+
+	// The second attached body
+	prism_joint_def.bodyIdB = obj
+	// The local anchor point relative to bodyB's origin
+	prism_joint_def.localAnchorB = rl_to_b2d_pos(btn.pos)
+
+	// The local translation unit axis in bodyA
+	prism_joint_def.localAxisA = btn.facing
+
+	// The constrained angle between the bodies: bodyB_angle - bodyA_angle
+	prism_joint_def.referenceAngle = 0
+
+	prism_joint_def.enableSpring = true
+	prism_joint_def.hertz = 1
+	prism_joint_def.dampingRatio = 1
+
+	// prism_joint_def.enableMotor = true
+	// prism_joint_def.maxMotorForce = 500
+	// prism_joint_def.motorSpeed = 10
+
+	prism_joint_def.enableLimit = true
+	prism_joint_def.lowerTranslation = 0
+	prism_joint_def.upperTranslation = 1.5
+
+	btn.joint = b2d.CreatePrismaticJoint(physics.world, prism_joint_def)
+
 
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = btn,
 		// TODO: on_event instead for the logic stuff
-		on_collide_enter = cube_btn_collide,
-		on_collide_exit = cube_btn_exit,
 		on_render = cube_btn_render,
+		on_update = update_cube_btn,
 	})
 	pair_physics(id, obj)
 
@@ -430,6 +484,7 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 		data = player_new(tex),
 		on_update = update_player,
 		on_render = draw_player,
+		flags = {.Weigh_Down_Buttons},
 	})
 	phys_obj_data(game_state.objects[int(id)].data.(Player).obj).game_object = id
 	game_state.player = id
@@ -437,25 +492,24 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 	return id
 }
 
+cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
+	btn, _ := phys_obj_gobj(self, Cube_Button)
+	other_gobj := phys_obj_gobj(collided)
 
-cube_btn_collide :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
-	btn := game_obj(self, Cube_Button)
-	if .Weigh_Down_Buttons in other_obj.flags {
+	if .Weigh_Down_Buttons in other_gobj.flags {
 		send_game_event(Game_Event {
-			sender = self,
 			name = btn.event,
 			payload = Logic_Event {
 				activated = true
 			}
 		})
-	}	
+	}
 }
 
-cube_btn_exit :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics_Object) {
-	btn := game_obj(self, Cube_Button)
+cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
+	btn, _ := phys_obj_gobj(self, Cube_Button)
 	
 	send_game_event(Game_Event {
-		sender = self,
 		name = btn.event,
 		payload = Logic_Event {
 			activated = false
@@ -464,8 +518,7 @@ cube_btn_exit :: proc(self, other: Game_Object_Id, self_obj, other_obj: ^Physics
 }
 
 trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
-	trigger, ok := phys_obj_gobj(self, G_Trigger)
-	assert(ok)
+	trigger, _ := phys_obj_gobj(self, G_Trigger)
 
 	switch trigger.type {
 	case .Level_Exit:
@@ -494,10 +547,40 @@ update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool
 	return false
 }
 
+update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
+	btn := game_obj(self, Cube_Button)
+
+	j_transl := b2d.PrismaticJoint_GetTranslation(btn.joint)
+	if j_transl > CUBE_BTN_PRESSED {
+		if !btn.pressed {
+			btn.pressed = true
+			send_game_event(Game_Event {
+				name = btn.event,
+				payload = Logic_Event {
+					activated = true
+				}
+			})
+		}
+	}
+	else {
+		if btn.pressed {
+			btn.pressed = false
+			send_game_event(Game_Event {
+				name = btn.event,
+				payload = Logic_Event {
+					activated = false
+				}
+			})
+		}
+	}
+
+	return false
+}
+
 sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	door := game_obj(self, Sliding_Door)
 
-	obj := phys_obj(game_obj(self).obj.?)
+	obj := game_obj(self).obj.?
 
 	origin := door.pos
 	target := door.pos + door.dims * transmute(Vec2)door.facing 
@@ -513,7 +596,8 @@ sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bo
 	if door.open_percent > 1 do door.open_percent = 1
 
 	new_pos := origin + (target - origin) * ease.ease(ease.Ease.Quintic_Out, door.open_percent);
-	setpos(obj, new_pos)
+	phys_obj_goto(obj, new_pos)
+	// setpos(obj, new_pos)
 
 	return false
 }
