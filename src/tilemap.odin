@@ -215,19 +215,37 @@ generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
 	for &object in tm.objects {
 		pos := object.pos - Vec2(32/2)
 		// object.pos = rl_to_b2d_pos(object.pos)
-		if "gen" in object.properties {
-			log.info(object.properties["gen"])
-			prop, ok := object.properties["gen"].(tiled.Tilemap_Enum)
-			if !ok do continue
-			if prop.value == "Static_Collision" {
-				add_phys_object_aabb(
-					pos = pos + object.dims / 2, 
-					scale = object.dims,
-					flags = {.Non_Kinematic, .Fixed},
-					collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface},
-				);
+		for name, prop in object.properties {
+			#partial switch data in prop {
+			case tiled.Tilemap_Enum:
+				if data.value == "Static_Collision" {
+					if object.dims == 0 && len(object.vertices) != 0 {
+						add_phys_object_polygon(
+							pos = pos + object.dims / 2, 
+							vertices = object.vertices,
+							flags = {.Non_Kinematic, .Fixed},
+							collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface},
+						);
+					}
+					else {
+						add_phys_object_aabb(
+							pos = pos + object.dims / 2, 
+							scale = object.dims,
+							flags = {.Non_Kinematic, .Fixed},
+							collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface},
+						);
+					}
+				}
 			}
 		}
+		// if "gen" in object.properties {
+		// 	log.info(object.properties["gen"])
+		// 	prop, ok := object.properties["gen"].(tiled.Tilemap_Enum)
+		// 	if !ok do continue
+		// 	if prop.value == "Static_Collision" {
+				
+		// 	}
+		// }
 	}
 }
 

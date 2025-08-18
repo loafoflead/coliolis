@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="24">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="5" nextobjectid="25">
  <editorsettings>
   <export target="cube_intro.tmj" format="json"/>
  </editorsettings>
  <tileset firstgid="1" source="colours.tsx"/>
- <layer id="1" name="collision" width="32" height="16" locked="1">
+ <tileset firstgid="5" source="example.tsx"/>
+ <layer id="1" name="collision" width="32" height="16" visible="0" locked="1">
   <properties>
    <property name="generate" value="static_collisiong"/>
   </properties>
@@ -25,6 +26,26 @@
 2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
 2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2
+</data>
+ </layer>
+ <layer id="4" name="Tile Layer 2" width="32" height="16">
+  <data encoding="csv">
+9,33,33,33,33,33,33,33,33,33,33,33,33,33,34,9,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+27,5,6,6,6,6,8,0,0,0,5,6,6,6,8,27,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+15,15,15,15,15,15,9,0,0,0,32,33,33,33,33,33,33,33,9,15,15,15,15,15,15,15,15,15,15,15,15,15,
+15,15,15,15,15,15,18,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,
+15,15,15,15,15,15,18,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,
+15,15,15,15,15,15,18,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,
+15,15,15,15,15,15,18,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,
+15,15,15,15,15,15,18,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,
+15,15,15,15,15,15,18,0,0,0,0,0,0,0,0,0,0,0,18,15,15,15,15,15,15,15,15,15,15,15,15,15,
+15,15,15,15,15,15,27,5,6,6,6,6,6,6,6,6,7,8,27,15,15,15,15,15,15,15,15,15,15,15,15,15
 </data>
  </layer>
  <objectgroup id="2" name="Object Layer 1" locked="1">
@@ -57,7 +78,7 @@
    <properties>
     <property name="class" type="class" propertytype="Exit_Chute">
      <properties>
-      <property name="next_level" type="file" value=""/>
+      <property name="next_level" type="file" value="cube_portal.tmj"/>
      </properties>
     </property>
    </properties>
@@ -70,6 +91,7 @@
       <property name="channel" propertytype="Event_Channels" value="Logic"/>
       <property name="event" value="door"/>
       <property name="facing" value=""/>
+      <property name="on_pressed" value="door"/>
      </properties>
     </property>
    </properties>
@@ -84,7 +106,7 @@
         <property name="channel" propertytype="Event_Channels" value="Logic"/>
         <property name="event" value="door"/>
         <property name="run_once" type="bool" value="true"/>
-        <property name="type" value="event"/>
+        <property name="type" propertytype="Condition_Type" value="Event"/>
        </properties>
       </property>
      </properties>
@@ -93,7 +115,7 @@
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
  </objectgroup>
- <objectgroup id="3" name="collision">
+ <objectgroup id="3" name="collision" visible="0" locked="1">
   <object id="14" x="320" y="224" width="160" height="32">
    <properties>
     <property name="gen" propertytype="Generate" value="Static_Collision"/>

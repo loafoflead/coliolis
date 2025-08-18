@@ -70,6 +70,7 @@ Tilemap_Layer :: struct {
 	properties: map[string]Tilemap_Object_Property,
 }
 
+Json_Vertex :: struct {x, y: f32}
 
 Tilemap_Json_Object :: struct {
 	x, y: f32,
@@ -77,6 +78,7 @@ Tilemap_Json_Object :: struct {
 	visible: bool,
 	id: int,
 	name: string,
+	polygon: []Json_Vertex,
 
 	rotation: f32,
 	type: string,
@@ -136,6 +138,7 @@ Tilemap_Object :: struct {
 	type_string: string,
 	type: Tilemap_Object_Type,
 	pos, dims: [2]f32,
+	vertices: []([2]f32),
 	rot: f32,
 	visible: bool,
 	properties: map[string]Tilemap_Object_Property,
@@ -299,6 +302,8 @@ parse_tilemap :: proc(path: string, path_prefix: string = "", parse_tileset_auto
 				obj.rot = object.rotation
 				obj.type_string = object.type
 				obj.type = tilemap_obj_type_from_string(object.type)
+				obj.vertices = transmute([]([2]f32))object.polygon // TODO: is this... right?
+				// TODO: add shape property to Tilemap_Object
 
 				for property in object.properties {
 					obj.properties[property.name] = tilemap_parse_property(arena, property) or_continue

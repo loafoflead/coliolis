@@ -299,7 +299,8 @@ CUBE_BTN_PRESSED :: 1.3
 // TODO: store people weighing it down?
 Cube_Button :: struct {
 	using common: Level_Feature_Common,
-	event: string,
+	on_pressed: string,
+	on_unpressed: string,
 	channel: Game_Event_Category,
 	joint: b2d.JointId,
 	pressed: bool,
@@ -349,7 +350,6 @@ obj_cube_new :: proc(pos: Vec2, respawn_event: string = "") -> (id: Game_Object_
 		pos = pos,
 		mass = 50,
 		scale = {32, 32},
-		flags = {.Weigh_Down_Buttons},
 		friction = 1
 	)
 
@@ -361,7 +361,7 @@ obj_cube_new :: proc(pos: Vec2, respawn_event: string = "") -> (id: Game_Object_
 		data = cube,
 		on_render = game_obj_collider_render,
 		on_killed = cube_on_kill,
-		flags = {.Weak_To_Being_Vaporised},
+		flags = {.Weak_To_Being_Vaporised, .Portal_Traveller},
 	})
 	pair_physics(id, obj)
 
@@ -572,7 +572,7 @@ cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 
 	if .Weigh_Down_Buttons in other_gobj.flags {
 		send_game_event(Game_Event {
-			name = btn.event,
+			name = btn.on_pressed,
 			payload = Logic_Event {
 				activated = true
 			}
@@ -584,7 +584,7 @@ cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 	btn, _ := phys_obj_gobj(self, Cube_Button)
 	
 	send_game_event(Game_Event {
-		name = btn.event,
+		name = btn.on_unpressed,
 		payload = Logic_Event {
 			activated = false
 		}
@@ -636,7 +636,7 @@ update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		if !btn.pressed {
 			btn.pressed = true
 			send_game_event(Game_Event {
-				name = btn.event,
+				name = btn.on_pressed,
 				payload = Logic_Event {
 					activated = true
 				}
@@ -647,11 +647,19 @@ update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		if btn.pressed {
 			btn.pressed = false
 			send_game_event(Game_Event {
-				name = btn.event,
+				name = btn.on_pressed,
 				payload = Logic_Event {
 					activated = false
 				}
 			})
+			if btn.on_unpressed != "" {
+				send_game_event(Game_Event {
+					name = btn.on_unpressed,
+					payload = Logic_Event {
+						activated = true
+					}
+				})
+			}
 		}
 	}
 
@@ -687,7 +695,7 @@ sliding_door_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
 	case Logic_Event:
 		door := game_obj(self, Sliding_Door)
-		if event.name == door.condition.event {
+		if event_matches(event.name, door.condition.event) {
 			door.open = payload.activated
 		}
 	}
@@ -699,7 +707,7 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	case Logic_Event:
 		self := game_obj(self, Portal_Fixture)
 		// portal_goto(self.portal, self.pos, transmute(Vec2)self.facing)
-		if event.name == self.condition.event {
+		if event_matches(event.name, self.condition.event) {
 			portal_goto(frame.portal, frame.pos, frame.facing)
 			self.condition.override = payload.activated
 		}
@@ -710,7 +718,7 @@ spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
 	case Logic_Event:
 		self := game_obj(self, Cube_Spawner)
-		if event.name == self.condition.event && is_timer_done(self.timer) {
+		if event_matches(event.name, self.condition.event) && is_timer_done(self.timer) {
 			obj_cube_new(self.pos + self.facing * 32, self.condition.event)
 			// reset_timer(self.timer)
 			self.timer.flags -= {.Update_Automatically}
@@ -721,7 +729,7 @@ spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
 		self := game_obj(self, Cube_Spawner)
 		// TODO: hack, fix how condition works generally because it has
 		// nothing to do with events...
-		if payload.event_name == self.condition.event {
+		if event_matches(payload.event_name, self.condition.event) {
 			obj_cube_new(self.pos + self.facing * 32, self.condition.event)
 		}
 	}

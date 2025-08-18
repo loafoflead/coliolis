@@ -69,6 +69,10 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 		if facing.x < 0 {
 			rotate(transform, Rad(linalg.PI))
 		}
+		else {
+			flup := transform_flip(phys_obj_transform(obj_id))
+			phys_obj_set_transform(obj_id, flup)
+		}
 	}
 
 	// if math.round(facing.x) == 0 {

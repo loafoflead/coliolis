@@ -31,8 +31,9 @@ debug_print: bool = false;
 
 BACKGROUND_COLOUR :: 0x181818;
 TILEMAP :: 
-	//"portals_intro.tmj"
-	"cube_intro.tmj" 
+	"portals_intro.tmj"
+	// "cube_intro.tmj" 
+	// "cube_portal.tmj"
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };

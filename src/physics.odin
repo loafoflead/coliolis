@@ -380,12 +380,97 @@ free_phys_world :: proc() {
 	physics.initialised = false;
 }
 
+add_phys_object_polygon :: proc(
+	mass:  f32 = 0,
+	vertices: []Vec2,
+	pos:   Vec2 = Vec2{},
+	on_collision_enter: Phys_Collide_Callback = nil, 
+	on_collision_exit : Phys_Collide_Callback = nil,
+	friction: f32 = DEFAULT_FRICTION,
+	can_rotate: bool = false,
+	game_obj: Maybe(Game_Object_Id) = nil,
+	parent: ^Transform = nil,
+	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
+	collision_layers: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+	collide_with: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
+) -> (id: Physics_Object_Id)
+{
+	vertices := vertices
+	for &vert in vertices {
+		vert = rl_to_b2d_pos(vert)
+	}
+	hull := b2d.ComputeHull(vertices)
+	radius := f32(0.1) // no idea wtf this does :)
+	polygon := b2d.MakePolygon(hull, radius)
+	area := f32(10) // idfk
+
+	id = add_phys_object(
+		area,
+		mass, 
+		polygon, 
+		pos, 
+		on_collision_enter, 
+		on_collision_exit, 
+		friction, 
+		can_rotate, 
+		game_obj,
+		parent,
+		flags,
+		collision_layers,
+		collide_with
+	)
+	return
+}
+
 add_phys_object_aabb :: proc(
 	mass:  f32 = 0,
 	scale: Vec2,
 	pos:   Vec2 = Vec2{},
-	vel:   Vec2 = Vec2{},
-	acc:   Vec2 = Vec2{},
+	on_collision_enter: Phys_Collide_Callback = nil, 
+	on_collision_exit : Phys_Collide_Callback = nil,
+	friction: f32 = DEFAULT_FRICTION,
+	can_rotate: bool = false,
+	game_obj: Maybe(Game_Object_Id) = nil,
+	parent: ^Transform = nil,
+	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
+	collision_layers: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+	collide_with: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
+) -> (id: Physics_Object_Id)
+{
+	to_f64 := proc(v: Vec2) -> [2]f64 {
+		return {f64(v.x), f64(v.y)}
+	}
+	to_f32 := proc(v: [2]f64) -> Vec2 {
+		return {f32(v.x), f32(v.y)}
+	}
+
+	double := to_f64(scale) / 2 * B2D_SCALE_FACTOR
+	scale := to_f32(double)
+	box := b2d.MakeBox(scale.x, scale.y)
+
+	id = add_phys_object(
+		scale.x * scale.y,
+		mass, 
+		box, 
+		pos, 
+		on_collision_enter, 
+		on_collision_exit, 
+		friction, 
+		can_rotate, 
+		game_obj,
+		parent,
+		flags,
+		collision_layers,
+		collide_with
+	)
+	return
+}
+
+add_phys_object :: proc(
+	volume: f32,
+	mass:  f32 = 0,
+	polygon: b2d.Polygon,
+	pos:   Vec2 = Vec2{},
 	on_collision_enter: Phys_Collide_Callback = nil, 
 	on_collision_exit : Phys_Collide_Callback = nil,
 	friction: f32 = DEFAULT_FRICTION,
@@ -449,19 +534,8 @@ add_phys_object_aabb :: proc(
 	body_id := b2d.CreateBody(physics.world, body_def)
 	append(&physics.bodies, body_id)
 
-	to_f64 := proc(v: Vec2) -> [2]f64 {
-		return {f64(v.x), f64(v.y)}
-	}
-	to_f32 := proc(v: [2]f64) -> Vec2 {
-		return {f32(v.x), f32(v.y)}
-	}
-
-	double := to_f64(scale) / 2 * B2D_SCALE_FACTOR
-	scale := to_f32(double)
-
 	// NOTE: MakeBox uses half extents (the number u give is half of the full size)
 	// but my api evolved with full scale, so this is just for me
-	body_box := b2d.MakeBox(scale.x, scale.y)
 	body_shape := b2d.DefaultShapeDef()
 
 	if .Invisible_To_Triggers not_in flags {
@@ -477,6 +551,16 @@ add_phys_object_aabb :: proc(
 		log.error("Object that was not a Trigger (b2d.Sensor) was passed with on_collision_enter/exit procs, not yet supported")
 	}
 
+	body_shape.density = (mass / volume) if mass != 0 else 1 
+	body_shape.material.friction = DEFAULT_FRICTION
+	// how fucking hard is it to just name things clearly :|
+	body_shape.filter = b2d.Filter {
+		// https://forum.odin-lang.org/t/how-to-abstract-a-c-bit-fields-with-odins-bit-set/523/2
+		categoryBits = transmute(u64)collision_layers,
+		maskBits = transmute(u64)collide_with,
+		groupIndex = 0,
+	}
+
 	if 
 		.No_Velocity_Dampening in flags || 
 		.No_Collisions in flags || 
@@ -488,21 +572,9 @@ add_phys_object_aabb :: proc(
 			flags & {.No_Velocity_Dampening, .No_Collisions, .Drag_Exception, .Weigh_Down_Buttons}
 		)
 	}
-	
-	// density = mass/volume
-	volume := scale.x * scale.y
-	body_shape.density = (mass / volume) if mass != 0 else 1 
-	body_shape.material.friction = DEFAULT_FRICTION
-	// how fucking hard is it to just name things clearly :|
-	body_shape.filter = b2d.Filter {
-		// https://forum.odin-lang.org/t/how-to-abstract-a-c-bit-fields-with-odins-bit-set/523/2
-		categoryBits = transmute(u64)collision_layers,
-		maskBits = transmute(u64)collide_with,
-		groupIndex = 0,
-	}
 	// log.info(collision_layers, transmute(u64)collision_layers)
 
-	_ = b2d.CreatePolygonShape(body_id, body_shape, body_box)
+	_ = b2d.CreatePolygonShape(body_id, body_shape, polygon)
 
 	id = body_id
 	

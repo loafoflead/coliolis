@@ -2,6 +2,8 @@ package main
 
 import "core:container/queue"
 import "core:log"
+import "core:strings"
+import "core:slice"
 
 /*
 	Messages are 'targeted' events, that are sent directly to a gameobject,
@@ -76,16 +78,47 @@ events_subscribe :: proc(id: Game_Object_Id, event_tys: Game_Event_Set = {}) {
 	game_state.event_subscribers[id] = event_tys
 }
 
+event_matches :: proc(event_name: string, my_events: string) -> bool {
+	events : []string
+
+	if strings.contains_rune(my_events, ',') {
+		// TODO: game state get arena :D (i love arenas <3)
+		events = strings.split(my_events, ",", allocator = context.temp_allocator)
+	}
+	else {
+		events = {my_events}
+	}
+
+	return slice.contains(events, event_name)
+}
+
 send_game_event :: proc(event: Game_Event) {
 	assert(game_state.initialised)
 
-	switch _ in event.payload {
-	case Logic_Event:
-		queue.push_front(&game_state.events[.Logic], event)
-	case Cube_Die:
-		queue.push_front(&game_state.events[.Logic], event)
-	case:
-		log.error(event)
-		unimplemented()
+	events : []string
+
+	if strings.contains_rune(event.name, ',') {
+		// TODO: game state get arena :D (i love arenas <3)
+		events = strings.split(event.name, ",", allocator = context.temp_allocator)
+	}
+	else {
+		events = {event.name}
+	}
+
+	for e_name in events {
+		event := Game_Event {
+			name = e_name,
+			payload = event.payload,
+			sender = event.sender,
+		}
+		switch _ in event.payload {
+		case Logic_Event:
+			queue.push_front(&game_state.events[.Logic], event)
+		case Cube_Die:
+			queue.push_front(&game_state.events[.Logic], event)
+		case:
+			log.error(event)
+			unimplemented()
+		}
 	}
 }
