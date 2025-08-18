@@ -8,21 +8,25 @@ import "core:log"
 	events are like channels
 */
 
-Game_Event_Type :: enum {
+Game_Event_Category :: enum {
 	Logic,
 }
 
-Game_Event_Set :: bit_set[Game_Event_Type]
+Game_Event_Set :: bit_set[Game_Event_Category]
 
 Game_Event :: struct {
 	sender: Game_Object_Id,
 	name: string,
 
-	payload: union{Logic_Event},
+	payload: union{Logic_Event, Cube_Die},
 }
 
 Logic_Event :: struct {
 	activated: bool,
+}
+
+Cube_Die :: struct {
+	event_name: string,
 }
 
 Collision :: struct {
@@ -54,9 +58,11 @@ inform_game_object :: proc(obj: Game_Object_Id, payload: Game_Object_Message_Pay
 	}
 }
 
-channel_from_string :: proc(s: string) -> (Game_Event_Type, bool) {
+channel_from_string :: proc(s: string) -> (Game_Event_Category, bool) {
 	switch s {
 	case "Logic":
+		return .Logic, true
+	case "Cube_Die":
 		return .Logic, true
 	case "None":
 		return {}, false
@@ -75,6 +81,8 @@ send_game_event :: proc(event: Game_Event) {
 
 	switch _ in event.payload {
 	case Logic_Event:
+		queue.push_front(&game_state.events[.Logic], event)
+	case Cube_Die:
 		queue.push_front(&game_state.events[.Logic], event)
 	case:
 		log.error(event)

@@ -30,8 +30,9 @@ debug_print: bool = false;
 // --------------   END   --------------
 
 BACKGROUND_COLOUR :: 0x181818;
-TILEMAP :: "portals_intro.tmj"
-	// "cube_intro.tmj" 
+TILEMAP :: 
+	//"portals_intro.tmj"
+	"cube_intro.tmj" 
 
 get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
@@ -413,7 +414,7 @@ _ :: proc() {
 		// draw_texture(five_w, pointer, drawn_portion = Rect { 100, 100, 100, 100 }, scale = {0.05, 0.05});
 
 		if rl.IsKeyPressed(rl.KeyboardKey.C) {
-			obj_cube_new(get_world_mouse_pos())
+			// obj_cube_new(get_world_mouse_pos())
 		}
 
 		click: int

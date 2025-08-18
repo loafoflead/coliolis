@@ -26,18 +26,22 @@ Game_Object_On_Collide_Function :: #type proc(self, other: Game_Object_Id, self_
 Game_Object_On_Update_Function  :: #type proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool)
 Game_Object_Render_Function     :: #type proc(self: Game_Object_Id, camera: Camera2D)
 Game_Object_Event_Recv_Function :: #type proc(self: Game_Object_Id, event: ^Game_Event)
+Game_Object_Killed_Callback     :: #type proc(self: Game_Object_Id)
 
 GAMESTATE_MESSAGES_PER_FRAME 	:: 16
 GAMESTATE_EVENTS_PER_FRAME 		:: 16
+GAMEOBJS_DELETED_PER_FRAME 		:: 16
 
 Game_State :: struct {
 	initialised: bool,
 	objects: [dynamic]Game_Object,
+	to_delete: queue.Queue(Game_Object_Id),
+
 	player: Game_Object_Id,
 	current_level: Maybe(Level_Features),
 
 	messages: queue.Queue(Game_Object_Message),
-	events: [Game_Event_Type]queue.Queue(Game_Event),
+	events: [Game_Event_Category]queue.Queue(Game_Event),
 	event_subscribers: map[Game_Object_Id]Game_Event_Set,
 }
 
@@ -46,6 +50,9 @@ Game_Object_Type :: union{Cube_Spawner, G_Trigger, Player, Portal_Fixture, Cube_
 Game_Object_Flags :: enum {
 	Weigh_Down_Buttons,
 	Portal_Traveller,
+	Weak_To_Being_Vaporised,
+
+	Dead,
 }
 
 Game_Object_Flagset :: bit_set[Game_Object_Flags; u32]
@@ -54,6 +61,7 @@ Game_Object :: struct {
 	on_update: Game_Object_On_Update_Function,
 	on_render: Game_Object_Render_Function,
 	on_event: Game_Object_Event_Recv_Function,
+	on_killed: Game_Object_Killed_Callback,
 
 	flags: Game_Object_Flagset,
 
@@ -65,7 +73,7 @@ Game_Object :: struct {
 initialise_game_state :: proc() {
 	game_state.objects = make([dynamic]Game_Object)
 	queue.init(&game_state.messages)
-	for ty in Game_Event_Type {
+	for ty in Game_Event_Category {
 		queue.init(&game_state.events[ty])
 	}
 	game_state.initialised = true
@@ -116,7 +124,7 @@ game_init_level :: proc() {
 
 	log.info(game_state.current_level)
 
-	obj_trigger_new(.Level_Exit)
+	obj_trigger_new_from_ty(.Level_Exit)
 }
 
 state_get_player_spawn :: proc() -> (point: Vec2 = 0, loaded: bool = false) #optional_ok {
@@ -166,10 +174,15 @@ pair_physics :: proc(gobj: Game_Object_Id, phobj: Physics_Object_Id) {
 	phys_obj_data(phobj).game_object = gobj
 }
 
+queue_remove_game_obj :: proc(id: Game_Object_Id) {
+	queue.push_front(&game_state.to_delete, id)
+}
+
 update_game_state :: proc(dt: f32) {
 	to_delete := make([dynamic]int)
 	for obj, i in game_state.objects {
 		should_delete := false
+		if .Dead in obj.flags do continue
 		if obj.on_update != nil do should_delete = (obj.on_update)(Game_Object_Id(i), dt)
 		if should_delete do append(&to_delete, i)
 	}
@@ -185,10 +198,18 @@ update_game_state :: proc(dt: f32) {
 
 		for id, channels in game_state.event_subscribers {
 			gobj := game_obj(id)
+			if .Dead in gobj.flags do continue
 			if .Logic in channels {
 				if gobj.on_event != nil do (gobj.on_event)(id, &l_event)
 			}
 		}
+	}
+
+	for _ in 0..<GAMEOBJS_DELETED_PER_FRAME {
+		id := queue.pop_back_safe(&game_state.to_delete) or_break
+
+		if .Dead in game_obj(id).flags do log.warn("tried to doubly kill a gobj")
+		append(&to_delete, int(id))
 	}
 
 	if is_timer_just_done("game.level_loaded") {
@@ -199,9 +220,15 @@ update_game_state :: proc(dt: f32) {
 	}
 
 	#reverse for idx in to_delete {
+		obj := game_state.objects[idx]
+		if obj.on_killed != nil do (obj.on_killed)(Game_Object_Id(idx))
 		// moves the last elem to this pos,
 		// so reverse means this should always be good
-		unordered_remove(&game_state.objects, idx)
+		obj.flags += {.Dead}
+		if phobj, ok := obj.obj.?; ok {
+			b2d.Body_Disable(phobj)
+		}
+		// unordered_remove(&game_state.objects, idx)
 	}
 }
 
@@ -220,6 +247,7 @@ game_obj_col_exit :: proc(gobj_id, other_gobj: Game_Object_Id, obj, other_obj: P
 
 render_game_objects :: proc(camera: Camera2D) {
 	for obj, i in game_state.objects {
+		if .Dead in obj.flags do continue
 		if obj.on_render != nil do (obj.on_render)(Game_Object_Id(i), camera)
 	}
 }
@@ -272,17 +300,19 @@ CUBE_BTN_PRESSED :: 1.3
 Cube_Button :: struct {
 	using common: Level_Feature_Common,
 	event: string,
-	channel: Game_Event_Type,
+	channel: Game_Event_Category,
 	joint: b2d.JointId,
 	pressed: bool,
 }
 
 Cube :: struct {
+	respawn_event: string,
 }
 
 Cube_Spawner :: struct {
 	using common: Level_Feature_Common,
 	condition: Condition,
+	timer: ^Timer,
 }
 
 Portal_Fixture :: struct {
@@ -302,15 +332,17 @@ Sliding_Door :: struct {
 
 G_Trigger_Type :: enum {
 	Kill,
+	Vaporise,
 	Level_Exit,
 }
 
 G_Trigger :: struct {
+	using common: Level_Feature_Common,
 	type: G_Trigger_Type,
 	// TODO: callback?
 }
 
-obj_cube_new :: proc(pos: Vec2) -> (id: Game_Object_Id) {
+obj_cube_new :: proc(pos: Vec2, respawn_event: string = "") -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
 
 	obj := add_phys_object_aabb(
@@ -322,11 +354,14 @@ obj_cube_new :: proc(pos: Vec2) -> (id: Game_Object_Id) {
 	)
 
 	cube: Cube
+	cube.respawn_event = respawn_event
 
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = cube,
 		on_render = game_obj_collider_render,
+		on_killed = cube_on_kill,
+		flags = {.Weak_To_Being_Vaporised},
 	})
 	pair_physics(id, obj)
 
@@ -368,8 +403,8 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 		scale = {32*2, 20},
 		flags = {.Fixed_Rotation},
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
-		on_collision_enter = cube_btn_collide,
-		on_collision_exit = cube_btn_exit,
+		// on_collision_enter = cube_btn_collide,
+		// on_collision_exit = cube_btn_exit,
 	)
 
 	btn := btn
@@ -428,6 +463,9 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 obj_cube_spawner_new :: proc(spwner: Cube_Spawner) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
 
+	spwner := spwner
+	spwner.timer = get_temp_timer(1, flags = {.Update_Automatically})
+
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = spwner,
@@ -455,13 +493,35 @@ obj_prtl_frame_new :: proc(fixture: Portal_Fixture) -> (id: Game_Object_Id) {
 	return // id
 }
 
-obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_INVALID) -> (id: Game_Object_Id) {
+obj_trigger_new :: proc(trigger: G_Trigger) -> (id: Game_Object_Id) {
+	assert(game_state.initialised)
+
+	obj := add_phys_object_aabb(
+		pos = trigger.pos,
+		scale = trigger.dims,
+		flags = {.Non_Kinematic, .Trigger},
+		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+		on_collision_enter = trigger_on_collide,
+		// collide_with = {}
+	)
+
+	id = Game_Object_Id(len(game_state.objects))
+	append(&game_state.objects, Game_Object {
+		data = trigger,
+		on_render = trigger_render,
+	})
+	pair_physics(id, obj)
+
+	return // id
+}
+
+obj_trigger_new_from_ty :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_INVALID) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
 
 	trueobj := obj
 
 	if trueobj == PHYS_OBJ_INVALID {
-		switch type {
+		#partial switch type {
 		case .Kill: 
 			log.error("Cannot generate collider for kill trigger without physics object")
 			return GAME_OBJECT_INVALID
@@ -474,6 +534,9 @@ obj_trigger_new :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = PHYS_OBJ_
 				collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 				on_collision_enter = trigger_on_collide,
 			)
+		case:
+			log.errorf("obj_trigger_new_from_ty does not support %v, only Level_Exit and Kill, please use obj_trigger_new", type)
+			return GAME_OBJECT_INVALID
 		}
 	}
 
@@ -544,6 +607,11 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 			b2d.Body_SetLinearVelocity(collided, Vec2(0))
 			phys_obj_goto(collided, state_get_player_spawn())
 			log.info("Player hit death trigger")
+		}
+	case .Vaporise:
+		gobj := phys_obj_gobj(collided)
+		if .Weak_To_Being_Vaporised in gobj.flags {
+			queue_remove_game_obj(phys_obj_data(collided).game_object.?)
 		}
 	}
 }
@@ -642,11 +710,19 @@ spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
 	case Logic_Event:
 		self := game_obj(self, Cube_Spawner)
+		if event.name == self.condition.event && is_timer_done(self.timer) {
+			obj_cube_new(self.pos + self.facing * 32, self.condition.event)
+			// reset_timer(self.timer)
+			self.timer.flags -= {.Update_Automatically}
+			reset_timer(self.timer)
+		}
+	case Cube_Die:
+	log.error("huh")
+		self := game_obj(self, Cube_Spawner)
 		// TODO: hack, fix how condition works generally because it has
 		// nothing to do with events...
-		if event.name == self.condition.event && self.condition.override != true {
-			obj_cube_new(self.pos + self.facing * 32)
-			self.condition.override = true
+		if payload.event_name == self.condition.event {
+			obj_cube_new(self.pos + self.facing * 32, self.condition.event)
 		}
 	}
 }
@@ -674,4 +750,17 @@ door_render :: proc(self: Game_Object_Id, _: Camera2D) {
 	gobj := game_obj(self)
 
 	draw_phys_obj(gobj.obj.?)
+}
+
+cube_on_kill :: proc(self: Game_Object_Id) {
+	self := game_obj(self, Cube)
+
+	if self.respawn_event == "" do return 
+
+	send_game_event(Game_Event {
+		name = self.respawn_event,
+		payload = Cube_Die {
+			event_name = self.respawn_event,
+		}
+	})
 }

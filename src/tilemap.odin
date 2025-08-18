@@ -117,6 +117,12 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 						door.pos = pos + object.dims/2
 						door.dims, door.facing = object.dims, angle_to_dir(object.rot)
 						obj_sliding_door_new(door)
+					case "Trigger":
+						trigger : G_Trigger
+						err = json.unmarshal_string(value.json_data, &trigger, allocator = arena)
+						trigger.pos = pos + object.dims/2
+						trigger.dims = object.dims
+						obj_trigger_new(trigger)
 					case:
 						log.warnf("Unknown object class '%s'", value.classname)
 						continue
@@ -250,7 +256,7 @@ generate_kill_triggers_for_tilemap :: proc(id: Tilemap_Id) {
 					},
 					flags = {.Non_Kinematic, .No_Gravity, .Fixed, .Trigger},
 				);
-				obj_trigger_new(.Kill, pid)
+				obj_trigger_new_from_ty(.Kill, pid)
 			}
 		}
 	}

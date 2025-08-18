@@ -626,6 +626,7 @@ cast_ray_in_world :: proc(og, dir: Vec2, exclude: []Physics_Object_Id = {}, laye
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect { return {} }
 
 draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), texture := TEXTURE_INVALID) {
+	if !b2d.Body_IsEnabled(obj_id) do return
 	shape_buf := [4]b2d.ShapeId{}
 
 	shapes := b2d.Body_GetShapes(obj_id, shape_buf[:])
