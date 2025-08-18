@@ -40,7 +40,7 @@ PHYS_OBJ_INVALID :: Physics_Object_Id{}
 PHYSICS_TIMESTEP :: f32(1.0/60.0)
 PHYSICS_SUBSTEPS :: 2
 
-DEFAULT_FRICTION :: f32(1)
+DEFAULT_FRICTION :: f32(0.4)
 
 B2D_SCALE_FACTOR :: f64(1.0/10.0)
 
@@ -94,6 +94,12 @@ Phys_Body_Data :: struct {
 	on_collision_enter: Phys_Collide_Callback,
 	on_collision_exit: Phys_Collide_Callback,
 	// TODO: on_collide_enter callback?
+}
+
+Ray_Collision :: struct {
+	point: Vec2,
+	normal: Vec2,
+	obj_id: Physics_Object_Id,
 }
 
 Physics_Object_Flag :: enum u32 {
@@ -531,7 +537,10 @@ update_phys_world :: proc() {
 
 phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool {
 	pos := phys_obj_pos(obj_id)
-	return cast_box_in_world(pos + Vec2{0, player_dims().y/2}, player_dims()/2, rot=Rad(0))
+	// TODO: match accurate dimensions
+	_, hit := cast_ray_in_world(pos, -transform_right(phys_obj_transform(obj_id)) * 2, exclude = {obj_id})
+	return hit
+	// return cast_box_in_world(pos + Vec2{0, player_dims().y/2}, player_dims()/2, rot=Rad(0), exclude = {obj_id})
 }
 
 point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, exclude: []Physics_Object_Id = {}, ignore_triggers := true) -> (
@@ -568,7 +577,45 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u6
 	return {}, false
 }
 
-cast_ray_in_world :: proc(og, dir: Vec2, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL) -> (rl.RayCollision, bool) { return {}, false }
+cast_ray_in_world :: proc(og, dir: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL) -> (Ray_Collision, bool) { 
+	filter := b2d.DefaultQueryFilter()
+
+	if layers != COLLISION_LAYERS_ALL do log.warn("TODO: support collision layer filtering in box cast")
+
+	Box_Cast_Ctx :: struct {
+		collided: bool,
+		exclude: []Physics_Object_Id,
+		position, normal: Vec2,
+		obj: Physics_Object_Id,
+	}
+
+	ctx: Box_Cast_Ctx
+	ctx.exclude = exclude
+
+	callback := proc "c" (shape_id: b2d.ShapeId, point: Vec2, normal: Vec2, fraction: f32, ctx: rawptr) -> f32 {
+		dat := cast(^Box_Cast_Ctx)ctx
+		obj := b2d.Shape_GetBody(shape_id)
+		context = runtime.default_context()
+		if !slice.contains(dat.exclude, obj) {
+			dat.collided = true
+			dat.position = point
+			dat.normal = normal
+			dat.obj = obj
+			// https://box2d.org/doc_version_2_4/classb2_ray_cast_callback.html
+			return 0 // stop here
+		}
+		return fraction
+	}
+	_tree := b2d.World_CastRay(physics.world, og, dir, filter, callback, ctx = &ctx)
+	// TODO: could prob use the tree to check how many cols but will keep this for when i add layer checks etc..
+	if ctx.collided do return Ray_Collision {
+		point = ctx.position,
+		normal = ctx.normal,
+		obj_id = ctx.obj
+	}, true
+
+	return {}, false 
+}
 
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect { return {} }
 
@@ -656,19 +703,32 @@ cast_box_in_world :: proc(centre, dimensions: Vec2, rot: Rad, exclude: []Physics
 		radius = diagonal
 	)
 	filter := b2d.DefaultQueryFilter()
-	if len(exclude) != 0 do log.warn("TODO: support filtering in box cast")
+
 	if layers != COLLISION_LAYERS_ALL do log.warn("TODO: support collision layer filtering in box cast")
 	if rot != Rad(0) do log.warn("TODO: support rotated box casts")
 
-	collided := false
-	callback := proc "c" (_: b2d.ShapeId, _: Vec2, _: Vec2, fraction: f32, ctx: rawptr) -> f32 {
-		hit := cast(^bool)ctx
-		hit ^= true
+	Box_Cast_Ctx :: struct {
+		collided: bool,
+		exclude: []Physics_Object_Id,
+	}
+
+	ctx: Box_Cast_Ctx
+	ctx.exclude = exclude
+
+	callback := proc "c" (shape_id: b2d.ShapeId, _: Vec2, _: Vec2, fraction: f32, ctx: rawptr) -> f32 {
+		dat := cast(^Box_Cast_Ctx)ctx
+		obj := b2d.Shape_GetBody(shape_id)
+		context = runtime.default_context()
+		if !slice.contains(dat.exclude, obj) {
+			libc.printf("hi")
+			dat.collided = true
+			return -1
+		}
 		return fraction
 	}
-	tree := b2d.World_CastShape(physics.world, shape_prxy, centre, filter, callback, ctx = &collided)
+	_tree := b2d.World_CastShape(physics.world, shape_prxy, centre, filter, callback, ctx = &ctx)
 	// TODO: could prob use the tree to check how many cols but will keep this for when i add layer checks etc..
-	if collided do return true
+	if ctx.collided do return true
 
 	return false
 }

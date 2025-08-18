@@ -76,7 +76,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 	tm := tilemap(id)
 
 	for &object in tm.objects {
-		object.pos -= Vec2(32/2)
+		pos := object.pos - Vec2(32/2)
 		// object.pos = rl_to_b2d_pos(object.pos)
 		if object.type == .Func {
 			for name, prop in object.properties {
@@ -89,32 +89,32 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 
 					switch value.classname {
 					case "Entry_Chute"		:
-						features.player_spawn = object.pos
+						features.player_spawn = pos
 						features.player_spawn_facing = angle_to_dir(object.rot)
 					case "Exit_Chute"		:
 						exit: Level_Exit
-						features.level_exit = object.pos
+						features.level_exit = pos
 						err = json.unmarshal_string(value.json_data, &exit, allocator = arena)
 						features.next_level = exit.next_level
 					case "Portal_Fixture"	:
 						frame: Portal_Fixture
 						err = json.unmarshal_string(value.json_data, &frame, allocator = arena)
-						frame.pos, frame.dims, frame.facing = object.pos, object.dims, angle_to_dir(object.rot)
+						frame.pos, frame.dims, frame.facing = pos, object.dims, angle_to_dir(object.rot)
 						obj_prtl_frame_new(frame)
 					case "Cube_Button":
 						btn: Cube_Button
 						err = json.unmarshal_string(value.json_data, &btn, allocator = arena)
-						btn.pos, btn.dims, btn.facing = object.pos, object.dims, angle_to_dir(object.rot)
+						btn.pos, btn.dims, btn.facing = pos, object.dims, angle_to_dir(object.rot)
 						obj_cube_btn_new(btn)
 					case "Cube_Spawner":
 						spwnr: Cube_Spawner
 						err = json.unmarshal_string(value.json_data, &spwnr, allocator = arena)
-						spwnr.pos, spwnr.dims, spwnr.facing = object.pos, object.dims, angle_to_dir(object.rot)
+						spwnr.pos, spwnr.dims, spwnr.facing = pos, object.dims, angle_to_dir(object.rot)
 						obj_cube_spawner_new(spwnr)
 					case "Sliding_Door":
 						door : Sliding_Door
 						err = json.unmarshal_string(value.json_data, &door, allocator = arena)
-						door.pos = object.pos + object.dims/2
+						door.pos = pos + object.dims/2
 						door.dims, door.facing = object.dims, angle_to_dir(object.rot)
 						obj_sliding_door_new(door)
 					case:
@@ -175,31 +175,50 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 }
 
 generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
+	tm := tilemap(id)
 	layers, found := tiled.find_layers_with_property(tilemap(id), "generate", GENERATE_STATIC_COLLISION)
 	if !found {
 		log.warn("No layer was found with the generate:\"static_collision\" property, no collision was generated")
-		return
 	}
-	for layer in layers {
-		for y in 0..<layer.height {
-			for x in 0..<layer.width {
-				tile := layer.data[y * layer.width + x]
-				// NOTE: zero seems to mean nothing, so all offsets have one added to them
-				if tile == 0 do continue;
+	else {
+		for layer in layers {
+			for y in 0..<layer.height {
+				for x in 0..<layer.width {
+					tile := layer.data[y * layer.width + x]
+					// NOTE: zero seems to mean nothing, so all offsets have one added to them
+					if tile == 0 do continue;
 
-				tileset, _ := tiled.get_tile_tileset(tilemap(id), tile);
+					tileset, _ := tiled.get_tile_tileset(tilemap(id), tile);
 
-				pos := Vec2 { cast(f32) (x * tileset.tilewidth), cast(f32) (y * tileset.tileheight) };
+					pos := Vec2 { cast(f32) (x * tileset.tilewidth), cast(f32) (y * tileset.tileheight) };
 
+					add_phys_object_aabb(
+						pos = pos, 
+						mass = 0,
+						scale = Vec2 {
+							cast(f32) tileset.tilewidth, 
+							cast(f32) tileset.tileheight 
+						},
+						flags = {.Non_Kinematic, .Fixed},
+						collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface}
+					);
+				}
+			}
+		}
+	}
+	for &object in tm.objects {
+		pos := object.pos - Vec2(32/2)
+		// object.pos = rl_to_b2d_pos(object.pos)
+		if "gen" in object.properties {
+			log.info(object.properties["gen"])
+			prop, ok := object.properties["gen"].(tiled.Tilemap_Enum)
+			if !ok do continue
+			if prop.value == "Static_Collision" {
 				add_phys_object_aabb(
-					pos = pos, 
-					mass = 0,
-					scale = Vec2 {
-						cast(f32) tileset.tilewidth, 
-						cast(f32) tileset.tileheight 
-					},
-					flags = {.Non_Kinematic, .No_Gravity, .Fixed},
-					collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface}
+					pos = pos + object.dims / 2, 
+					scale = object.dims,
+					flags = {.Non_Kinematic, .Fixed},
+					collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface},
 				);
 			}
 		}

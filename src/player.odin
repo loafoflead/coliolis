@@ -1,5 +1,7 @@
 package main;
 
+import "core:log"
+
 import "core:math"
 import "core:math/ease";
 
@@ -7,7 +9,7 @@ import rl "thirdparty/raylib"
 import b2d "thirdparty/box2d"
 
 PLAYER_HORIZ_ACCEL :: 10.0; // newtons???
-PLAYER_JUMP_STR :: 10000.0; // idk
+PLAYER_JUMP_STR :: 25_000.0; // idk
 
 PLAYER_WIDTH :: 32;
 PLAYER_HEIGHT :: 32;
@@ -55,7 +57,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	set_timer_done(&player.step_timer)
 
 	player.coyote_timer = timer_new(0.2)
-	player.jump_timer = timer_new(0.25)
+	player.jump_timer = timer_new(0.35, flags={.Update_Automatically})
 
 	return player;
 }
@@ -72,34 +74,43 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		move += -1;
 	}
 
-	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
+	update_timer(&player.jump_timer, dt)
+
+	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) && is_timer_done(&player.jump_timer) {
 		if !player.in_air || !is_timer_done(&player.coyote_timer) {
 			player.jumping = true;
-			if !is_timer_done(&player.coyote_timer) do set_timer_done(&player.coyote_timer);
-		}
-	}
-	if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
-		if player.jumping && !is_timer_done(&player.jump_timer) {
 			impulse := Vec2 {
 				0,
 				-PLAYER_JUMP_STR
 				// -PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current))
 			}
 			b2d.Body_ApplyLinearImpulseToCenter(player_obj, rl_to_b2d_pos(impulse), wake=true)
-			// b2d.Body_SetLinearVelocity(
-			// 	player_obj, rl_to_b2d_pos(new_vel)
-			// )
-			// set_timer_done(&player.jump_timer)
-			// update_timer(&player.jump_timer, dt);
+			if !is_timer_done(&player.coyote_timer) do set_timer_done(&player.coyote_timer);
+			reset_timer(&player.jump_timer)
 		}
 	}
-	else {
-		player.jumping = false;
-	}
+	// if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
+	// 	if player.jumping && !is_timer_done(&player.jump_timer) {
+	// 		impulse := Vec2 {
+	// 			0,
+	// 			-PLAYER_JUMP_STR
+	// 			// -PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current))
+	// 		}
+	// 		b2d.Body_ApplyLinearImpulseToCenter(player_obj, rl_to_b2d_pos(impulse), wake=true)
+	// 		// b2d.Body_SetLinearVelocity(
+	// 		// 	player_obj, rl_to_b2d_pos(new_vel)
+	// 		// )
+	// 		// set_timer_done(&player.jump_timer)
+	// 		// update_timer(&player.jump_timer, dt);
+	// 	}
+	// }
+	// else {
+	// 	player.jumping = false;
+	// }
 
 	if phys_obj_grounded(player.obj) {
 		player.in_air = false;
-		reset_timer(&player.jump_timer);
+		// reset_timer(&player.jump_timer);
 		reset_timer(&player.coyote_timer);
 	}
 	else {

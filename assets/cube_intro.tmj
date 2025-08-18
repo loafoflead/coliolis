@@ -12,7 +12,7 @@
                 {
                  "name":"generate",
                  "type":"string",
-                 "value":"static_collision"
+                 "value":"static_collisiong"
                 }],
          "type":"tilelayer",
          "visible":true,
@@ -176,10 +176,7 @@
                             {
                              "channel":"Logic",
                              "event":"door",
-                             "facing":
-                                {
-                                 "y":-1
-                                }
+                             "facing":""
                             }
                         }],
                  "rotation":270,
@@ -242,9 +239,182 @@
          "visible":true,
          "x":0,
          "y":0
+        }, 
+        {
+         "draworder":"topdown",
+         "id":3,
+         "name":"collision",
+         "objects":[
+                {
+                 "height":32,
+                 "id":14,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":160,
+                 "x":320,
+                 "y":224
+                }, 
+                {
+                 "height":32,
+                 "id":15,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":192,
+                 "x":32,
+                 "y":224
+                }, 
+                {
+                 "height":32,
+                 "id":16,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":448,
+                 "x":32,
+                 "y":0
+                }, 
+                {
+                 "height":256,
+                 "id":17,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":32,
+                 "x":480,
+                 "y":0
+                }, 
+                {
+                 "height":256,
+                 "id":18,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":32,
+                 "x":0,
+                 "y":0
+                }, 
+                {
+                 "height":256,
+                 "id":19,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":32,
+                 "x":192,
+                 "y":256
+                }, 
+                {
+                 "height":256,
+                 "id":20,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":32,
+                 "x":576,
+                 "y":256
+                }, 
+                {
+                 "height":32,
+                 "id":21,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":256,
+                 "x":320,
+                 "y":256
+                }, 
+                {
+                 "height":32,
+                 "id":22,
+                 "name":"",
+                 "properties":[
+                        {
+                         "name":"gen",
+                         "propertytype":"Generate",
+                         "type":"string",
+                         "value":"Static_Collision"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":352,
+                 "x":224,
+                 "y":480
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
         }],
- "nextlayerid":3,
- "nextobjectid":14,
+ "nextlayerid":4,
+ "nextobjectid":23,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.2",

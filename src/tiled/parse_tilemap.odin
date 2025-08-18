@@ -116,8 +116,14 @@ Tilemap_Class :: struct {
 	json_data: string,
 }
 
+Tilemap_Enum :: struct {
+	name: string,
+	value: string,
+}
+
 Tilemap_Object_Property :: union {
 	Tilemap_Class,
+	Tilemap_Enum,
 	Tilemap_Object_Id, // for links
 	string,
 }
@@ -206,7 +212,15 @@ tilemap_parse_property :: proc(arena: runtime.Allocator, property: Tilemap_Json_
 			json_data = strings.to_string(builda)
 		}
 	case "string":
-		prop = property.value.(string)
+		if property.propertytype != "" {
+			prop = Tilemap_Enum {
+				name = property.propertytype,
+				value = property.value.(string),
+			}
+		}
+		else {
+			prop = property.value.(string)
+		}
 	case "color", "file", "float", "int", "bool":
 		unimplemented("More data types for top level object properties")
 	case "object":

@@ -311,7 +311,7 @@ _ :: proc() {
 
 	selected_portal: int = 0;
 
-	collision: rl.RayCollision
+	collision: Ray_Collision
 
 	target: Vec3
 	spin: f32
@@ -466,10 +466,10 @@ _ :: proc() {
 				}
 			}
 		}
-		if collision.hit {
-			draw_line(collision.point.xy, collision.point.xy + collision.normal.xy * 100, Colour{1 = 255, 3 = 255})
-			// draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
-		}
+		// if collision.hit {
+		// 	draw_line(collision.point.xy, collision.point.xy + collision.normal.xy * 100, Colour{1 = 255, 3 = 255})
+		// 	// draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
+		// }
 		// setrot(phys_obj(portal_handler.portals[selected_portal].obj), Rad(-spin))
 
 

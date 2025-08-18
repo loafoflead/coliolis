@@ -1,33 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="40">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="46">
  <editorsettings>
   <export target="portals_intro.tmj" format="json"/>
  </editorsettings>
  <tileset firstgid="1" source="example.tsx"/>
  <tileset firstgid="82" source="colours.tsx"/>
- <layer id="1" name="collision" width="32" height="16" visible="0" locked="1" opacity="0.7">
-  <properties>
-   <property name="generate" value="static_collision"/>
-  </properties>
-  <data encoding="csv">
-83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,
-83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,
-83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,
-83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83,83
-</data>
- </layer>
  <layer id="2" name="midground" width="32" height="16" locked="1" opacity="0.78">
   <data encoding="csv">
 1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,4,
@@ -48,7 +25,7 @@
 28,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,30,31
 </data>
  </layer>
- <objectgroup id="3" name="markers">
+ <objectgroup id="3" name="markers" locked="1">
   <object id="36" name="ptl1" type="func" x="416" y="416" rotation="-90">
    <properties>
     <property name="class" type="class" propertytype="Portal_Fixture">
@@ -60,11 +37,7 @@
         <property name="type" value="always"/>
        </properties>
       </property>
-      <property name="facing" type="class">
-       <properties>
-        <property name="y" type="int" value="-1"/>
-       </properties>
-      </property>
+      <property name="facing" type="class"/>
       <property name="facing_y" type="qlonglong" value="-1"/>
       <property name="link" type="qlonglong" value="21"/>
       <property name="portal" type="int" value="1"/>
@@ -84,11 +57,7 @@
         <property name="type" value="always"/>
        </properties>
       </property>
-      <property name="facing" type="class">
-       <properties>
-        <property name="y" type="int" value="-1"/>
-       </properties>
-      </property>
+      <property name="facing" type="class"/>
       <property name="facing_y" type="qlonglong" value="-1"/>
       <property name="link" type="qlonglong" value="21"/>
       <property name="portal" type="int" value="2"/>
@@ -112,6 +81,33 @@
     </property>
    </properties>
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+ </objectgroup>
+ <objectgroup id="6" name="collision">
+  <object id="40" x="32" y="415" width="960" height="32">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="42" x="0" y="0" width="32" height="448">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="43" x="32" y="0" width="960" height="32">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="44" x="992" y="0" width="32" height="448">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="45" x="480" y="32" width="64" height="384">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
   </object>
  </objectgroup>
 </map>
