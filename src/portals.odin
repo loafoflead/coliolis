@@ -108,7 +108,7 @@ initialise_portal_handler :: proc() {
 		ptl.obj = PHYS_OBJ_INVALID
 	}
 
-	prtl_col_layers := COLLISION_LAYERS_ALL//Collision_Set{.L0}
+	prtl_col_layers := Collision_Set{.Default, .L0}
 
 	portal_handler.portals.x.obj = add_phys_object_aabb(
 		pos = Vec2 {5, 0},
@@ -204,6 +204,9 @@ portal_from_phys_id :: proc(id: Physics_Object_Id) -> (^Portal, bool) #optional_
 prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
 	portal := portal_from_phys_id(self)
 	occupant_id, occupied := portal.occupant.?;
+	gobj, has_gobj := phys_obj_gobj(collided)
+	if !has_gobj do return
+	if .Portal_Traveller not_in gobj.flags do return
 
 	if !occupied && is_timer_done("portal_tp") {
 		ty := b2d.Body_GetType(collided)

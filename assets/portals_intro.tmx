@@ -25,7 +25,7 @@
 28,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,30,31
 </data>
  </layer>
- <objectgroup id="3" name="markers" locked="1">
+ <objectgroup id="3" name="markers">
   <object id="36" name="ptl1" type="func" x="416" y="416" rotation="-90">
    <properties>
     <property name="class" type="class" propertytype="Portal_Fixture">
@@ -34,10 +34,13 @@
       <property name="condition" type="class" propertytype="Condition">
        <properties>
         <property name="activated_when" value="always"/>
-        <property name="type" value="always"/>
+        <property name="channel" propertytype="Event_Channels" value="Logic"/>
+        <property name="event" value="level_load"/>
+        <property name="run_once" type="bool" value="true"/>
+        <property name="type" propertytype="Condition_Type" value="Event"/>
        </properties>
       </property>
-      <property name="facing" type="class"/>
+      <property name="facing" value=""/>
       <property name="facing_y" type="qlonglong" value="-1"/>
       <property name="link" type="qlonglong" value="21"/>
       <property name="portal" type="int" value="1"/>
@@ -54,10 +57,13 @@
       <property name="condition" type="class" propertytype="Condition">
        <properties>
         <property name="activated_when" value="always"/>
-        <property name="type" value="always"/>
+        <property name="channel" propertytype="Event_Channels" value="Logic"/>
+        <property name="event" value="level_load"/>
+        <property name="run_once" type="bool" value="true"/>
+        <property name="type" propertytype="Condition_Type" value="Event"/>
        </properties>
       </property>
-      <property name="facing" type="class"/>
+      <property name="facing" value=""/>
       <property name="facing_y" type="qlonglong" value="-1"/>
       <property name="link" type="qlonglong" value="21"/>
       <property name="portal" type="int" value="2"/>
@@ -83,7 +89,7 @@
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
  </objectgroup>
- <objectgroup id="6" name="collision">
+ <objectgroup id="6" name="collision" locked="1">
   <object id="40" x="32" y="415" width="960" height="32">
    <properties>
     <property name="gen" propertytype="Generate" value="Static_Collision"/>

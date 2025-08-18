@@ -296,7 +296,7 @@ phys_obj_transform_apply_to_body :: proc(id: Physics_Object_Id) {
 }
 
 phys_obj_pos :: proc(id: Physics_Object_Id) -> Vec2 {
-	return b2d.Body_GetPosition(id)
+	return b2d_to_rl_pos(b2d.Body_GetPosition(id))
 }
 
 phys_obj_shape :: proc(id: Physics_Object_Id) -> b2d.ShapeId {
@@ -538,7 +538,7 @@ update_phys_world :: proc() {
 phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool {
 	pos := phys_obj_pos(obj_id)
 	// TODO: match accurate dimensions
-	_, hit := cast_ray_in_world(pos, -transform_right(phys_obj_transform(obj_id)) * 2, exclude = {obj_id})
+	_, hit := cast_ray_in_world(pos, transform_right(phys_obj_transform(obj_id)) * 2, exclude = {obj_id})
 	return hit
 	// return cast_box_in_world(pos + Vec2{0, player_dims().y/2}, player_dims()/2, rot=Rad(0), exclude = {obj_id})
 }
@@ -580,7 +580,10 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u6
 cast_ray_in_world :: proc(og, dir: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL) -> (Ray_Collision, bool) { 
 	filter := b2d.DefaultQueryFilter()
 
-	if layers != COLLISION_LAYERS_ALL do log.warn("TODO: support collision layer filtering in box cast")
+	if layers != COLLISION_LAYERS_ALL {
+		// filter.categoryBits = transmute(u64)layers
+		filter.maskBits = transmute(u64)layers
+	}
 
 	Box_Cast_Ctx :: struct {
 		collided: bool,
@@ -606,10 +609,13 @@ cast_ray_in_world :: proc(og, dir: Vec2, exclude: []Physics_Object_Id = {}, laye
 		}
 		return fraction
 	}
-	_tree := b2d.World_CastRay(physics.world, og, dir, filter, callback, ctx = &ctx)
-	// TODO: could prob use the tree to check how many cols but will keep this for when i add layer checks etc..
+	dir := dir - og
+	dir.y = -dir.y
+	dir += rl_to_b2d_pos(og)
+	tree := b2d.World_CastRay(physics.world, rl_to_b2d_pos(og), dir, filter, callback, ctx = &ctx)
+	ctx.normal.y = -ctx.normal.y
 	if ctx.collided do return Ray_Collision {
-		point = ctx.position,
+		point = b2d_to_rl_pos(ctx.position),
 		normal = ctx.normal,
 		obj_id = ctx.obj
 	}, true

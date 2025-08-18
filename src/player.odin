@@ -18,6 +18,8 @@ PLAYER_WEIGHT :: 60;
 
 PLAYER_STEP_UP_HEIGHT :: 20;
 
+PORTAL_RANGE :: 500
+
 Player :: struct {
 	obj: Physics_Object_Id,
 	texture: Texture_Id,
@@ -108,15 +110,15 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	// 	player.jumping = false;
 	// }
 
-	if phys_obj_grounded(player.obj) {
-		player.in_air = false;
-		// reset_timer(&player.jump_timer);
-		reset_timer(&player.coyote_timer);
-	}
-	else {
-		update_timer(&player.coyote_timer, dt);
-		player.in_air = true;
-	}
+	// if phys_obj_grounded(player.obj) {
+	// 	player.in_air = false;
+	// 	// reset_timer(&player.jump_timer);
+	// 	reset_timer(&player.coyote_timer);
+	// }
+	// else {
+	// 	update_timer(&player.coyote_timer, dt);
+	// 	player.in_air = true;
+	// }
 
 PLAYER_STEPPING_UP :: false
 
@@ -171,7 +173,10 @@ when PLAYER_STEPPING_UP {
 		b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * PLAYER_HORIZ_ACCEL * 60 * PLAYER_WEIGHT), wake=false)
 	}
 
-	if rl.IsKeyPressed(rl.KeyboardKey.L) do player.portals_unlocked += 1
+	if rl.IsKeyPressed(rl.KeyboardKey.L) {
+		player.portals_unlocked += 1
+		log.info(player.portals_unlocked)
+	}
 	// else {
 	// 	if math.abs(player_obj.rot) > 0.1 {
 	// 		// rotate(player_obj, player_obj.rot * 0.01);

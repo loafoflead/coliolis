@@ -45,6 +45,7 @@ Game_Object_Type :: union{Cube_Spawner, G_Trigger, Player, Portal_Fixture, Cube_
 
 Game_Object_Flags :: enum {
 	Weigh_Down_Buttons,
+	Portal_Traveller,
 }
 
 Game_Object_Flagset :: bit_set[Game_Object_Flags; u32]
@@ -86,6 +87,9 @@ game_load_level_from_tilemap :: proc(path: string) {
 
 	clear(&game_state.objects)
 	initialise_portal_handler()
+
+	create_named_timer("game.level_loaded", 1, flags = {.Update_Automatically})
+	reset_timer("game.level_loaded")
 
 	// fmt.printfln("%#v", tilemap(test_map))
 	generate_static_physics_for_tilemap(tmap)
@@ -185,6 +189,13 @@ update_game_state :: proc(dt: f32) {
 				if gobj.on_event != nil do (gobj.on_event)(id, &l_event)
 			}
 		}
+	}
+
+	if is_timer_just_done("game.level_loaded") {
+		send_game_event(Game_Event {
+			name = "level_load",
+			payload = Logic_Event { activated = true },
+		})
 	}
 
 	#reverse for idx in to_delete {
@@ -484,7 +495,7 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 		data = player_new(tex),
 		on_update = update_player,
 		on_render = draw_player,
-		flags = {.Weigh_Down_Buttons},
+		flags = {.Weigh_Down_Buttons, .Portal_Traveller},
 	})
 	phys_obj_data(game_state.objects[int(id)].data.(Player).obj).game_object = id
 	game_state.player = id
@@ -540,15 +551,17 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	frame := game_obj(self, Portal_Fixture)
 
-	if condition_true(frame.condition) {
-		portal_goto(frame.portal, frame.pos, frame.facing)
-	}
+	// if condition_true(frame.condition) {
+	// 	portal_goto(frame.portal, frame.pos, frame.facing)
+	// }
 
 	return false
 }
 
 update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	btn := game_obj(self, Cube_Button)
+
+	if !is_timer_done("game.level_loaded") do return false
 
 	j_transl := b2d.PrismaticJoint_GetTranslation(btn.joint)
 	if j_transl > CUBE_BTN_PRESSED {
@@ -613,11 +626,15 @@ sliding_door_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 }
 
 prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
+	frame := game_obj(self, Portal_Fixture)
 	#partial switch payload in event.payload {
 	case Logic_Event:
 		self := game_obj(self, Portal_Fixture)
 		// portal_goto(self.portal, self.pos, transmute(Vec2)self.facing)
-		if event.name == self.condition.event do self.condition.override = payload.activated
+		if event.name == self.condition.event {
+			portal_goto(frame.portal, frame.pos, frame.facing)
+			self.condition.override = payload.activated
+		}
 	}
 }
 

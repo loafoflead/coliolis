@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="23">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="24">
  <editorsettings>
   <export target="cube_intro.tmj" format="json"/>
  </editorsettings>
@@ -38,10 +38,10 @@
         <property name="activated_when" value="event"/>
         <property name="channel" propertytype="Event_Channels" value="Logic"/>
         <property name="event" value="door"/>
-        <property name="type" value="event"/>
+        <property name="type" propertytype="Condition_Type" value="Event"/>
        </properties>
       </property>
-      <property name="facing" type="class"/>
+      <property name="facing" value=""/>
       <property name="facing_x" type="int" value="1"/>
      </properties>
     </property>
@@ -137,6 +137,15 @@
   <object id="22" x="224" y="480" width="352" height="32">
    <properties>
     <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="23" name="vaporiser" type="func" x="224" y="288" width="128" height="64">
+   <properties>
+    <property name="class" type="class" propertytype="Trigger">
+     <properties>
+      <property name="type" propertytype="TriggerType" value="Vaporise"/>
+     </properties>
+    </property>
    </properties>
   </object>
  </objectgroup>

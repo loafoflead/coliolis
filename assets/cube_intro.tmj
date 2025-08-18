@@ -42,12 +42,9 @@
                                  "activated_when":"event",
                                  "channel":"Logic",
                                  "event":"door",
-                                 "type":"event"
+                                 "type":"Event"
                                 },
-                             "facing":
-                                {
-                                 "x":1
-                                },
+                             "facing":"",
                              "facing_x":1
                             }
                         }],
@@ -406,6 +403,27 @@
                  "width":352,
                  "x":224,
                  "y":480
+                }, 
+                {
+                 "height":64,
+                 "id":23,
+                 "name":"vaporiser",
+                 "properties":[
+                        {
+                         "name":"class",
+                         "propertytype":"Trigger",
+                         "type":"class",
+                         "value":
+                            {
+                             "type":"Vaporise"
+                            }
+                        }],
+                 "rotation":0,
+                 "type":"func",
+                 "visible":true,
+                 "width":128,
+                 "x":224,
+                 "y":288
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -414,7 +432,7 @@
          "y":0
         }],
  "nextlayerid":4,
- "nextobjectid":23,
+ "nextobjectid":25,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.2",

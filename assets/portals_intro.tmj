@@ -55,12 +55,12 @@
                              "condition":
                                 {
                                  "activated_when":"always",
-                                 "type":"always"
+                                 "channel":"Logic",
+                                 "event":"level_load",
+                                 "run_once":true,
+                                 "type":"Event"
                                 },
-                             "facing":
-                                {
-                                 "y":-1
-                                },
+                             "facing":"",
                              "facing_y":-1,
                              "link":21,
                              "portal":1
@@ -109,12 +109,12 @@
                              "condition":
                                 {
                                  "activated_when":"always",
-                                 "type":"always"
+                                 "channel":"Logic",
+                                 "event":"level_load",
+                                 "run_once":true,
+                                 "type":"Event"
                                 },
-                             "facing":
-                                {
-                                 "y":-1
-                                },
+                             "facing":"",
                              "facing_y":-1,
                              "link":21,
                              "portal":2

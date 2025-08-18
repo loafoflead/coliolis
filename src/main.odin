@@ -132,6 +132,8 @@ main :: proc() {
 
 	follow_player := false
 
+	collision: Maybe(Ray_Collision)
+
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 
@@ -147,21 +149,41 @@ main :: proc() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))
 
-		draw_phys_world()
+		// draw_phys_world()
 		draw_portals(selected_portal);
 		render_game_objects(camera)
 		// draw_texture(dir_tex, pos=rl_to_b2d_pos(get_world_mouse_pos()), scale=0.1)
-
-
-
-
-
-
-
-
-
+		draw_tilemap(state_level().tilemap, {0., 0.});
 
 		rl.EndDrawing()
+
+
+		click: int
+		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) do click = 1
+		else if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) do click = 2
+
+		if click != 0 && click <= game_obj(game_state.player, Player).portals_unlocked {
+			player_pos := phys_obj_pos(game_obj(game_state.player, Player).obj)
+			col, hit := cast_ray_in_world(
+				player_pos,
+				player_pos + linalg.normalize(get_world_mouse_pos() - player_pos) * PORTAL_RANGE,
+				exclude = {game_obj(game_state.player, Player).obj},
+				layers = {.Portal_Surface}
+			)
+			if hit {
+				portal_goto(i32(click), col.point, col.normal)
+				collision = col
+			}
+			else {
+				collision = nil
+			}
+		}
+		if col, ok := collision.?; ok {
+			draw_line(col.point.xy, col.point.xy + col.normal.xy * 100, Colour{1 = 255, 3 = 255})
+			// draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
+		}
+		player_pos := phys_obj_pos(game_obj(game_state.player, Player).obj)
+		draw_line(player_pos, player_pos + linalg.normalize(get_world_mouse_pos() - player_pos) * 50)
 
 when DEBUG {
 		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
@@ -233,24 +255,6 @@ when DEBUG {
 			}
 
 			portal_obj := portal_handler.portals[selected_portal].obj
-
-			if rl.IsKeyPressed(rl.KeyboardKey.F) {
-				log.info("flibbin")
-				// trans := phys_obj_transform(portal_obj)
-				// log.infof("before: %#v",trans)
-				// ntrans := transform_flip_2(trans)
-				// log.infof("during: %#v",ntrans)
-				// phys_obj_set_transform(portal_obj, ntrans)
-				// // trans ^= ntrans
-				// // phys_obj_transform_sync(portal_obj)
-				// log.infof("after: %#v", phys_obj_transform(portal_obj))
-				// log.infof("%#v", trans)
-				// rotate(trans, linalg.PI/2)
-				// log.infof("%#v", trans)
-				// phys_obj_transform_sync(portal_obj)
-				// log.infof("%#v", phys_obj_transform(portal_obj))
-				phys_obj_transform(portal_obj) ^= transform_flip(phys_obj_transform(portal_obj));
-			}
 
 			mouse_move := rl.GetMouseWheelMove();
 			if mouse_move != 0 {
