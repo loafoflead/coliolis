@@ -16,13 +16,14 @@ Game_Event_Category :: enum {
 }
 
 Game_Event_Category_Set :: bit_set[Game_Event_Category]
+Game_Event_Payload :: union{Activation_Event, Cube_Die, Level_Event}
 
 Game_Event :: struct {
 	sender: Game_Object_Id,
 	name: string,
 	categories: Game_Event_Category_Set,
 
-	payload: union{Activation_Event, Cube_Die},
+	payload: Game_Event_Payload,
 }
 
 Activation_Event :: struct {
@@ -31,6 +32,11 @@ Activation_Event :: struct {
 
 Cube_Die :: struct {
 	event_name: string,
+}
+
+Level_Event :: enum {
+	End,
+	Load,
 }
 
 Game_Object_Message_Payload :: union {
@@ -90,7 +96,7 @@ event_matches :: proc(event_name: string, my_events: string) -> bool {
 	return slice.contains(events, event_name)
 }
 
-send_game_event :: proc(event: Game_Event) {
+send_game_event_done :: proc(event: Game_Event) {
 	assert(game_state.initialised)
 
 	events : []string
@@ -113,3 +119,12 @@ send_game_event :: proc(event: Game_Event) {
 		queue.push_front(&game_state.events, event)
 	}
 }
+
+send_new_game_event :: proc(channel: string, payload: Game_Event_Payload) {
+	send_game_event_done(Game_Event {
+		name = channel,
+		payload = payload
+	})
+}
+
+send_game_event :: proc{send_new_game_event, send_game_event_done}

@@ -202,6 +202,17 @@ update_game_state :: proc(dt: f32) {
 			if .Dead in gobj.flags do continue
 			if gobj.on_event != nil do (gobj.on_event)(id, &event)
 		}
+
+		#partial switch value in event.payload {
+		case Level_Event:
+			#partial switch value {
+			case .End:
+				if state_level().next_level != "" {
+					game_load_level_from_tilemap(state_level().next_level)
+					return
+				}
+			}
+		}
 	}
 
 	for _ in 0..<GAMEOBJS_DELETED_PER_FRAME {
@@ -597,9 +608,7 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 	case .Level_Exit:
 		if collided == game_obj(game_state.player, Player).obj {
 			log.info("Player hit level exit")
-			if state_level().next_level != "" {
-				game_load_level_from_tilemap(state_level().next_level)
-			}
+			send_game_event("lvl", Level_Event.End)
 		}
 	case .Kill:
 		if collided == game_obj(game_state.player, Player).obj {
