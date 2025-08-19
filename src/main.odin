@@ -130,15 +130,20 @@ main :: proc() {
 	dragging: bool;
 	drag_og: Vec2;
 
-	debug_mode: bool = true
+	debug_mode: bool = false
 
-	follow_player := false
+	follow_player := true
 
 	collision: Maybe(Ray_Collision)
 
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 
+		if rl.IsWindowResized() {
+			window_width = rl.GetScreenWidth()
+			window_height = rl.GetScreenHeight()
+			camera.scale = Vec2{cast(f32)window_width, cast(f32)window_height}
+		}
 
 		update_phys_world()
 		update_game_state(dt)
@@ -158,6 +163,10 @@ main :: proc() {
 		draw_portals(selected_portal);
 
 		rl.EndDrawing()
+
+		if follow_player {
+			camera.pos = phys_obj_pos(game_obj(game_state.player, Player).obj)
+		}
 
 
 		click: int
@@ -184,65 +193,136 @@ main :: proc() {
 			draw_line(col.point.xy, col.point.xy + col.normal.xy * 100, Colour{1 = 255, 3 = 255})
 			// draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
 		}
-		player_pos := phys_obj_pos(game_obj(game_state.player, Player).obj)
-		draw_line(player_pos, player_pos + linalg.normalize(get_world_mouse_pos() - player_pos) * 50)
+		// draw_line(player_pos, player_pos + linalg.normalize(get_world_mouse_pos() - player_pos) * 50)
+
+		if rl.IsKeyDown(rl.KeyboardKey.LEFT_CONTROL) {
+			player_pos := phys_obj_pos(game_obj(game_state.player, Player).obj)
+			
+			selected_id, any_selected := selected.?
+			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
+				obj_id, ok := point_collides_in_world(get_world_mouse_pos());
+				log.info(obj_id)
+				if ok {
+					dist := linalg.length(phys_obj_pos(obj_id) - player_pos)
+					if obj_id != game_obj(game_state.player, Player).obj && dist < PLAYER_REACH {
+						og_ty = b2d.Body_GetType(obj_id)
+						if og_ty == b2d.BodyType.dynamicBody {
+							selected = obj_id;
+
+							def := b2d.DefaultMouseJointDef()
+							def.bodyIdA = mouse_ptr_body
+							def.bodyIdB = obj_id
+							def.maxForce = 100_000
+							def.hertz = 16
+							def.target = b2d.Body_GetPosition(obj_id)
+							def.collideConnected = false
+
+							mouse_joint = b2d.CreateMouseJoint(physics.world, def)
+						}
+					}
+				}
+			}
+			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
+				if b2d.Joint_IsValid(mouse_joint) {
+					b2d.DestroyJoint(mouse_joint)
+					mouse_joint = b2d.nullJointId
+				}
+
+				selected = nil;
+			}
+			if any_selected {
+				target := get_world_mouse_pos()
+				dist := linalg.length(get_world_mouse_pos() - player_pos)
+				if dist > PLAYER_REACH {
+					target = player_pos + linalg.normalize(get_world_mouse_pos() - player_pos) * PLAYER_REACH
+				}
+				if b2d.Joint_IsValid(mouse_joint) {
+					jdist := linalg.length(get_world_mouse_pos() - phys_obj_pos(selected_id))
+					if jdist > SNAP_LIMIT && dist > PLAYER_REACH {
+						if b2d.Joint_IsValid(mouse_joint) {
+							b2d.DestroyJoint(mouse_joint)
+							mouse_joint = b2d.nullJointId
+						}
+
+						selected = nil;
+					}
+					else {
+						b2d.MouseJoint_SetTarget(
+							mouse_joint,
+							rl_to_b2d_pos(target),
+						)
+					}
+				}
+				draw_line(player_pos, target, Colour(255))
+
+				mouse_last_pos = get_world_mouse_pos();
+			}
+		}
+		else {
+			if b2d.Joint_IsValid(mouse_joint) {
+				b2d.DestroyJoint(mouse_joint)
+				mouse_joint = b2d.nullJointId
+			}
+
+			selected = nil;
+		}
 
 when DEBUG {
 		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
 
 		if debug_mode {
 			selected_id, any_selected := selected.?
-			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
-				obj_id, ok := point_collides_in_world(get_world_mouse_pos());
-				log.info(obj_id)
-				if ok {
-					og_ty = b2d.Body_GetType(obj_id)
-					if og_ty != b2d.BodyType.staticBody {
-						// b2d.Body_SetType(obj_id, b2d.BodyType.dynamicBody)
-						selected = obj_id;
+			// if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
+			// 	obj_id, ok := point_collides_in_world(get_world_mouse_pos());
+			// 	log.info(obj_id)
+			// 	if ok {
+			// 		og_ty = b2d.Body_GetType(obj_id)
+			// 		if og_ty != b2d.BodyType.staticBody {
+			// 			// b2d.Body_SetType(obj_id, b2d.BodyType.dynamicBody)
+			// 			selected = obj_id;
 
-						def := b2d.DefaultMouseJointDef()
-						def.bodyIdA = mouse_ptr_body
-						def.bodyIdB = obj_id
-						def.maxForce = 10000000
-						def.target = b2d.Body_GetPosition(obj_id)
-						def.collideConnected = false
+			// 			def := b2d.DefaultMouseJointDef()
+			// 			def.bodyIdA = mouse_ptr_body
+			// 			def.bodyIdB = obj_id
+			// 			def.maxForce = 10000000
+			// 			def.target = b2d.Body_GetPosition(obj_id)
+			// 			def.collideConnected = false
 
-						mouse_joint = b2d.CreateMouseJoint(physics.world, def)
-						selected_is_static = false
-					}
-					else {
-						selected_is_static = true
-						selected = obj_id
-					}
-				}
-			}
-			if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
-				if b2d.Joint_IsValid(mouse_joint) {
-					log.info("goop")
-					b2d.DestroyJoint(mouse_joint)
-					mouse_joint = b2d.nullJointId
-				}
-				// if !selected_is_static {
-					// b2d.Body_SetLinearVelocity(selected_id, (get_world_mouse_pos() - mouse_last_pos) * 100)
-				// }
+			// 			mouse_joint = b2d.CreateMouseJoint(physics.world, def)
+			// 			selected_is_static = false
+			// 		}
+			// 		else {
+			// 			selected_is_static = true
+			// 			selected = obj_id
+			// 		}
+			// 	}
+			// }
+			// if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) && any_selected {
+			// 	if b2d.Joint_IsValid(mouse_joint) {
+			// 		log.info("goop")
+			// 		b2d.DestroyJoint(mouse_joint)
+			// 		mouse_joint = b2d.nullJointId
+			// 	}
+			// 	// if !selected_is_static {
+			// 		// b2d.Body_SetLinearVelocity(selected_id, (get_world_mouse_pos() - mouse_last_pos) * 100)
+			// 	// }
 
-				selected = nil;
-			}
-			if any_selected {
-				mpos := get_b2d_world_mouse_pos()
-				if selected_is_static {
-					b2d.Body_SetTransform(selected_id, mpos, {1, 0})
-				}
-				else if b2d.Joint_IsValid(mouse_joint) {
-					b2d.MouseJoint_SetTarget(
-						mouse_joint,
-						rl_to_b2d_pos(get_world_mouse_pos()),
-					)
-				}
-				// b2d.Body_SetTransform(mouse_ptr_body, get_world_mouse_pos(), b2d.Body_GetRotation(mouse_ptr_body))
-				mouse_last_pos = get_world_mouse_pos();
-			}
+			// 	selected = nil;
+			// }
+			// if any_selected {
+			// 	mpos := get_b2d_world_mouse_pos()
+			// 	if selected_is_static {
+			// 		b2d.Body_SetTransform(selected_id, mpos, {1, 0})
+			// 	}
+			// 	else if b2d.Joint_IsValid(mouse_joint) {
+			// 		b2d.MouseJoint_SetTarget(
+			// 			mouse_joint,
+			// 			rl_to_b2d_pos(get_world_mouse_pos()),
+			// 		)
+			// 	}
+			// 	// b2d.Body_SetTransform(mouse_ptr_body, get_world_mouse_pos(), b2d.Body_GetRotation(mouse_ptr_body))
+			// 	mouse_last_pos = get_world_mouse_pos();
+			// }
 
 			if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) && !any_selected && dragging == false {
 				dragging = true;

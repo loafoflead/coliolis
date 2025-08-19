@@ -19,6 +19,8 @@ PLAYER_WEIGHT :: 60;
 PLAYER_STEP_UP_HEIGHT :: 20;
 
 PORTAL_RANGE :: 500
+PLAYER_REACH :: 80
+SNAP_LIMIT   :: 40
 
 Player :: struct {
 	obj: Physics_Object_Id,
