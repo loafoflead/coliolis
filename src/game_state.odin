@@ -41,8 +41,8 @@ Game_State :: struct {
 	current_level: Maybe(Level_Features),
 
 	messages: queue.Queue(Game_Object_Message),
-	events: [Game_Event_Category]queue.Queue(Game_Event),
-	event_subscribers: map[Game_Object_Id]Game_Event_Set,
+	events: queue.Queue(Game_Event),
+	event_subscribers: [dynamic]Game_Object_Id,
 }
 
 Game_Object_Type :: union{Cube_Spawner, G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door, Cube}
@@ -73,15 +73,16 @@ Game_Object :: struct {
 initialise_game_state :: proc() {
 	game_state.objects = make([dynamic]Game_Object)
 	queue.init(&game_state.messages)
-	for ty in Game_Event_Category {
-		queue.init(&game_state.events[ty])
-	}
+	// for ty in Game_Event_Category {
+	queue.init(&game_state.events)
+	// }
 	game_state.initialised = true
 }
 
 free_game_state :: proc() {
 	delete(game_state.objects)
 	queue.destroy(&game_state.messages)
+	queue.destroy(&game_state.events)
 }
 
 game_load_level_from_tilemap :: proc(path: string) {
@@ -194,14 +195,12 @@ update_game_state :: proc(dt: f32) {
 	}
 
 	for _ in 0..<GAMESTATE_EVENTS_PER_FRAME {
-		l_event := queue.pop_back_safe(&game_state.events[.Logic]) or_break
+		event := queue.pop_back_safe(&game_state.events) or_break
 
-		for id, channels in game_state.event_subscribers {
+		for id in game_state.event_subscribers {
 			gobj := game_obj(id)
 			if .Dead in gobj.flags do continue
-			if .Logic in channels {
-				if gobj.on_event != nil do (gobj.on_event)(id, &l_event)
-			}
+			if gobj.on_event != nil do (gobj.on_event)(id, &event)
 		}
 	}
 
@@ -215,7 +214,7 @@ update_game_state :: proc(dt: f32) {
 	if is_timer_just_done("game.level_loaded") {
 		send_game_event(Game_Event {
 			name = "level_load",
-			payload = Logic_Event { activated = true },
+			payload = Activation_Event { activated = true },
 		})
 	}
 
@@ -388,7 +387,7 @@ obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 		on_event = sliding_door_event_recv,
 		on_render = door_render,
 	})
-	events_subscribe(id, {.Logic})
+	events_subscribe(id)
 	pair_physics(id, obj)
 
 	return // id
@@ -472,7 +471,7 @@ obj_cube_spawner_new :: proc(spwner: Cube_Spawner) -> (id: Game_Object_Id) {
 		// TODO: on_event instead for the logic stuff
 		on_event = spawner_recv_event,
 	})
-	events_subscribe(id, {.Logic})
+	events_subscribe(id)
 
 	return // id
 }
@@ -488,7 +487,7 @@ obj_prtl_frame_new :: proc(fixture: Portal_Fixture) -> (id: Game_Object_Id) {
 		on_update = update_prtl_frame,
 		on_event = prtl_frame_event_recv,
 	})
-	events_subscribe(id, {.Logic})
+	events_subscribe(id)
 
 	return // id
 }
@@ -573,7 +572,7 @@ cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 	if .Weigh_Down_Buttons in other_gobj.flags {
 		send_game_event(Game_Event {
 			name = btn.on_pressed,
-			payload = Logic_Event {
+			payload = Activation_Event {
 				activated = true
 			}
 		})
@@ -585,7 +584,7 @@ cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 	
 	send_game_event(Game_Event {
 		name = btn.on_unpressed,
-		payload = Logic_Event {
+		payload = Activation_Event {
 			activated = false
 		}
 	})	
@@ -637,7 +636,7 @@ update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool =
 			btn.pressed = true
 			send_game_event(Game_Event {
 				name = btn.on_pressed,
-				payload = Logic_Event {
+				payload = Activation_Event {
 					activated = true
 				}
 			})
@@ -648,14 +647,14 @@ update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool =
 			btn.pressed = false
 			send_game_event(Game_Event {
 				name = btn.on_pressed,
-				payload = Logic_Event {
+				payload = Activation_Event {
 					activated = false
 				}
 			})
 			if btn.on_unpressed != "" {
 				send_game_event(Game_Event {
 					name = btn.on_unpressed,
-					payload = Logic_Event {
+					payload = Activation_Event {
 						activated = true
 					}
 				})
@@ -693,7 +692,7 @@ sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bo
 
 sliding_door_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
-	case Logic_Event:
+	case Activation_Event:
 		door := game_obj(self, Sliding_Door)
 		if event_matches(event.name, door.condition.event) {
 			door.open = payload.activated
@@ -704,7 +703,7 @@ sliding_door_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	frame := game_obj(self, Portal_Fixture)
 	#partial switch payload in event.payload {
-	case Logic_Event:
+	case Activation_Event:
 		self := game_obj(self, Portal_Fixture)
 		// portal_goto(self.portal, self.pos, transmute(Vec2)self.facing)
 		if event_matches(event.name, self.condition.event) {
@@ -716,7 +715,7 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 
 spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
-	case Logic_Event:
+	case Activation_Event:
 		self := game_obj(self, Cube_Spawner)
 		if event_matches(event.name, self.condition.event) && is_timer_done(self.timer) {
 			obj_cube_new(self.pos + self.facing * 32, self.condition.event)

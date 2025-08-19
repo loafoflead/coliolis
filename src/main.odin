@@ -266,7 +266,7 @@ when DEBUG {
 			// if rl.IsKeyPressed(rl.KeyboardKey.K) do b2d.Body_SetTransform(portal_handler.portals[0].obj, get_b2d_world_mouse_pos(), {1, 0})
 			// if rl.IsKeyPressed(rl.KeyboardKey.L) do b2d.Body_SetTransform(portal_handler.portals[1].obj, get_b2d_world_mouse_pos(), {1, 0})
 			if rl.IsKeyPressed(rl.KeyboardKey.T) do b2d.Body_SetTransform(game_obj(game_state.player, Player).obj, get_b2d_world_mouse_pos(), {1, 0})
-			if rl.IsKeyPressed(rl.KeyboardKey.N) do game_
+			if rl.IsKeyPressed(rl.KeyboardKey.N) do unimplemented("level next event")
 
 			if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
 		}

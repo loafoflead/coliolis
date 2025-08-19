@@ -11,19 +11,21 @@ import "core:slice"
 */
 
 Game_Event_Category :: enum {
+	None,
 	Logic,
 }
 
-Game_Event_Set :: bit_set[Game_Event_Category]
+Game_Event_Category_Set :: bit_set[Game_Event_Category]
 
 Game_Event :: struct {
 	sender: Game_Object_Id,
 	name: string,
+	categories: Game_Event_Category_Set,
 
-	payload: union{Logic_Event, Cube_Die},
+	payload: union{Activation_Event, Cube_Die},
 }
 
-Logic_Event :: struct {
+Activation_Event :: struct {
 	activated: bool,
 }
 
@@ -31,14 +33,10 @@ Cube_Die :: struct {
 	event_name: string,
 }
 
-Collision :: struct {
-	other: Game_Object_Id,
-	self_obj, other_obj: ^Physics_Object,
-}
-
 Game_Object_Message_Payload :: union {
 }
 
+// DM for gameobjects (deprecated/unused(?))
 Game_Object_Message :: struct {
 	gobj: Game_Object_Id,
 	payload: Game_Object_Message_Payload,
@@ -67,15 +65,15 @@ channel_from_string :: proc(s: string) -> (Game_Event_Category, bool) {
 	case "Cube_Die":
 		return .Logic, true
 	case "None":
-		return {}, false
+		return .None, true
 	case:
 		log.errorf("Unknown channel '%s'", s)
-		return {}, false
+		return .None, true
 	}
 }
 
-events_subscribe :: proc(id: Game_Object_Id, event_tys: Game_Event_Set = {}) {
-	game_state.event_subscribers[id] = event_tys
+events_subscribe :: proc(id: Game_Object_Id) {
+	append(&game_state.event_subscribers, id)
 }
 
 event_matches :: proc(event_name: string, my_events: string) -> bool {
@@ -108,17 +106,10 @@ send_game_event :: proc(event: Game_Event) {
 	for e_name in events {
 		event := Game_Event {
 			name = e_name,
+			categories = event.categories,
 			payload = event.payload,
 			sender = event.sender,
 		}
-		switch _ in event.payload {
-		case Logic_Event:
-			queue.push_front(&game_state.events[.Logic], event)
-		case Cube_Die:
-			queue.push_front(&game_state.events[.Logic], event)
-		case:
-			log.error(event)
-			unimplemented()
-		}
+		queue.push_front(&game_state.events, event)
 	}
 }
