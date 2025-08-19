@@ -11,7 +11,7 @@ import "core:fmt"
 
 PORTAL_EXIT_SPEED_BOOST :: 1;
 
-PORTAL_WIDTH, PORTAL_HEIGHT :: f32(30), f32(100)
+PORTAL_WIDTH, PORTAL_HEIGHT :: f32(16), f32(80)
 
 Portal_State :: enum {
 	Connected,
@@ -134,18 +134,18 @@ initialise_portal_handler :: proc() {
 	);
 	portal_handler.edge_colliders = {
 		add_phys_object_aabb(
-			pos = {0, -50},
-			scale = Vec2 { 2.0, 1.0 },
+			pos = {-10, -50},
+			scale = Vec2 { 20.0, 10.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
-			collide_with = {},
+			collide_with = COLLISION_LAYERS_ALL,
 		),
 		add_phys_object_aabb(
-			pos = {0, 50},
-			scale = Vec2 { 2.0, 1.0 },
+			pos = {-10, 50},
+			scale = Vec2 { 20.0, 10.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
-			collide_with = {},
+			collide_with = COLLISION_LAYERS_ALL,
 		),
 		add_phys_object_aabb(
 			pos = {10, -60},
@@ -162,6 +162,8 @@ initialise_portal_handler :: proc() {
 			collide_with = {},
 		),
 	};
+
+	for edge in portal_handler.edge_colliders do phys_obj_transform_sync_from_body(edge)
 
 	portal_handler.teleported_timer = 
 		create_named_timer("portal_tp", 1.0, flags={.Update_Automatically});
@@ -304,12 +306,14 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		if !occupied do continue;
 
 
-		// for edge in portal_handler.edge_colliders {
-		// 	phys_obj(edge).parent = portal_obj	
-		// }
+		for edge in portal_handler.edge_colliders {
+			phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
+			// phys_obj_transform_sync_from_body(edge, sync_rotation=false)
+			phys_obj_goto_parent(edge)
+		}
 
 		if !is_timer_done("portal_tp") do continue;
-
+		phys_obj_transform_sync_from_body(occupant_id, sync_rotation=false)
 		occupant_trans := phys_obj_transform(occupant_id)
 		portal_trans := phys_obj_transform(portal.obj)
 

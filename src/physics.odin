@@ -250,6 +250,15 @@ phys_obj_goto :: proc(id: Physics_Object_Id, pos: Vec2 = MARKER_VEC2, rot:= MARK
 	b2d.Body_SetTransform(id, pos, dir)
 }
 
+phys_obj_goto_transform :: proc(id: Physics_Object_Id, transform: Transform) {
+	b2d.Body_SetTransform(id, rl_to_b2d_pos({transform.mat[3][0], transform.mat[3][1]}), {transform.mat[0][0], transform.mat[0][1]})
+}
+
+phys_obj_goto_parent :: proc(id: Physics_Object_Id) {
+	world := transform_to_world(phys_obj_transform(id))
+	phys_obj_goto_transform(id, world)
+}
+
 // TODO: make less dookie
 phys_obj_rotate :: proc(id: Physics_Object_Id, rot: Rad) {
 	cur := b2d.Body_GetRotation(id)
@@ -288,6 +297,26 @@ phys_obj_transform_sync_from_body :: proc(id: Physics_Object_Id, sync_rotation :
 
 	t.mat[3][0] =pos.x; t.mat[3][1] = pos.y
 	transform_align(t)
+}
+
+phys_obj_transform_new_from_body :: proc(id: Physics_Object_Id, sync_rotation := false) -> Transform {
+	t := phys_obj_transform(id)^
+
+	b2d_pos := b2d.Body_GetPosition(id)
+	if sync_rotation {
+		b2d_rot := b2d.Body_GetRotation(id)
+		// Z-axis (what our physics rotations are around)
+		// cos(theta) -sin(theta)
+		// sin(theta)  cos(theta)
+		t.mat[0][0] =  b2d_rot.c; t.mat[1][0] = -b2d_rot.s
+		t.mat[0][1] =  b2d_rot.s; t.mat[1][1] =  b2d_rot.c
+	}
+
+	pos := b2d_to_rl_pos(b2d_pos)
+
+	t.mat[3][0] =pos.x; t.mat[3][1] = pos.y
+	transform_align(&t)
+	return t
 }
 
 phys_obj_transform_apply_to_body :: proc(id: Physics_Object_Id) {
@@ -706,13 +735,12 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	b2d_transform := b2d.Body_GetTransform(obj_id)
 	draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:], colour=colour)
 
-	phys_obj_transform_sync_from_body(obj_id, sync_rotation=false)
-	trans := phys_obj_transform(obj_id)
+	trans := phys_obj_transform_new_from_body(obj_id, sync_rotation=false)
 
-	end := trans.pos + transform_forward(trans) * 50 / camera.zoom;
+	end := trans.pos + transform_forward(&trans) * 50 / camera.zoom;
 	draw_line(trans.pos, end);
 	// right arrow
-	end = trans.pos + transform_right(trans) * 50 / camera.zoom;
+	end = trans.pos + transform_right(&trans) * 50 / camera.zoom;
 	draw_line(trans.pos, end, colour=Colour{0, 0, 255, 255});
 
 	// draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + transmute(Vec2)transform.q / camera.zoom * 50, Colour{2..<4=255})

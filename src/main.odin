@@ -152,10 +152,10 @@ main :: proc() {
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))
 
 		// draw_phys_world()
-		draw_portals(selected_portal);
 		render_game_objects(camera)
 		// draw_texture(dir_tex, pos=rl_to_b2d_pos(get_world_mouse_pos()), scale=0.1)
 		draw_tilemap(state_level().tilemap, {0., 0.});
+		draw_portals(selected_portal);
 
 		rl.EndDrawing()
 
@@ -263,9 +263,10 @@ when DEBUG {
 				camera.zoom += mouse_move * 0.1;
 			}
 
-			if rl.IsKeyPressed(rl.KeyboardKey.K) do b2d.Body_SetTransform(portal_handler.portals[0].obj, get_b2d_world_mouse_pos(), {1, 0})
-			if rl.IsKeyPressed(rl.KeyboardKey.L) do b2d.Body_SetTransform(portal_handler.portals[1].obj, get_b2d_world_mouse_pos(), {1, 0})
+			// if rl.IsKeyPressed(rl.KeyboardKey.K) do b2d.Body_SetTransform(portal_handler.portals[0].obj, get_b2d_world_mouse_pos(), {1, 0})
+			// if rl.IsKeyPressed(rl.KeyboardKey.L) do b2d.Body_SetTransform(portal_handler.portals[1].obj, get_b2d_world_mouse_pos(), {1, 0})
 			if rl.IsKeyPressed(rl.KeyboardKey.T) do b2d.Body_SetTransform(game_obj(game_state.player, Player).obj, get_b2d_world_mouse_pos(), {1, 0})
+			if rl.IsKeyPressed(rl.KeyboardKey.N) do game_
 
 			if rl.IsKeyPressed(rl.KeyboardKey.B) do debug_toggle()
 		}
