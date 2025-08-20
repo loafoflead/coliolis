@@ -7,3 +7,5 @@ test.tiled-*
 *.tiled-project
 *.tx
 bin/*
+
+*.kra*

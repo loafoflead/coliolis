@@ -8,6 +8,7 @@ import "core:fmt";
 import "core:mem";
 
 import "core:math/linalg";
+import "core:math/ease"
 
 import "core:os";
 
@@ -111,6 +112,9 @@ main :: proc() {
 	dir_tex, ok = load_texture("nesw_sprite.png")
 	if !ok do os.exit(1)
 
+	portal_handler.textures[0], ok = load_texture("portal_a.png")
+	if !ok do log.panicf("missing portal texture")
+
 	game_load_level_from_tilemap(TILEMAP)
 
 	for &p in portal_handler.portals do p.state += {.Alive}
@@ -156,13 +160,18 @@ main :: proc() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))
 
+		// ntrans := transform_new(0, 0)
+		// draw_rectangle_transform(
+		// 	&ntrans,
+		// 	Rect {0, 0, 100, 30},
+		// 	texture_id = portal_handler.textures[0],
+		// )
+
 		// draw_phys_world()
 		render_game_objects(camera)
 		// draw_texture(dir_tex, pos=rl_to_b2d_pos(get_world_mouse_pos()), scale=0.1)
 		draw_tilemap(state_level().tilemap, {0., 0.});
 		draw_portals(selected_portal);
-
-		rl.EndDrawing()
 
 		if follow_player {
 			camera.pos = phys_obj_pos(game_obj(game_state.player, Player).obj)
@@ -253,7 +262,16 @@ main :: proc() {
 						)
 					}
 				}
-				draw_line(player_pos, target, Colour(255))
+				dist_frac := dist / PLAYER_REACH
+				if dist_frac == 0 do dist_frac = 0.01
+				green := f32(105)
+				red := f32(0)
+				hue := green - (green * dist_frac)
+				draw_line(
+					player_pos,
+					target, 
+					cast(Colour)rl.ColorFromHSV(hue, 1, 1)
+				)
 
 				mouse_last_pos = get_world_mouse_pos();
 			}
@@ -266,6 +284,8 @@ main :: proc() {
 
 			selected = nil;
 		}
+
+		rl.EndDrawing()
 
 when DEBUG {
 		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode

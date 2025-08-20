@@ -78,17 +78,17 @@ draw_rectangle_transform :: proc(
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
         rlgl.Normal3f(0, 0, 1); // TODO: find out what this does
 
-        if aligned_transform != transform^ {
-	        #reverse for vert, i in vertices {
-	        	rlgl.TexCoord2f(uv[i].x, uv[i].y);
-	        	rlgl.Vertex2f(vert.x - cam_scaled_rect.x/2, vert.y - cam_scaled_rect.y/2);
-	        }
-        } else {
+        // if aligned_transform != transform^ {
+	    //     #reverse for vert, i in vertices {
+	    //     	rlgl.TexCoord2f(uv[i].x, uv[i].y);
+	    //     	rlgl.Vertex2f(vert.x - cam_scaled_rect.x/2, vert.y - cam_scaled_rect.y/2);
+	    //     }
+        // } else {
         	for vert, i in vertices {
 	        	rlgl.TexCoord2f(uv[i].x, uv[i].y);
 	        	rlgl.Vertex2f(vert.x - cam_scaled_rect.x/2, vert.y - cam_scaled_rect.y/2);
 	        }
-        }
+        // }
     rlgl.End();
 }
 

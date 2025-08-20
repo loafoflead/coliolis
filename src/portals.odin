@@ -31,6 +31,7 @@ Portal_Handler :: struct {
 	portals: [2]Portal,
 	edge_colliders: [4]Physics_Object_Id,
 	teleported_timer: ^Timer,
+	textures: [2]Texture_Id,
 }
 
 portal_dims :: proc() -> Vec2 {
@@ -190,7 +191,16 @@ draw_portals :: proc(selected_portal: int) {
 		if !is_timer_done("portal_tp") || .Connected not_in portal.state do sat = 0;
 		// TODO: messed up HSV pls fix it l8r
 		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
-		draw_phys_obj(portal.obj, colour);
+		ntrans := phys_obj_transform_new_from_body(portal.obj)
+		rotate(&ntrans, Rad(linalg.PI/2))
+		move(&ntrans, -transform_right(&ntrans) * 16)
+		draw_rectangle_transform(
+			&ntrans,
+			Rect {0, 0, 100, 32},
+			texture_id = portal_handler.textures[0],
+		)
+		log.info(ntrans.rot)
+		// draw_phys_obj(portal.obj, colour);
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
 	for edge in portal_handler.edge_colliders {
