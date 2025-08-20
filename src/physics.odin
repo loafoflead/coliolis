@@ -635,11 +635,16 @@ update_phys_world :: proc() {
 	}
 }
 
+phys_obj_aabb :: proc(id: Physics_Object_Id) -> b2d.AABB {
+	return b2d.Shape_GetAABB(phys_obj_shape(id))
+}
 
 phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool {
 	pos := phys_obj_pos(obj_id)
-	// TODO: match accurate dimensions
-	_, hit := cast_ray_in_world(pos, transform_right(phys_obj_transform(obj_id)) * 2, exclude = {obj_id})
+	aabb := phys_obj_aabb(obj_id)
+	height := (aabb.upperBound.y - aabb.lowerBound.y) / f32(B2D_SCALE_FACTOR)
+	trans := phys_obj_transform_new_from_body(obj_id)
+	_, hit := cast_ray_in_world(pos, transform_right(&trans) * (height), exclude = {obj_id})
 	return hit
 	// return cast_box_in_world(pos + Vec2{0, player_dims().y/2}, player_dims()/2, rot=Rad(0), exclude = {obj_id})
 }

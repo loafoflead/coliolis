@@ -120,8 +120,6 @@ main :: proc() {
 
 	game_load_level_from_tilemap(TILEMAP)
 
-	for &p in portal_handler.portals do p.state += {.Alive}
-
 	selected_portal: int
 
 	mouse_last_pos: Vec2;
@@ -239,7 +237,6 @@ main :: proc() {
 			selected_id, any_selected := selected.?
 			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
 				obj_id, ok := point_collides_in_world(get_world_mouse_pos());
-				log.info(obj_id)
 				if ok {
 					dist := linalg.length(phys_obj_pos(obj_id) - player_pos)
 					if obj_id != game_obj(game_state.player, Player).obj && dist < PLAYER_REACH {

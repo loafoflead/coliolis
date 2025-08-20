@@ -360,7 +360,8 @@ obj_cube_new :: proc(pos: Vec2, respawn_event: string = "") -> (id: Game_Object_
 		pos = pos,
 		mass = 50,
 		scale = {32, 32},
-		friction = 1
+		friction = 1,
+		flags = {.Never_Sleep},
 	)
 
 	cube: Cube

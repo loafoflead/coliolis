@@ -240,11 +240,11 @@ draw_portals :: proc(selected_portal: int) {
 		// draw_phys_obj(portal.obj, colour);
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
-	for edge in portal_handler.edge_colliders {
-		colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
+	// for edge in portal_handler.edge_colliders {
+	// 	colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
 
-		draw_phys_obj(edge, colour);
-	}
+	// 	draw_phys_obj(edge, colour);
+	// }
 }
 
 portal_from_phys_id :: proc(id: Physics_Object_Id) -> (^Portal, bool) #optional_ok {

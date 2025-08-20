@@ -8,7 +8,7 @@ import "core:math/ease";
 import rl "thirdparty/raylib"
 import b2d "thirdparty/box2d"
 
-PLAYER_HORIZ_ACCEL :: 10.0; // newtons???
+PLAYER_HORIZ_ACCEL :: 5000.0; // newtons???
 PLAYER_JUMP_STR :: 25_000.0; // idk
 
 PLAYER_WIDTH :: 32;
@@ -53,7 +53,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 		mass = PLAYER_WEIGHT, 
 		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
 		flags = {.Fixed_Rotation, .Never_Sleep},
-		friction = 0.5,
+		friction = 0.25,
 	);
 	player.texture = texture;
 
@@ -112,15 +112,15 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	// 	player.jumping = false;
 	// }
 
-	// if phys_obj_grounded(player.obj) {
-	// 	player.in_air = false;
-	// 	// reset_timer(&player.jump_timer);
-	// 	reset_timer(&player.coyote_timer);
-	// }
-	// else {
-	// 	update_timer(&player.coyote_timer, dt);
-	// 	player.in_air = true;
-	// }
+	if phys_obj_grounded(player.obj) {
+		player.in_air = false;
+		// reset_timer(&player.jump_timer);
+		reset_timer(&player.coyote_timer);
+	}
+	else {
+		update_timer(&player.coyote_timer, dt);
+		player.in_air = true;
+	}
 
 PLAYER_STEPPING_UP :: false
 
@@ -163,16 +163,19 @@ when PLAYER_STEPPING_UP {
 		// b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, wake = true)
 		new_vel := b2d.Body_GetLinearVelocity(player_obj)
 		new_vel.x = move * PLAYER_HORIZ_ACCEL
-		b2d.Body_SetLinearVelocity(player_obj, new_vel)
+		b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, false)
+		// b2d.Body_SetLinearVelocity(player_obj, new_vel)
 		// player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
 	}
 	else {
 		cur_vel := b2d.Body_GetLinearVelocity(player_obj)
-		force := Vec2{
-			cur_vel.x,
-			0
+		if math.abs(cur_vel.x) > 1 {
+			force := Vec2{
+				cur_vel.x,
+				0
+			}
+			b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * 60 * PLAYER_WEIGHT), wake=false)
 		}
-		b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * PLAYER_HORIZ_ACCEL * 60 * PLAYER_WEIGHT), wake=false)
 	}
 
 	if rl.IsKeyPressed(rl.KeyboardKey.L) {
