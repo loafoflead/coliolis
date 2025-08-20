@@ -215,7 +215,7 @@ main :: proc() {
 			player_pos := phys_obj_pos(game_obj(game_state.player, Player).obj)
 			col, hit := cast_ray_in_world(
 				player_pos,
-				player_pos + linalg.normalize(get_world_mouse_pos() - player_pos) * PORTAL_RANGE,
+				linalg.normalize(get_world_mouse_pos() - player_pos) * PORTAL_RANGE,
 				exclude = {game_obj(game_state.player, Player).obj},
 				layers = {.Portal_Surface}
 			)

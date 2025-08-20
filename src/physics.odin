@@ -678,7 +678,7 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u6
 	return {}, false
 }
 
-cast_ray_in_world :: proc(og, dir: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL) -> (Ray_Collision, bool) { 
+cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL) -> (Ray_Collision, bool) { 
 	filter := b2d.DefaultQueryFilter()
 
 	if layers != COLLISION_LAYERS_ALL {
@@ -710,10 +710,7 @@ cast_ray_in_world :: proc(og, dir: Vec2, exclude: []Physics_Object_Id = {}, laye
 		}
 		return fraction
 	}
-	dir := dir - og
-	dir.y = -dir.y
-	dir += rl_to_b2d_pos(og)
-	tree := b2d.World_CastRay(physics.world, rl_to_b2d_pos(og), dir, filter, callback, ctx = &ctx)
+	tree := b2d.World_CastRay(physics.world, rl_to_b2d_pos(og), rl_to_b2d_pos(to_end), filter, callback, ctx = &ctx)
 	ctx.normal.y = -ctx.normal.y
 	if ctx.collided do return Ray_Collision {
 		point = b2d_to_rl_pos(ctx.position),
