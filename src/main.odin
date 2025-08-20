@@ -23,6 +23,7 @@ resources 		: Resources
 physics  		: Physics
 timers  		: Timer_Handler
 portal_handler 	: Portal_Handler
+particle_handler: Particle_Handler
 
 window_width : i32 = 600;
 window_height : i32 = 400;
@@ -97,8 +98,11 @@ main :: proc() {
 	initialise_phys_world()
 	defer free_phys_world()
 
-	initialise_timers();
-	defer free_timers();
+	initialise_timers()
+	defer free_timers()
+
+	initialise_particle_handler()
+	defer free_particle_handler()
 
 	initialise_game_state()
 	defer free_game_state()
@@ -112,8 +116,7 @@ main :: proc() {
 	dir_tex, ok = load_texture("nesw_sprite.png")
 	if !ok do os.exit(1)
 
-	portal_handler.textures[0], ok = load_texture("portal_a.png")
-	if !ok do log.panicf("missing portal texture")
+	
 
 	game_load_level_from_tilemap(TILEMAP)
 
@@ -140,6 +143,28 @@ main :: proc() {
 
 	collision: Maybe(Ray_Collision)
 
+	test_particle := Particle_Def {
+		draw_info = Particle_Draw_Info {
+			shape = .Square,
+			texture = dir_tex,
+			scale = Vec2(10),
+			colour = Colour(255),
+			alpha_easing = .Bounce_In,
+		},
+		lifetime_secs = 2,
+		movement = Particle_Physics {
+			perm_acc = Vec2(0),
+			initial_conds = Particle_Init_Random {
+				vert_spread = 100,
+				horiz_spread = 100,
+				vel_dir_max = 360,
+				vel_mag_max = 20,
+				ang_vel_min = -100,
+				ang_vel_max = 100,
+			}
+		}
+	}
+
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 
@@ -154,6 +179,7 @@ main :: proc() {
 		// update_portals();
 		update_portals(physics.bodies[1])
 		update_timers(dt)
+		update_particles(dt)
 
 
 
@@ -167,11 +193,14 @@ main :: proc() {
 		// 	texture_id = portal_handler.textures[0],
 		// )
 
+		// particle_spawn({50, 50}, 35, test_particle)
+
 		// draw_phys_world()
 		render_game_objects(camera)
 		// draw_texture(dir_tex, pos=rl_to_b2d_pos(get_world_mouse_pos()), scale=0.1)
 		draw_tilemap(state_level().tilemap, {0., 0.});
 		draw_portals(selected_portal);
+		render_particles()
 
 		if follow_player {
 			camera.pos = phys_obj_pos(game_obj(game_state.player, Player).obj)

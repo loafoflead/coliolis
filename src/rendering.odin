@@ -97,15 +97,16 @@ draw_rectangle_transform :: proc(
 draw_texture :: proc(
 	texture_id: Texture_Id, 
 	pos: Vec2, 
+	rotation: f32 = 0,
 	drawn_portion: Rect = MARKER_RECT,
 	scale: Vec2 = MARKER_VEC2,
 	pixel_scale: Vec2 = MARKER_VEC2,
+	tint := Colour(255),
 ) {
 	if int(texture_id) >= len(resources.textures) {
 		unimplemented("Tried to draw nonexistent texture");
 	}
 	screen_pos := world_pos_to_screen_pos(camera, pos);
-	rotation := f32(0.0);
 	tex := resources.textures[int(texture_id)];
 
 	n_patch_info: rl.NPatchInfo;
@@ -161,7 +162,7 @@ draw_texture :: proc(
 		transmute(rl.Rectangle) dest, // destination
 		transmute(rl.Vector2) -screen_pos + dest.zw / 2, 
 		rotation,
-		rl.WHITE
+		cast(rl.Color)tint,
 	);
 }
 

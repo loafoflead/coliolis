@@ -12,6 +12,11 @@ import "core:fmt"
 PORTAL_EXIT_SPEED_BOOST :: 1;
 
 PORTAL_WIDTH, PORTAL_HEIGHT :: f32(16), f32(80)
+@(rodata)
+PORTAL_COLOURS := [2]Colour {
+	Colour{0x00, 0x96, 0x50, 255},
+	Colour{0xf0, 0x5f, 0x45, 255},
+}
 
 Portal_State :: enum {
 	Connected,
@@ -32,6 +37,7 @@ Portal_Handler :: struct {
 	edge_colliders: [4]Physics_Object_Id,
 	teleported_timer: ^Timer,
 	textures: [2]Texture_Id,
+	surface_particle: Particle_Def,
 }
 
 portal_dims :: proc() -> Vec2 {
@@ -107,6 +113,10 @@ initialise_portal_handler :: proc() {
 	if !physics.initialised do panic("Must initialise physics world before initialising portals");
 	if !timers.initialised do panic("Must initialise timers before initialising portals");
 
+	ok: bool
+	portal_handler.textures[0], ok = load_texture("portal_a.png")
+	if !ok do log.panicf("missing portal texture")
+
 	for &ptl in portal_handler.portals {
 		ptl.state = {}
 		ptl.occupant = nil
@@ -164,6 +174,29 @@ initialise_portal_handler :: proc() {
 		),
 	};
 
+	portal_handler.surface_particle = Particle_Def {
+		draw_info = Particle_Draw_Info {
+			shape = .Square,
+			// texture = portal_handler.textures[0],
+			scale = Vec2 {5, 5},
+			colour = Colour{255, 0, 0, 255},
+			alpha_easing = .Bounce_Out,
+		},
+		lifetime_secs = 1,
+		movement = Particle_Physics {
+			perm_acc = Vec2{0, 1000},
+			initial_conds = Particle_Init_Random {
+				vert_spread = PORTAL_HEIGHT,
+				vel_dir_min = -36,
+				vel_dir_max = 36,
+				vel_mag_max = 19,
+				vel_mag_min = 10,
+				ang_vel_min = -10,
+				ang_vel_max = 10,
+			}
+		}
+	}
+
 	for edge in portal_handler.edge_colliders do phys_obj_transform_sync_from_body(edge)
 
 	portal_handler.teleported_timer = 
@@ -192,14 +225,18 @@ draw_portals :: proc(selected_portal: int) {
 		// TODO: messed up HSV pls fix it l8r
 		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
 		ntrans := phys_obj_transform_new_from_body(portal.obj)
+		portal_handler.surface_particle.draw_info.colour = PORTAL_COLOURS[i]
+		particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
+
 		rotate(&ntrans, Rad(linalg.PI/2))
 		move(&ntrans, -transform_right(&ntrans) * 16)
 		draw_rectangle_transform(
 			&ntrans,
 			Rect {0, 0, 100, 32},
 			texture_id = portal_handler.textures[0],
+			colour = PORTAL_COLOURS[i],
 		)
-		log.info(ntrans.rot)
+		// portal_handler.surface_particle.
 		// draw_phys_obj(portal.obj, colour);
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
