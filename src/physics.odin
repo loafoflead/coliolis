@@ -691,18 +691,18 @@ cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, l
 		filter.maskBits = transmute(u64)layers
 	}
 
-	Box_Cast_Ctx :: struct {
+	Raycast_Ctx :: struct {
 		collided: bool,
 		exclude: []Physics_Object_Id,
 		position, normal: Vec2,
 		obj: Physics_Object_Id,
 	}
 
-	ctx: Box_Cast_Ctx
+	ctx: Raycast_Ctx
 	ctx.exclude = exclude
 
 	callback := proc "c" (shape_id: b2d.ShapeId, point: Vec2, normal: Vec2, fraction: f32, ctx: rawptr) -> f32 {
-		dat := cast(^Box_Cast_Ctx)ctx
+		dat := cast(^Raycast_Ctx)ctx
 		obj := b2d.Shape_GetBody(shape_id)
 		context = runtime.default_context()
 		if !slice.contains(dat.exclude, obj) {
@@ -754,6 +754,16 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	// polygon := b2d.Shape_GetPolygon(shapes[0])
 	// transform := b2d.Body_GetTransform(obj_id)
 	// draw_polygon_convex(transform, vertices = polygon.vertices[:], colour = colour)
+}
+
+phys_obj_colliding :: proc(obj: Physics_Object_Id) -> bool {
+	contact_buf := [4]b2d.ContactData {}
+	contacts := b2d.Body_GetContactData(obj, contact_buf[:])
+	if len(contacts) != 0 do return true
+	// for contact in contacts {
+	// 	if contact.shapeIdB == first_shape_b || contact.shapeIdA == first_shape_b do return true
+	// }
+	return false
 }
 
 check_phys_objects_collide :: proc(obj1id, obj2id: Physics_Object_Id, first_set_pos := MARKER_VEC2) -> bool {

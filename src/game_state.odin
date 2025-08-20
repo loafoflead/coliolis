@@ -114,7 +114,8 @@ game_load_level_from_tilemap :: proc(path: string) {
 
 	player_gobj_id := obj_player_new(dir_tex)
 	player := game_obj(player_gobj_id, Player)
-	phys_obj_goto(player.obj, state_get_player_spawn())
+	player_goto(state_get_player_spawn())
+	// phys_obj_goto(player.obj, state_get_player_spawn())
 	game_state.player = player_gobj_id
 
 	game_init_level()
@@ -571,7 +572,8 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 		on_render = draw_player,
 		flags = {.Weigh_Down_Buttons, .Portal_Traveller},
 	})
-	phys_obj_data(game_state.objects[int(id)].data.(Player).obj).game_object = id
+	// phys_obj_data(get_player().logic_obj).game_object = id
+	// phys_obj_data(get_player().dynamic_obj).game_object = id
 	game_state.player = id
 
 	return id
@@ -607,12 +609,12 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 
 	switch trigger.type {
 	case .Level_Exit:
-		if collided == game_obj(game_state.player, Player).obj {
+		if collided == get_player().dynamic_obj {
 			log.info("Player hit level exit")
 			send_game_event("lvl", Level_Event.End)
 		}
 	case .Kill:
-		if collided == game_obj(game_state.player, Player).obj {
+		if collided == get_player().dynamic_obj {
 			b2d.Body_SetLinearVelocity(collided, Vec2(0))
 			phys_obj_goto(collided, state_get_player_spawn())
 			log.info("Player hit death trigger")

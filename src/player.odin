@@ -1,5 +1,6 @@
 package main;
 
+import "core:c/libc"
 import "core:log"
 
 import "core:math"
@@ -23,7 +24,12 @@ PLAYER_REACH :: 80
 SNAP_LIMIT   :: 40
 
 Player :: struct {
-	obj: Physics_Object_Id,
+	logic_obj: Physics_Object_Id,
+	dynamic_obj: Physics_Object_Id,
+
+	transform: Transform,
+	vel: Vec2,
+
 	texture: Texture_Id,
 	step_timer: Timer,
 
@@ -41,19 +47,22 @@ player_dims :: proc() -> Vec2 {
 	return {PLAYER_WIDTH, PLAYER_HEIGHT}
 }
 
-player_feet :: proc(player: ^Player) -> Vec2 {
-	obj := phys_obj(player.obj);
-	return obj.pos + Vec2 {0, PLAYER_HEIGHT / 2 - 2};
-}
-
 player_new :: proc(texture: Texture_Id) -> Player {
 	player: Player;
-	player.obj = add_phys_object_aabb(
+	// player.dynamic_obj = add_phys_object_aabb(
+	// 	pos = get_screen_centre(), 
+	// 	mass = PLAYER_WEIGHT, 
+	// 	scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
+	// 	flags = {.Fixed_Rotation, .Never_Sleep},
+	// 	friction = 0.25,
+	// );
+	player.transform = transform_new(0, 0)
+	player.logic_obj = add_phys_object_aabb(
 		pos = get_screen_centre(), 
-		mass = PLAYER_WEIGHT, 
 		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
-		flags = {.Fixed_Rotation, .Never_Sleep},
-		friction = 0.25,
+		flags = {.Fixed_Rotation, .Non_Dynamic},
+		collision_layers = {},
+		collide_with = COLLISION_LAYERS_ALL,
 	);
 	player.texture = texture;
 
@@ -66,33 +75,185 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	return player;
 }
 
+player_goto :: proc(pos: Vec2) {
+	setpos(&get_player().transform, pos)
+	// b2d.Body_SetTransform(get_player().logic_obj, rl_to_b2d_pos(pos), {1, 0})
+	// b2d.Body_SetTransform(get_player().dynamic_obj, rl_to_b2d_pos(pos), {1, 0})
+	// unimplemented("player_goto")
+}
+
+player_pos :: proc() -> Vec2 {
+	return get_player().transform.pos
+	// return phys_obj_pos(game_obj(game_state.player, Player).logic_obj)
+}
+
+get_player :: proc() -> ^Player {
+	g := game_obj(game_state.player, Player)
+	return g
+}
+
+player_capsule :: proc() -> b2d.Capsule {
+	mover : b2d.Capsule
+	mover.center1 = rl_to_b2d_pos(get_player().transform.pos) + Vec2{0, 1}
+	mover.center2 = rl_to_b2d_pos(get_player().transform.pos) - Vec2{0, 1}
+	// mover.center1 = b2d.TransformPoint( m_transform, m_capsule.center1 );
+	// mover.center2 = b2d.TransformPoint( m_transform, m_capsule.center2 );
+	mover.radius = 1
+	return mover
+}
+
+player_grounded_check :: proc() -> bool {
+	player := get_player()
+
+	points := []Vec2 {0}
+	proxy := b2d.MakeProxy(points, radius = f32(0))
+	filter := b2d.DefaultQueryFilter()
+
+	Shapecast_Ctx :: struct {
+		collided: bool,
+		position, normal: Vec2,
+		obj: Physics_Object_Id,
+	}
+
+	ctx: Shapecast_Ctx
+
+	callback := proc "c" (shape_id: b2d.ShapeId, point: Vec2, normal: Vec2, fraction: f32, ctx: rawptr) -> f32 {
+		dat := cast(^Shapecast_Ctx)ctx
+		obj := b2d.Shape_GetBody(shape_id)
+
+		dat.collided = true
+		dat.position = point
+		dat.normal = normal
+		dat.obj = obj
+		return 0 // stop here
+		// return fraction
+	}
+
+	_ = b2d.World_CastShape( physics.world, proxy, rl_to_b2d_pos(player_pos() + transform_right(&player.transform) * 2), filter, callback, &ctx );
+	draw_line(player_pos(), player_pos() + transform_right(&player.transform) * 3 / f32(B2D_SCALE_FACTOR))
+	return !ctx.collided && math.abs(player.vel.y) <= 0.1 
+}
+
 update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	player := game_obj(player, Player)
-	player_obj := player.obj
+	// player_obj := player.obj
 
-	move: f32 = 0.0;
+	movement := Vec2(0);
 	if rl.IsKeyDown(rl.KeyboardKey.D) {
-		move +=  1;
+		movement.x +=  1;
 	}
 	if rl.IsKeyDown(rl.KeyboardKey.A) {
-		move += -1;
+		movement.x += -1;
 	}
 
 	update_timer(&player.jump_timer, dt)
 
-	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) && is_timer_done(&player.jump_timer) {
-		if !player.in_air || !is_timer_done(&player.coyote_timer) {
-			player.jumping = true;
-			impulse := Vec2 {
-				0,
-				-PLAYER_JUMP_STR
-				// -PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current))
-			}
-			b2d.Body_ApplyLinearImpulseToCenter(player_obj, rl_to_b2d_pos(impulse), wake=true)
-			if !is_timer_done(&player.coyote_timer) do set_timer_done(&player.coyote_timer);
-			reset_timer(&player.jump_timer)
+	PLAYER_SPEED :: 7
+	PLAYER_MOVE_SUBSTEPS :: 5
+
+	PLAYER_MAX_X_SPEED :: 50
+	PLAYER_MAX_Y_SPEED :: 50
+
+	if movement != 0.0 && is_timer_done(&player.step_timer) {
+		player.vel += movement * PLAYER_SPEED
+		// target = player.transform.pos + movement * PLAYER_SPEED * dt
+		// b2d.Body_SetLinearVelocity(playemovementr.logic_obj, move * PLAYER_SPEED)
+	}
+
+	if player.in_air {
+		player.vel.x *= 0.99
+	}
+	else {
+		player.vel.x *= 0.9
+	}
+
+	player.vel.x = math.clamp(player.vel.x, -PLAYER_MAX_X_SPEED, PLAYER_MAX_X_SPEED)//math.sign(player.vel.x) * math.max(math.abs(player.vel.x), PLAYER_MAX_X_SPEED)
+	player.vel.y = math.clamp(player.vel.y, -PLAYER_MAX_Y_SPEED, PLAYER_MAX_Y_SPEED)//math.sign(player.vel.y) * math.max(math.abs(player.vel.y), PLAYER_MAX_Y_SPEED)
+
+	player.vel += Vec2{0, 1}
+
+	// COPIED FROM:
+	// https://github.com/erincatto/box2d/blob/main/samples/sample_character.cpp
+
+	target := player.transform.pos + player.vel * dt
+	// player.vel *= 0.9
+
+	Mover_Context :: struct {
+		planes: [10]b2d.CollisionPlane,
+		idx: int,
+	}
+	mctx: Mover_Context
+
+	result_proc := proc "c" (shapeId: b2d.ShapeId, plane: ^b2d.PlaneResult, ctx: rawptr) -> bool {
+		if ctx == nil {
+			libc.printf("bad bad mojo\n")
+			libc.abort()
+			// log.panicf("bad bad booboo")
+		}
+
+		if b2d.Shape_IsSensor(shapeId) do return true
+
+		mctx := cast(^Mover_Context)ctx
+
+		max_push := f32(9999999999) // TODO: f32.Max or whaddeva
+		clip_velocity := true
+
+		// if ctx.idx == len(ctx.planes)-1 do return true
+		if plane.hit {
+			mctx^.planes[mctx.idx] = b2d.CollisionPlane{plane.plane, max_push, 0, clip_velocity}
+			mctx^.idx += 1
+		}
+		return true
+	}
+	filter := b2d.DefaultQueryFilter()
+	filter.maskBits = transmute(u64)Collision_Set{.Default}
+	filter.categoryBits = transmute(u64)Collision_Set{.Default}
+	mover := player_capsule()
+	tolerance := f32(0.01) // ?
+
+	for i:=0; i < PLAYER_MOVE_SUBSTEPS; i+=1 {
+		mctx.idx = 0
+		mover := player_capsule()
+
+		b2d.World_CollideMover(physics.world, mover, filter, result_proc, &mctx)
+
+		result := b2d.SolvePlanes( rl_to_b2d_pos(target) - rl_to_b2d_pos(player.transform.pos), mctx.planes[:mctx.idx]);
+
+		// m_totalIterations += result.iterationCount;
+
+		fraction := b2d.World_CastMover( physics.world, mover, result.position, filter );
+
+		delta := fraction * result.position;
+
+		target += b2d_to_rl_pos(delta)
+		setpos(&player.transform, target);
+
+		// idfk???
+		if ( b2d.LengthSquared( delta ) < tolerance * tolerance )
+		{
+			break;
 		}
 	}
+
+	b2d_vel := player.vel
+	b2d_vel.y = -b2d_vel.y
+	b2d_vel = b2d.ClipVector( b2d_vel, mctx.planes[:mctx.idx] );
+	b2d_vel.y = -b2d_vel.y
+	player.vel = b2d_vel
+
+	// if rl.IsKeyPressed(rl.KeyboardKey.SPACE) && is_timer_done(&player.jump_timer) {
+	// 	if !player.in_air || !is_timer_done(&player.coyote_timer) {
+	// 		player.jumping = true;
+	// 		impulse := Vec2 {
+	// 			0,
+	// 			-PLAYER_JUMP_STR
+	// 			// -PLAYER_JUMP_STR * (1 - ease.exponential_out(player.jump_timer.current))
+	// 		}
+	// 		b2d.Body_ApplyLinearImpulseToCenter(player_obj, rl_to_b2d_pos(impulse), wake=true)
+	// 		if !is_timer_done(&player.coyote_timer) do set_timer_done(&player.coyote_timer);
+	// 		reset_timer(&player.jump_timer)
+	// 	}
+	// }
 	// if rl.IsKeyDown(rl.KeyboardKey.SPACE) {
 	// 	if player.jumping && !is_timer_done(&player.jump_timer) {
 	// 		impulse := Vec2 {
@@ -112,7 +273,7 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	// 	player.jumping = false;
 	// }
 
-	if phys_obj_grounded(player.obj) {
+	if player_grounded_check() {
 		player.in_air = false;
 		// reset_timer(&player.jump_timer);
 		reset_timer(&player.coyote_timer);
@@ -159,24 +320,24 @@ when PLAYER_STEPPING_UP {
 	}
 }
 
-	if move != 0.0 && is_timer_done(&player.step_timer) {
-		// b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, wake = true)
-		new_vel := b2d.Body_GetLinearVelocity(player_obj)
-		new_vel.x = move * PLAYER_HORIZ_ACCEL
-		b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, false)
-		// b2d.Body_SetLinearVelocity(player_obj, new_vel)
-		// player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
-	}
-	else {
-		cur_vel := b2d.Body_GetLinearVelocity(player_obj)
-		if math.abs(cur_vel.x) > 1 {
-			force := Vec2{
-				cur_vel.x,
-				0
-			}
-			b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * 60 * PLAYER_WEIGHT), wake=false)
-		}
-	}
+	// if move != 0.0 && is_timer_done(&player.step_timer) {
+	// 	// b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, wake = true)
+	// 	new_vel := b2d.Body_GetLinearVelocity(player_obj)
+	// 	new_vel.x = move * PLAYER_HORIZ_ACCEL
+	// 	b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, false)
+	// 	// b2d.Body_SetLinearVelocity(player_obj, new_vel)
+	// 	// player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
+	// }
+	// else {
+	// 	cur_vel := b2d.Body_GetLinearVelocity(player_obj)
+	// 	if math.abs(cur_vel.x) > 1 {
+	// 		force := Vec2{
+	// 			cur_vel.x,
+	// 			0
+	// 		}
+	// 		b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * 60 * PLAYER_WEIGHT), wake=false)
+	// 	}
+	// }
 
 	if rl.IsKeyPressed(rl.KeyboardKey.L) {
 		player.portals_unlocked += 1
@@ -203,11 +364,15 @@ when PLAYER_STEPPING_UP {
 }
 
 draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
-	player := game_obj(player, Player)
+	capsule := player_capsule()
+	draw_circle(b2d_to_rl_pos(capsule.center1), capsule.radius / f32(B2D_SCALE_FACTOR))
+	draw_circle(b2d_to_rl_pos(capsule.center2), capsule.radius / f32(B2D_SCALE_FACTOR))
+	// player := game_obj(player, Player)
 	// obj:=phys_obj(player.obj);
 	
 	// r := phys_obj_to_rect(obj).zw;
-	draw_phys_obj(player.obj);
+	// draw_phys_obj(get_player().dynamic_obj, colour=Colour{255, 0, 0, 255});
+	draw_phys_obj(get_player().logic_obj, colour=Colour{0, 255, 0, 155});
 	// draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);
 	// draw_texture(player.texture, obj.pos, pixel_scale=phys_obj_to_rect(obj).zw);	
 	// draw_rectangle(obj.pos - r/2, r);	

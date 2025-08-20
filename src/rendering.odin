@@ -49,6 +49,11 @@ draw_polygon_convex :: proc(
     rlgl.End();
 }
 
+draw_circle :: proc(pos: Vec2, radius: f32) {
+	pos := world_pos_to_screen_pos(camera, pos)
+	rl.DrawCircle(cast(i32)pos.x, cast(i32)pos.y, radius, rl.DARKBLUE);
+}
+
 draw_rectangle_transform :: proc(
 		transform: ^Transform, 
 		rect: Rect, 
