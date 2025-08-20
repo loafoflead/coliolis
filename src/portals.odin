@@ -258,6 +258,7 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 	portal := portal_from_phys_id(self)
 	occupant_id, occupied := portal.occupant.?;
 	gobj, has_gobj := phys_obj_gobj(collided)
+	log.infof("hit: %s", b2d.Body_GetName(collided))
 	if !has_gobj do return
 	if .Portal_Traveller not_in gobj.flags do return
 

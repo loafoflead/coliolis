@@ -1,5 +1,7 @@
 package main;
 
+import vmem "core:mem/virtual"
+
 import "core:c/libc"
 import "core:log"
 
@@ -24,8 +26,9 @@ PLAYER_REACH :: 80
 SNAP_LIMIT   :: 40
 
 Player :: struct {
-	logic_obj: Physics_Object_Id,
-	dynamic_obj: Physics_Object_Id,
+	// logic_obj: Physics_Object_Id,
+	// dynamic_obj: Physics_Object_Id,
+	obj: Physics_Object_Id,
 
 	transform: Transform,
 	vel: Vec2,
@@ -56,14 +59,36 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	// 	flags = {.Fixed_Rotation, .Never_Sleep},
 	// 	friction = 0.25,
 	// );
+	arena := vmem.arena_allocator(&physics.arena)
+
 	player.transform = transform_new(0, 0)
-	player.logic_obj = add_phys_object_aabb(
-		pos = get_screen_centre(), 
-		scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
-		flags = {.Fixed_Rotation, .Non_Dynamic},
-		collision_layers = {},
-		collide_with = COLLISION_LAYERS_ALL,
-	);
+	body_def := b2d.DefaultBodyDef()
+	data := new(Phys_Body_Data, allocator = arena)
+	data.transform = transform_new(0, 0)
+	body_def.userData = data
+	body_def.name = "player"
+
+	player.obj = b2d.CreateBody(physics.world, body_def)
+
+	shape := b2d.DefaultShapeDef()
+	// shape.maxPush = 0.025
+	// shape.clipVelocity = false
+	shape.filter = b2d.Filter {
+		transmute(u64)Collision_Set{.Player},
+		transmute(u64)Collision_Set{.Default},
+		0
+	}
+	shape.enableSensorEvents = true
+
+	_ = b2d.CreateCapsuleShape(player.obj, shape, player_capsule())
+
+	// player.logic_obj = add_phys_object_aabb(
+	// 	pos = get_screen_centre(), 
+	// 	scale = Vec2 { PLAYER_WIDTH, PLAYER_HEIGHT },
+	// 	flags = {.Fixed_Rotation, .Non_Dynamic},
+	// 	collision_layers = {},
+	// 	collide_with = COLLISION_LAYERS_ALL,
+	// );
 	player.texture = texture;
 
 	player.step_timer = timer_new(0.2)
@@ -87,15 +112,15 @@ player_pos :: proc() -> Vec2 {
 	// return phys_obj_pos(game_obj(game_state.player, Player).logic_obj)
 }
 
-get_player :: proc() -> ^Player {
+get_player :: proc "contextless" () -> ^Player {
 	g := game_obj(game_state.player, Player)
 	return g
 }
 
 player_capsule :: proc() -> b2d.Capsule {
 	mover : b2d.Capsule
-	mover.center1 = rl_to_b2d_pos(get_player().transform.pos) + Vec2{0, 1}
-	mover.center2 = rl_to_b2d_pos(get_player().transform.pos) - Vec2{0, 1}
+	mover.center1 = Vec2{0, 1}
+	mover.center2 = -Vec2{0, 1}
 	// mover.center1 = b2d.TransformPoint( m_transform, m_capsule.center1 );
 	// mover.center2 = b2d.TransformPoint( m_transform, m_capsule.center2 );
 	mover.radius = 1
@@ -108,6 +133,9 @@ player_grounded_check :: proc() -> bool {
 	points := []Vec2 {0}
 	proxy := b2d.MakeProxy(points, radius = f32(0))
 	filter := b2d.DefaultQueryFilter()
+	filter.maskBits = transmute(u64)Collision_Set{.Default}
+	filter.categoryBits = transmute(u64)Collision_Set{.Default}
+
 
 	Shapecast_Ctx :: struct {
 		collided: bool,
@@ -164,7 +192,7 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		player.vel.x *= 0.99
 	}
 	else {
-		player.vel.x *= 0.9
+		player.vel.x *= 0.86
 	}
 
 	player.vel.x = math.clamp(player.vel.x, -PLAYER_MAX_X_SPEED, PLAYER_MAX_X_SPEED)//math.sign(player.vel.x) * math.max(math.abs(player.vel.x), PLAYER_MAX_X_SPEED)
@@ -191,6 +219,8 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 			// log.panicf("bad bad booboo")
 		}
 
+		body := b2d.Shape_GetBody(shapeId)
+
 		if b2d.Shape_IsSensor(shapeId) do return true
 
 		mctx := cast(^Mover_Context)ctx
@@ -208,15 +238,15 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	filter := b2d.DefaultQueryFilter()
 	filter.maskBits = transmute(u64)Collision_Set{.Default}
 	filter.categoryBits = transmute(u64)Collision_Set{.Default}
-	mover := player_capsule()
 	tolerance := f32(0.01) // ?
 
 	for i:=0; i < PLAYER_MOVE_SUBSTEPS; i+=1 {
 		mctx.idx = 0
 		mover := player_capsule()
+		mover.center1 = rl_to_b2d_pos(transform_point(&player.transform, b2d_to_rl_pos(mover.center1)))
+		mover.center2 = rl_to_b2d_pos(transform_point(&player.transform, b2d_to_rl_pos(mover.center2)))
 
 		b2d.World_CollideMover(physics.world, mover, filter, result_proc, &mctx)
-
 		result := b2d.SolvePlanes( rl_to_b2d_pos(target) - rl_to_b2d_pos(player.transform.pos), mctx.planes[:mctx.idx]);
 
 		// m_totalIterations += result.iterationCount;
@@ -240,6 +270,8 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	b2d_vel = b2d.ClipVector( b2d_vel, mctx.planes[:mctx.idx] );
 	b2d_vel.y = -b2d_vel.y
 	player.vel = b2d_vel
+
+	b2d.Body_SetTransform(player.obj, rl_to_b2d_pos(player.transform.pos), {1, 0})
 
 	// if rl.IsKeyPressed(rl.KeyboardKey.SPACE) && is_timer_done(&player.jump_timer) {
 	// 	if !player.in_air || !is_timer_done(&player.coyote_timer) {
@@ -364,15 +396,15 @@ when PLAYER_STEPPING_UP {
 }
 
 draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
-	capsule := player_capsule()
-	draw_circle(b2d_to_rl_pos(capsule.center1), capsule.radius / f32(B2D_SCALE_FACTOR))
-	draw_circle(b2d_to_rl_pos(capsule.center2), capsule.radius / f32(B2D_SCALE_FACTOR))
+	// capsule := player_capsule()
+	// draw_circle(player_pos() + capsule.center1 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR))
+	// draw_circle(player_pos() + capsule.center2 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR))
 	// player := game_obj(player, Player)
 	// obj:=phys_obj(player.obj);
 	
 	// r := phys_obj_to_rect(obj).zw;
 	// draw_phys_obj(get_player().dynamic_obj, colour=Colour{255, 0, 0, 255});
-	draw_phys_obj(get_player().logic_obj, colour=Colour{0, 255, 0, 155});
+	draw_phys_obj(get_player().obj, colour=Colour{0, 255, 0, 155});
 	// draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);
 	// draw_texture(player.texture, obj.pos, pixel_scale=phys_obj_to_rect(obj).zw);	
 	// draw_rectangle(obj.pos - r/2, r);	

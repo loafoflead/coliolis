@@ -214,7 +214,7 @@ main :: proc() {
 			col, hit := cast_ray_in_world(
 				player_pos,
 				linalg.normalize(get_world_mouse_pos() - player_pos) * PORTAL_RANGE,
-				exclude = {get_player().logic_obj, get_player().dynamic_obj},
+				exclude = {get_player().obj},
 				layers = {.Portal_Surface}
 			)
 			if hit {
@@ -239,7 +239,7 @@ main :: proc() {
 				obj_id, ok := point_collides_in_world(get_world_mouse_pos());
 				if ok {
 					dist := linalg.length(phys_obj_pos(obj_id) - player_pos)
-					if obj_id != get_player().dynamic_obj && dist < PLAYER_REACH {
+					if obj_id != get_player().obj && dist < PLAYER_REACH {
 						og_ty = b2d.Body_GetType(obj_id)
 						if og_ty == b2d.BodyType.dynamicBody {
 							selected = obj_id;

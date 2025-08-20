@@ -154,13 +154,13 @@ state_player :: proc() -> ^Player {
 	return game_obj(game_state.player, Player)
 }
 
-get_game_obj :: proc(id: Game_Object_Id) -> (^Game_Object, bool) #optional_ok {
+get_game_obj :: proc "contextless" (id: Game_Object_Id) -> (^Game_Object, bool) #optional_ok {
 	if id == GAME_OBJECT_INVALID || int(id) >= len(game_state.objects) do return nil, false
 
 	return &game_state.objects[int(id)], true
 }
 
-get_game_obj_data :: proc(id: Game_Object_Id, $T: typeid) -> (^T, bool) #optional_ok {
+get_game_obj_data :: proc "contextless" (id: Game_Object_Id, $T: typeid) -> (^T, bool) #optional_ok {
 	if id == GAME_OBJECT_INVALID || int(id) >= len(game_state.objects) do return nil, false
 
 	ret, valid := &game_state.objects[int(id)].data.(T)
@@ -572,9 +572,10 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 		on_render = draw_player,
 		flags = {.Weigh_Down_Buttons, .Portal_Traveller},
 	})
-	// phys_obj_data(get_player().logic_obj).game_object = id
-	// phys_obj_data(get_player().dynamic_obj).game_object = id
 	game_state.player = id
+
+	phys_obj_data(get_player().obj).game_object = id
+	// phys_obj_data(get_player().dynamic_obj).game_object = id
 
 	return id
 }
@@ -609,12 +610,12 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 
 	switch trigger.type {
 	case .Level_Exit:
-		if collided == get_player().dynamic_obj {
+		if collided == get_player().obj {
 			log.info("Player hit level exit")
 			send_game_event("lvl", Level_Event.End)
 		}
 	case .Kill:
-		if collided == get_player().dynamic_obj {
+		if collided == get_player().obj {
 			b2d.Body_SetLinearVelocity(collided, Vec2(0))
 			phys_obj_goto(collided, state_get_player_spawn())
 			log.info("Player hit death trigger")

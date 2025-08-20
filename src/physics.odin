@@ -50,9 +50,10 @@ Collision_Layer :: enum u64 {
 	Default,
 	Portal_Surface,
 	L0, L1,
+	Player,
 }
 Collision_Set :: bit_set[Collision_Layer; u64]
-COLLISION_LAYERS_ALL: bit_set[Collision_Layer; u64] : {.Default, .Portal_Surface, .L0, .L1};
+COLLISION_LAYERS_ALL: bit_set[Collision_Layer; u64] : {.Default, .Player, .Portal_Surface, .L0, .L1};
 
 PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer; u64] { .Default }
 PHYS_OBJ_DEFAULT_COLLISION_LAYERS 	  :: bit_set[Collision_Layer; u64] { .Default }
@@ -733,10 +734,19 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	shape_buf := [4]b2d.ShapeId{}
 
 	shapes := b2d.Body_GetShapes(obj_id, shape_buf[:])
-	polygon := b2d.Shape_GetPolygon(shapes[0])
-	b2d_transform := b2d.Body_GetTransform(obj_id)
-	draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:], colour=colour)
-
+	ty := b2d.Shape_GetType(shapes[0])
+	#partial switch ty {
+	case .capsuleShape:
+		capsule := b2d.Shape_GetCapsule(shapes[0])
+		draw_circle(phys_obj_pos(obj_id) + capsule.center1 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR))
+		draw_circle(phys_obj_pos(obj_id) + capsule.center2 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR))
+	case .polygonShape:
+		polygon := b2d.Shape_GetPolygon(shapes[0])
+		b2d_transform := b2d.Body_GetTransform(obj_id)
+		draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:], colour=colour)
+	case:
+		log.panicf("idk how to draw a ", ty)
+	}
 	trans := phys_obj_transform_new_from_body(obj_id, sync_rotation=false)
 
 	end := trans.pos + transform_forward(&trans) * 50 / camera.zoom;
