@@ -193,10 +193,10 @@ main :: proc() {
 
 		// particle_spawn({50, 50}, 35, test_particle)
 
-		draw_phys_world()
+		// draw_phys_world()
 		render_game_objects(camera)
 		// draw_texture(dir_tex, pos=rl_to_b2d_pos(get_world_mouse_pos()), scale=0.1)
-		// draw_tilemap(state_level().tilemap, {0., 0.});
+		draw_tilemap(state_level().tilemap, {0., 0.});
 		draw_portals(selected_portal);
 		render_particles()
 
@@ -245,6 +245,10 @@ main :: proc() {
 							selected = obj_id;
 
 							def := b2d.DefaultMouseJointDef()
+							if !b2d.Body_IsValid(mouse_ptr_body) {
+								mouse_ptr_body_def := b2d.DefaultBodyDef()
+								mouse_ptr_body = b2d.CreateBody(physics.world, mouse_ptr_body_def)
+							}
 							def.bodyIdA = mouse_ptr_body
 							def.bodyIdB = obj_id
 							def.maxForce = 100_000

@@ -34,7 +34,7 @@ Portal :: struct {
 
 Portal_Handler :: struct {
 	portals: [2]Portal,
-	edge_colliders: [4]Physics_Object_Id,
+	edge_colliders: [2]Physics_Object_Id,
 	teleported_timer: ^Timer,
 	textures: [2]Texture_Id,
 	surface_particle: Particle_Def,
@@ -149,6 +149,7 @@ initialise_portal_handler :: proc() {
 			scale = Vec2 { 20.0, 10.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
+			friction = 1,
 			collide_with = COLLISION_LAYERS_ALL,
 		),
 		add_phys_object_aabb(
@@ -156,22 +157,23 @@ initialise_portal_handler :: proc() {
 			scale = Vec2 { 20.0, 10.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0},
+			friction = 1,
 			collide_with = COLLISION_LAYERS_ALL,
 		),
-		add_phys_object_aabb(
-			pos = {10, -60},
-			scale = Vec2 { 1.0, 1.0 },
-			flags = {.Non_Kinematic}, 
-			collision_layers = {.L0},
-			collide_with = {},
-		),
-		add_phys_object_aabb(
-			pos = {10, 60},
-			scale = Vec2 { 1.0, 1.0 },
-			flags = {.Non_Kinematic}, 
-			collision_layers = {.L0},
-			collide_with = {},
-		),
+		// add_phys_object_aabb(
+		// 	pos = {10, -60},
+		// 	scale = Vec2 { 1.0, 1.0 },
+		// 	flags = {.Non_Kinematic}, 
+		// 	collision_layers = {.L0},
+		// 	collide_with = {},
+		// ),
+		// add_phys_object_aabb(
+		// 	pos = {10, 60},
+		// 	scale = Vec2 { 1.0, 1.0 },
+		// 	flags = {.Non_Kinematic}, 
+		// 	collision_layers = {.L0},
+		// 	collide_with = {},
+		// ),
 	};
 
 	portal_handler.surface_particle = Particle_Def {
@@ -240,11 +242,11 @@ draw_portals :: proc(selected_portal: int) {
 		// draw_phys_obj(portal.obj, colour);
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
-	// for edge in portal_handler.edge_colliders {
-	// 	colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
+	for edge in portal_handler.edge_colliders {
+		colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
 
-	// 	draw_phys_obj(edge, colour);
-	// }
+		draw_phys_obj(edge, colour);
+	}
 }
 
 portal_from_phys_id :: proc(id: Physics_Object_Id) -> (^Portal, bool) #optional_ok {
@@ -279,6 +281,9 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 				maskBits = transmute(u64)Collision_Set{.L0},
 			})
 
+			TODO: the only real way to fix buggines when walking up to a portal
+			from a direction is to instead disable all colliders intersecting this portal
+
 			// 	shape, phys_shape_filter(
 			// 	{},
 			// 	collides,
@@ -293,7 +298,7 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
 	portal := portal_from_phys_id(self)
 	if .Connected not_in portal.state do return
-	
+
 	occupant_id, occupied := portal.occupant.?;
 
 	if occupied && collided == occupant_id {

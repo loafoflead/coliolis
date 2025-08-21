@@ -13,7 +13,7 @@ import rl "thirdparty/raylib"
 import b2d "thirdparty/box2d"
 
 PLAYER_HORIZ_ACCEL :: 5000.0; // newtons???
-PLAYER_JUMP_STR :: 25_000.0; // idk
+PLAYER_JUMP_STR :: 100.0; // idk
 
 PLAYER_WIDTH :: 32;
 PLAYER_HEIGHT :: 32;
@@ -122,14 +122,14 @@ get_player :: proc "contextless" () -> ^Player {
 
 player_capsule :: proc() -> b2d.Capsule {
 	mover : b2d.Capsule
-	if game_state.player != 0 && get_player().teleporting {
-		mover.center1 = Vec2(0)
-		mover.center2 = mover.center1
-	}
-	else {
+	// if game_state.player != 0 && get_player().teleporting {
+	// 	mover.center1 = Vec2(0)
+	// 	mover.center2 = mover.center1
+	// }
+	// else {
 		mover.center1 = Vec2{0, 1}
 		mover.center2 = -Vec2{0, 1}
-	}
+	// }
 	// mover.center1 = b2d.TransformPoint( m_transform, m_capsule.center1 );
 	// mover.center2 = b2d.TransformPoint( m_transform, m_capsule.center2 );
 	mover.radius = 1
