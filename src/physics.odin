@@ -184,6 +184,33 @@ initialise_phys_world :: proc() {
 	physics.initialised = true;
 }
 
+reinit_phys_world :: proc() {
+	old := physics.world
+	vmem.arena_free_all(&physics.arena)
+	
+	arena := vmem.arena_allocator(&physics.arena)
+
+	world_def := b2d.DefaultWorldDef()
+	world_def.gravity = GRAVITY
+	// TODO: delete the old one? check if it increments the generation
+	physics.world = b2d.CreateWorld(world_def)
+	b2d.DestroyWorld(old)
+
+	physics.bodies = make([dynamic]Physics_Object_Id, allocator = arena)
+	// phys_world.generation += len(phys_world.objects)
+
+	// log.infof("Physics world generation: %i", phys_world.generation)
+
+	// clear(&phys_world.objects)
+	// clear(&phys_world.collisions)
+	// phys_world.collision_placeholder = add_phys_object_aabb(
+	// 	scale={1, 1},
+	// 	flags = {.Non_Kinematic, .Fixed, .Trigger},
+	// 	collision_layers = {.Default},
+	// )
+	// phys_world.initialised = true;
+}
+
 b2d_to_rl_pos :: proc(pos: Vec2) -> Vec2 {
 	return Vec2{f32(f64(pos.x) / B2D_SCALE_FACTOR), -f32(f64(pos.y) / B2D_SCALE_FACTOR)}
 }
@@ -378,31 +405,7 @@ phys_obj_world_pos :: proc(obj: ^Physics_Object) -> Vec2 {
 }
 
 
-reinit_phys_world :: proc() {
-	arena := vmem.arena_allocator(&physics.arena)
 
-	b2d.DestroyWorld(physics.world)
-
-	world_def := b2d.DefaultWorldDef()
-	world_def.gravity = GRAVITY
-	// TODO: delete the old one? check if it increments the generation
-	physics.world = b2d.CreateWorld(world_def)
-
-	clear(&physics.bodies)
-	// physics.bodies = make([dynamic]Physics_Object_Id, allocator = arena)
-	// phys_world.generation += len(phys_world.objects)
-
-	// log.infof("Physics world generation: %i", phys_world.generation)
-
-	// clear(&phys_world.objects)
-	// clear(&phys_world.collisions)
-	// phys_world.collision_placeholder = add_phys_object_aabb(
-	// 	scale={1, 1},
-	// 	flags = {.Non_Kinematic, .Fixed, .Trigger},
-	// 	collision_layers = {.Default},
-	// )
-	// phys_world.initialised = true;
-}
 
 free_phys_world :: proc() {
 	b2d.DestroyWorld(physics.world);
@@ -423,6 +426,7 @@ add_phys_object_polygon :: proc(
 	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
 	collision_layers: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 	collide_with: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
+	name: cstring = "",
 ) -> (id: Physics_Object_Id)
 {
 	vertices := vertices
@@ -447,7 +451,8 @@ add_phys_object_polygon :: proc(
 		parent,
 		flags,
 		collision_layers,
-		collide_with
+		collide_with,
+		name,
 	)
 	return
 }
@@ -465,6 +470,7 @@ add_phys_object_aabb :: proc(
 	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
 	collision_layers: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 	collide_with: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
+	name: cstring = "",
 ) -> (id: Physics_Object_Id)
 {
 	to_f64 := proc(v: Vec2) -> [2]f64 {
@@ -491,7 +497,8 @@ add_phys_object_aabb :: proc(
 		parent,
 		flags,
 		collision_layers,
-		collide_with
+		collide_with,
+		name,
 	)
 	return
 }
@@ -510,8 +517,10 @@ add_phys_object :: proc(
 	flags: bit_set[Physics_Object_Flag] = PHYS_OBJ_DEFAULT_FLAGS,
 	collision_layers: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 	collide_with: bit_set[Collision_Layer; u64] = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
+	name: cstring = "",
 ) -> (id: Physics_Object_Id)
 {
+	if len(name) > 30 do log.panicf("phys obj can't have a name longer than 30 chars")
 	// local := transform_new(pos, rot=0, parent=parent);
 	// obj := Physics_Object {
 	// 	vel = vel, 
@@ -528,6 +537,7 @@ add_phys_object :: proc(
 
 	body_def := b2d.DefaultBodyDef()
 	body_def.position = rl_to_b2d_pos(pos)
+	body_def.name = name
 
 	if .Never_Sleep in flags {
 		body_def.enableSleep = false
@@ -684,7 +694,7 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u6
 	return {}, false
 }
 
-cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL) -> (Ray_Collision, bool) { 
+cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, triggers := true) -> (Ray_Collision, bool) { 
 	filter := b2d.DefaultQueryFilter()
 
 	if layers != COLLISION_LAYERS_ALL {
@@ -694,25 +704,33 @@ cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, l
 
 	Raycast_Ctx :: struct {
 		collided: bool,
+		fraction: f32,
 		exclude: []Physics_Object_Id,
+		triggers: bool,
 		position, normal: Vec2,
 		obj: Physics_Object_Id,
 	}
 
 	ctx: Raycast_Ctx
 	ctx.exclude = exclude
+	ctx.triggers = triggers
+	ctx.fraction = 999999 // TODO: f32.max
 
 	callback := proc "c" (shape_id: b2d.ShapeId, point: Vec2, normal: Vec2, fraction: f32, ctx: rawptr) -> f32 {
 		dat := cast(^Raycast_Ctx)ctx
 		obj := b2d.Shape_GetBody(shape_id)
 		context = runtime.default_context()
-		if !slice.contains(dat.exclude, obj) {
+
+		if b2d.Shape_IsSensor(shape_id) && !dat.triggers do return fraction
+
+		if !slice.contains(dat.exclude, obj) && fraction < dat.fraction {
 			dat.collided = true
 			dat.position = point
 			dat.normal = normal
 			dat.obj = obj
+			dat.fraction = fraction
 			// https://box2d.org/doc_version_2_4/classb2_ray_cast_callback.html
-			return 0 // stop here
+			return fraction // stop here
 		}
 		return fraction
 	}
@@ -729,7 +747,7 @@ cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, l
 
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect { return {} }
 
-draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), texture := TEXTURE_INVALID) {
+draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), texture := TEXTURE_INVALID, lines := true) {
 	if !b2d.Body_IsEnabled(obj_id) do return
 	shape_buf := [4]b2d.ShapeId{}
 
@@ -738,8 +756,8 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	#partial switch ty {
 	case .capsuleShape:
 		capsule := b2d.Shape_GetCapsule(shapes[0])
-		draw_circle(phys_obj_pos(obj_id) + capsule.center1 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR))
-		draw_circle(phys_obj_pos(obj_id) + capsule.center2 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR))
+		draw_circle(phys_obj_pos(obj_id) + capsule.center1 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR),colour)
+		draw_circle(phys_obj_pos(obj_id) + capsule.center2 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR),colour)
 	case .polygonShape:
 		polygon := b2d.Shape_GetPolygon(shapes[0])
 		b2d_transform := b2d.Body_GetTransform(obj_id)
@@ -747,6 +765,8 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	case:
 		log.panicf("idk how to draw a ", ty)
 	}
+
+	if !lines do return
 	trans := phys_obj_transform_new_from_body(obj_id, sync_rotation=false)
 
 	end := trans.pos + transform_forward(&trans) * 50 / camera.zoom;

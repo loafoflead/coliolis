@@ -95,6 +95,10 @@ game_load_level_from_tilemap :: proc(path: string) {
 	reinit_phys_world()
 
 	clear(&game_state.objects)
+	queue.clear(&game_state.events)
+	queue.clear(&game_state.messages)
+	clear(&game_state.event_subscribers)
+	game_state.player = 0
 	initialise_portal_handler()
 
 	create_named_timer("game.level_loaded", 1, flags = {.Update_Automatically})
@@ -514,6 +518,7 @@ obj_trigger_new :: proc(trigger: G_Trigger) -> (id: Game_Object_Id) {
 		flags = {.Non_Kinematic, .Trigger},
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 		on_collision_enter = trigger_on_collide,
+		collide_with = PHYS_OBJ_DEFAULT_COLLIDE_WITH + {.Player},
 		// collide_with = {}
 	)
 
@@ -544,6 +549,7 @@ obj_trigger_new_from_ty :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = P
 				scale = {32*4, 32*2},
 				flags = {.Non_Kinematic, .No_Gravity, .Fixed, .Trigger},
 				collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+				collide_with = PHYS_OBJ_DEFAULT_COLLIDE_WITH + {.Player},
 				on_collision_enter = trigger_on_collide,
 			)
 		case:

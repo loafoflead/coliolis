@@ -225,6 +225,7 @@ generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
 							vertices = object.vertices,
 							flags = {.Non_Kinematic, .Fixed},
 							collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface},
+							name = "tilemap_static_poly",
 						);
 					}
 					else {
@@ -233,6 +234,7 @@ generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
 							scale = object.dims,
 							flags = {.Non_Kinematic, .Fixed},
 							collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface},
+							name = "tilemap_static_rect",
 						);
 					}
 				}

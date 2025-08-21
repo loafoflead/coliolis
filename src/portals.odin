@@ -9,7 +9,7 @@ import "core:math"
 import "core:log"
 import "core:fmt"
 
-PORTAL_EXIT_SPEED_BOOST :: 1;
+PORTAL_EXIT_SPEED_BOOST :: 10;
 
 PORTAL_WIDTH, PORTAL_HEIGHT :: f32(16), f32(80)
 @(rodata)
@@ -256,9 +256,11 @@ portal_from_phys_id :: proc(id: Physics_Object_Id) -> (^Portal, bool) #optional_
 
 prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
 	portal := portal_from_phys_id(self)
+	if .Connected not_in portal.state do return
+
 	occupant_id, occupied := portal.occupant.?;
 	gobj, has_gobj := phys_obj_gobj(collided)
-	log.infof("hit: %s", b2d.Body_GetName(collided))
+	log.infof("hit: '%s', %t, %v", b2d.Body_GetName(collided), has_gobj, gobj.flags)
 	if !has_gobj do return
 	if .Portal_Traveller not_in gobj.flags do return
 
@@ -290,6 +292,8 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 
 prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
 	portal := portal_from_phys_id(self)
+	if .Connected not_in portal.state do return
+	
 	occupant_id, occupied := portal.occupant.?;
 
 	if occupied && collided == occupant_id {
@@ -299,6 +303,9 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 			categoryBits = cur_filter.categoryBits,//transmute(u64)portal.occupant_layers,
 			maskBits = transmute(u64)portal.occupant_layers,
 		})
+		if game_state.player == phys_obj_data(occupant_id).game_object.? {
+			get_player().teleporting = false
+		}
 
 		// 	phys_shape_filter(
 		// 	transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits,
@@ -312,6 +319,8 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 
 // TODO: make player a global?
 update_portals :: proc(collider: Physics_Object_Id) {
+	if !is_timer_done("game.level_loaded") do return
+
 	if .Alive in portal_handler.portals[0].state && .Alive in portal_handler.portals[1].state {
 		for &ptl in portal_handler.portals {
 			ptl.state += {.Connected}
@@ -360,9 +369,15 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			phys_obj_goto_parent(edge)
 		}
 
+		player := false
+
 		if !is_timer_done("portal_tp") do continue;
 		phys_obj_transform_sync_from_body(occupant_id, sync_rotation=false)
 		occupant_trans := phys_obj_transform(occupant_id)
+		if game_state.player == phys_obj_data(occupant_id).game_object.? {
+			occupant_trans := &get_player().transform
+			player = true
+		}
 		portal_trans := phys_obj_transform(portal.obj)
 
 		// log.infof("%#v", occupant_trans)
@@ -405,13 +420,22 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			other_portal.occupant = occupant_id;
 			other_portal.occupant_layers = portal.occupant_layers;
 
-			new_vel := normalize(ntr.pos - portal.occupant_last_new_pos) * (linalg.length(b2d.Body_GetLinearVelocity(occupant_id)) + PORTAL_EXIT_SPEED_BOOST);
-			new_vel.y = -new_vel.y
-			new_pos := rl_to_b2d_pos(ntr.pos);
 
-			b2d.Body_SetTransform(occupant_id, new_pos, transmute(b2d.Rot)angle_to_dir(ntr.rot))
-			// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
-			b2d.Body_SetLinearVelocity(occupant_id, new_vel)
+			if player {
+				new_vel := normalize(ntr.pos - portal.occupant_last_new_pos) * (linalg.length(get_player().vel) + PORTAL_EXIT_SPEED_BOOST)
+				get_player().transform = ntr
+				get_player().vel = new_vel
+				get_player().teleporting = true
+			}
+			else {
+				new_vel := normalize(ntr.pos - portal.occupant_last_new_pos) * (linalg.length(b2d.Body_GetLinearVelocity(occupant_id)) + PORTAL_EXIT_SPEED_BOOST)
+				new_pos := rl_to_b2d_pos(ntr.pos)
+				new_vel.y = -new_vel.y
+
+				b2d.Body_SetTransform(occupant_id, new_pos, transmute(b2d.Rot)angle_to_dir(ntr.rot))
+				// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
+				b2d.Body_SetLinearVelocity(occupant_id, new_vel)
+			}
 			// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
 			// transform_reset_rotation_plane(&ntr);
 			// obj.local = ntr;

@@ -49,9 +49,9 @@ draw_polygon_convex :: proc(
     rlgl.End();
 }
 
-draw_circle :: proc(pos: Vec2, radius: f32) {
+draw_circle :: proc(pos: Vec2, radius: f32, colour:=Colour(255)) {
 	pos := world_pos_to_screen_pos(camera, pos)
-	rl.DrawCircle(cast(i32)pos.x, cast(i32)pos.y, radius * camera.zoom, rl.DARKBLUE);
+	rl.DrawCircle(cast(i32)pos.x, cast(i32)pos.y, radius * camera.zoom, cast(rl.Color)colour);
 }
 
 draw_rectangle_transform :: proc(
