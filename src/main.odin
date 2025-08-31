@@ -251,7 +251,7 @@ main :: proc() {
 							}
 							def.bodyIdA = mouse_ptr_body
 							def.bodyIdB = obj_id
-							def.maxForce = 100_000
+							def.maxForce = 100_000_000
 							def.hertz = 16
 							def.target = b2d.Body_GetPosition(obj_id)
 							def.collideConnected = false
@@ -271,18 +271,25 @@ main :: proc() {
 			}
 			if any_selected {
 				target := get_world_mouse_pos()
+				circle_mouse_pos: Vec2
 				dist := linalg.length(get_world_mouse_pos() - player_pos)
 				if dist > PLAYER_REACH {
 					target = player_pos + linalg.normalize(get_world_mouse_pos() - player_pos) * PLAYER_REACH
+					circle_mouse_pos = target
+				}
+				else {
+					circle_mouse_pos = get_world_mouse_pos()
 				}
 				if b2d.Joint_IsValid(mouse_joint) {
-					jdist := linalg.length(get_world_mouse_pos() - phys_obj_pos(selected_id))
-					if jdist > SNAP_LIMIT && dist > PLAYER_REACH {
+					jdist := linalg.length(circle_mouse_pos - phys_obj_pos(selected_id))
+					if jdist > SNAP_LIMIT && linalg.length(mouse_last_pos - get_world_mouse_pos()) < 10 {
 						if b2d.Joint_IsValid(mouse_joint) {
 							b2d.DestroyJoint(mouse_joint)
 							mouse_joint = b2d.nullJointId
 						}
 
+						vel := b2d.Body_GetLinearVelocity(selected_id)
+						b2d.Body_SetLinearVelocity(selected_id, vel * 0.1)
 						selected = nil;
 					}
 					else {
