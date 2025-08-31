@@ -12,7 +12,7 @@ import "core:fmt"
 PORTAL_EXIT_SPEED_BOOST :: 10
 PORTAL_OCCUPANTS_INITIAL_CAP :: 10
 
-PORTAL_WIDTH, PORTAL_HEIGHT :: f32(8), f32(80)
+PORTAL_WIDTH, PORTAL_HEIGHT :: f32(10), f32(80)
 
 @(rodata)
 PORTAL_COLOURS := [2]Colour {
@@ -64,31 +64,70 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 
 	obj_id := portal_handler.portals[portal - 1].obj
 
-	phys_obj_goto(obj_id, pos, facing)
-	phys_obj_transform_sync_from_body(obj_id, sync_rotation=false)
-	transform := phys_obj_transform(obj_id)
-	setrot(transform, Rad(ang))
-	// phys_obj_transform(obj_id, sync_rotation=true)
-	// phys_obj_transform(obj_id) ^= transform_flip(phys_obj_transform(obj_id))
-	if math.round(facing.y) != 0 {
-		// up (for raylib)
-		if facing.y < 0 {
-			// do nothing
-		}
-		else {
-			flup := transform_flip_vert(phys_obj_transform(obj_id))
-			phys_obj_set_transform(obj_id, flup)
-		}
-	}
-	if math.round(facing.x) != 0 {
-		if facing.x < 0 {
-			rotate(transform, Rad(linalg.PI))
-		}
-		else {
-			flup := transform_flip(phys_obj_transform(obj_id))
-			phys_obj_set_transform(obj_id, flup)
-		}
-	}
+	up := Vec3{0, 0, 1}
+
+	// TODO: seriously figure out wtf the deal is with this
+	// i mean this is seriously just trial and error, absolutely no science to it
+	// I dont understand if the linalg package has some weird matrix format i'm not privy to
+	// (I'm using :
+	//	[
+	//    cos, -sin, .., x,
+	//	  sin,  cos, .., y,	
+	//    .. ,   .., 1 , 0,
+	//    .. ,   .., .., 1
+	//	]
+	// ) and i just have no idea why this is so shit
+	// and this business of always having to rotate by a quarter turn is so weird and pops
+	// up everywhere its so annoying
+	// fix it pls
+	mpos := Vec3{get_world_mouse_pos().x, get_world_mouse_pos().y, 0}
+
+	mat3 := linalg.matrix3_look_at_f32(
+		Vec3{pos.x, pos.y, 0},
+		Vec3{pos.x, pos.y, 0} + Vec3{math.round(facing.x), math.round(facing.y), 0}, 
+		up
+	)
+	mat3 = mat3 * linalg.matrix3_rotate_f32(-linalg.PI/2, up)
+	// log.infof(
+	// 	"[\n\t%f, %f, %f,\n\t%f, %f, %f,\n\t%f, %f, %f\n]", 
+	// 	mat3[0, 0], mat3[1, 0], mat3[2, 0],
+	// 	mat3[0, 1], mat3[1, 1], mat3[2, 1],
+	// 	mat3[0, 2], mat3[1, 2], mat3[2, 2],
+	// )
+
+	trans := transform_new(pos, 0)//transform_from_matrix(mat4)
+	trans.mat[0, 0], trans.mat[0, 1] = mat3[0,0], mat3[2, 0]
+	trans.mat[1, 0], trans.mat[1, 1] = mat3[0,1], mat3[2, 1]
+	// log.infof("\n%#v", mat4)
+	// log.infof("\n%#v", trans)
+	// draw_rectangle_transform(&trans, Rect{0, 0, 190, 100})
+	phys_obj_set_transform(obj_id, trans)
+	phys_obj_goto(obj_id, pos, {math.round(trans.mat[0, 0]), -math.round(trans.mat[0, 1])})
+
+	// phys_obj_transform_sync_from_body(obj_id, sync_rotation=false)
+	// transform := phys_obj_transform(obj_id)
+	// setrot(transform, Rad(ang))
+	// // phys_obj_transform(obj_id, sync_rotation=true)
+	// // phys_obj_transform(obj_id) ^= transform_flip(phys_obj_transform(obj_id))
+	// if math.round(facing.y) != 0 {
+	// 	// up (for raylib)
+	// 	if facing.y < 0 {
+	// 		// do nothing
+	// 	}
+	// 	else {
+	// 		flup := transform_flip_vert(phys_obj_transform(obj_id))
+	// 		phys_obj_set_transform(obj_id, flup)
+	// 	}
+	// }
+	// if math.round(facing.x) != 0 {
+	// 	if facing.x < 0 {
+	// 		rotate(transform, Rad(linalg.PI))
+	// 	}
+	// 	else {
+	// 		flup := transform_flip(phys_obj_transform(obj_id))
+	// 		phys_obj_set_transform(obj_id, flup)
+	// 	}
+	// }
 
 	// if math.round(facing.x) == 0 {
 	// 	if facing.y > 0 {
@@ -135,18 +174,30 @@ initialise_portal_handler :: proc() {
 
 	prtl_col_layers := Collision_Set{.Default, .L0}
 
-	portal_handler.portals.x.obj = add_phys_object_aabb(
+	portal_handler.portals.x.obj = add_phys_object_polygon(
+		vertices = {
+			{PORTAL_WIDTH/2, PORTAL_HEIGHT / 2},
+			{-2 * PORTAL_WIDTH, PORTAL_HEIGHT /2},
+			{-2 * PORTAL_WIDTH, -PORTAL_HEIGHT /2},
+			{PORTAL_WIDTH/2, -PORTAL_HEIGHT / 2},
+		},
 		pos = Vec2 {5, 0},
-		scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
+		// scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},
 		on_collision_enter = prtl_collide_begin,
 		on_collision_exit = prtl_collide_end,
 		collision_layers = prtl_col_layers,
 		collide_with = COLLISION_LAYERS_ALL,
 	);
-	portal_handler.portals.y.obj = add_phys_object_aabb(
+	portal_handler.portals.y.obj = add_phys_object_polygon(
+		vertices = {
+			{PORTAL_WIDTH/2, PORTAL_HEIGHT / 2},
+			{-2 * PORTAL_WIDTH, PORTAL_HEIGHT /2},
+			{-2 * PORTAL_WIDTH, -PORTAL_HEIGHT /2},
+			{PORTAL_WIDTH/2, -PORTAL_HEIGHT / 2},
+		},
 		pos = Vec2 {5, 0},
-		scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
+		// scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},
 		on_collision_enter = prtl_collide_begin,
 		on_collision_exit = prtl_collide_end,
@@ -155,18 +206,29 @@ initialise_portal_handler :: proc() {
 	);
 	portal_handler.edge_colliders = {
 		add_phys_object_aabb(
-			pos = {-10, -50},
-			scale = Vec2 { 20.0, 10.0 },
+			// vertices = {
+			// 	({0  , 0} + Vec2{-10, 10}),
+			// 	({20,  0} + Vec2{-10, 10}),
+			// 	({20 ,  -20} + Vec2{-10, 10}),
+			// },
+			pos = {0, -40},
+			scale = Vec2 { 11.5, 10.0 },
 			flags = {.Non_Kinematic}, 
-			collision_layers = {.L0},
+			collision_layers = {.L0, .Default},
 			friction = 1,
 			collide_with = COLLISION_LAYERS_ALL,
 		),
 		add_phys_object_aabb(
-			pos = {-10, 50},
-			scale = Vec2 { 20.0, 10.0 },
+			// vertices = {
+			// 	({0  , 0} - Vec2(10)),
+			// 	({20,  0} - Vec2(10)),
+			// 	({20 ,  20} - Vec2(10)),
+			// 	// {10 , 10},
+			// },
+			pos = {0, 40},
+			scale = Vec2 { 11.5, 10.0 },
 			flags = {.Non_Kinematic}, 
-			collision_layers = {.L0},
+			collision_layers = {.L0, .Default},
 			friction = 1,
 			collide_with = COLLISION_LAYERS_ALL,
 		),
@@ -237,18 +299,18 @@ draw_portals :: proc(selected_portal: int) {
 		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
 		ntrans := phys_obj_transform_new_from_body(portal.obj)
 		portal_handler.surface_particle.draw_info.colour = PORTAL_COLOURS[i]
-		particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
+		// particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
 
 		rotate(&ntrans, Rad(linalg.PI/2))
 		move(&ntrans, -transform_right(&ntrans) * 16)
-		draw_rectangle_transform(
-			&ntrans,
-			Rect {0, 0, 100, 32},
-			texture_id = portal_handler.textures[0],
-			colour = PORTAL_COLOURS[i],
-		)
+		// draw_rectangle_transform(
+		// 	&ntrans,
+		// 	Rect {0, 0, 100, 32},
+		// 	texture_id = portal_handler.textures[0],
+		// 	colour = PORTAL_COLOURS[i],
+		// )
 		// portal_handler.surface_particle.
-		// draw_phys_obj(portal.obj, colour);
+		draw_phys_obj(portal.obj, colour)
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
 	for edge in portal_handler.edge_colliders {
@@ -382,12 +444,6 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 		append(&portal.occupants, occupant)
 		// portal.occupant = collided;
 
-		// belongs := transmute(bit_set[Collision_Layer; u64])cur_filter.categoryBits
-		b2d.Shape_SetFilter(shape, b2d.Filter {
-			categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
-			maskBits = transmute(u64)Collision_Set{.L0},
-		})
-
 		// TODO: the only real way to fix buggines when walking up to a portal
 		// from a direction is to instead disable all colliders intersecting this portal
 
@@ -399,6 +455,8 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 	// }
 }
 
+// FIXME: bug where if you go thru a portal the other portal beleive you're still
+// inside it until you collide in and out of it
 prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
 	portal := portal_from_phys_id(self)
 	if .Connected not_in portal.state do return
@@ -411,9 +469,10 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 			to_occupant_centre := phys_obj_pos(collided) - phys_obj_pos(self);
 			side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(self)));
 
+			log.infof("goner: %v", portal)
 			if side >= 0 && occupant.last_side < 0 {
 				teleport_occupant(occupant, portal, &portal_handler.portals[portal.linked])
-				continue
+				// continue
 			}
 
 			shape := phys_obj_shape(occupant.phys_id)
@@ -425,7 +484,6 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 			if game_state.player == phys_obj_data(occupant.phys_id).game_object.? {
 				get_player().teleporting = false
 			}
-			log.info("goner")
 		}
 		else {
 			append(&retain, occupant)
@@ -482,12 +540,14 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		for edge in portal_handler.edge_colliders {
 			phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
 			// phys_obj_transform_sync_from_body(edge, sync_rotation=false)
+			// phys_obj_goto(edge, phys_obj_pos(portal.obj))
 			phys_obj_goto_parent(edge)
 		}
 
 		remove := make([dynamic]int, len=0, cap=len(portal.occupants))
 
 		for &occupant, occ_idx in portal.occupants {
+
 			if !is_timer_done(occupant.tp_timer) do continue;
 
 			other_portal := &portal_handler.portals[1 if i == 0 else 0]
@@ -499,6 +559,23 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			if game_state.player == phys_obj_data(occupant.phys_id).game_object.? {
 				occupant_trans = &get_player().transform
 			}
+
+			shape := phys_obj_shape(occupant.phys_id)
+
+			cur_filter := b2d.Shape_GetFilter(shape)
+			
+			// if dist < 32 {
+				b2d.Shape_SetFilter(shape, b2d.Filter {
+					categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
+					maskBits = transmute(u64)Collision_Set{.L0},
+				})
+			// }
+			// else {
+			// 	b2d.Shape_SetFilter(shape, b2d.Filter {
+			// 		categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
+			// 		maskBits = transmute(u64)occupant.layers,
+			// 	})
+			// }
 
 			to_occupant_centre := phys_obj_pos(occupant.phys_id) - phys_obj_pos(portal.obj);
 			side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(portal.obj)));
@@ -535,6 +612,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			occupant.last_side = side;
 		}
 		for idx in remove {
+			log.infof("removing occupant %d from %v", idx, portal)
 			unordered_remove(&portal.occupants, idx)
 		}
 	}

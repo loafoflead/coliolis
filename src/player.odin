@@ -115,6 +115,11 @@ player_pos :: proc() -> Vec2 {
 	// return phys_obj_pos(game_obj(game_state.player, Player).logic_obj)
 }
 
+player_feet :: proc() -> Vec2 {
+	capsule := player_capsule()
+	return player_pos() + capsule.center2 + linalg.normalize(capsule.center2) * capsule.radius
+}
+
 get_player :: proc "contextless" () -> ^Player {
 	g := game_obj(game_state.player, Player)
 	return g
@@ -139,14 +144,16 @@ player_capsule :: proc() -> b2d.Capsule {
 player_grounded_check :: proc() -> bool {
 	player := get_player()
 
-	target := player_pos() + transform_right(&player.transform) * 26
+	target := player_pos() + transform_right(&player.transform) * 21
+	filter := b2d.Shape_GetFilter(phys_obj_shape(player.obj))
+	layers := transmute(Collision_Set)filter.maskBits
 
-	_, hit := cast_ray_in_world(player_pos(), target - player_pos(), exclude = {player.obj}, layers = {.Default}, triggers = false)
+	_, hit := cast_ray_in_world(player_pos(), target - player_pos(), exclude = {player.obj}, layers = layers, triggers = false)
 	// draw_line(player_pos(), target)
 
 	// if hit do log.info("COWABUNGA")
 
-	return hit && math.abs(player.vel.y) < 0.1 
+	return hit
 
 	// points : []Vec2 = { Vec2{0, 0} }
 	// proxy := b2d.MakeProxy(points, radius = f32(0.1))
@@ -215,10 +222,10 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	}
 
 	if player.in_air {
-		player.vel.x *= 0.9
+		player.vel.x *= 0.95
 	}
 	else {
-		player.vel.x *= 0.86
+		player.vel.x *= 0.9
 	}
 
 	player.vel.x = math.clamp(player.vel.x, -PLAYER_MAX_X_SPEED, PLAYER_MAX_X_SPEED)//math.sign(player.vel.x) * math.max(math.abs(player.vel.x), PLAYER_MAX_X_SPEED)
@@ -229,7 +236,7 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		player.vel += Vec2{0, 4}
 	}
 	else {
-		player.vel.y = 0
+		if !player.jumping do player.vel.y *= 0.8
 	}
 
 	// COPIED FROM:
@@ -349,7 +356,9 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	// }
 
 	if player_grounded_check() {
-		player.in_air = false;
+		// if math.abs(player.vel.y) < 0.1 {
+			player.in_air = false;
+		// }
 		// reset_timer(&player.jump_timer);
 		reset_timer(&player.coyote_timer);
 	}
@@ -436,6 +445,10 @@ when PLAYER_STEPPING_UP {
 			rotate(&player.transform, -0.1);
 		}
 		if math.abs(player.transform.rot) < 0.1 {
+			// log.info("ABSOLUTE ZERO")
+			setrot(&player.transform, 0)
+		}
+		else if math.abs(player.transform.rot - linalg.PI) < 0.1 {
 			setrot(&player.transform, 0)
 		}
 	// }
@@ -459,7 +472,7 @@ draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
 	// obj:=phys_obj(player.obj);
 	
 	// r := phys_obj_to_rect(obj).zw;
-	// draw_phys_obj(get_player().dynamic_obj, colour=Colour{255, 0, 0, 255});
+	// draw_phys_obj(get_player().obj, colour=Colour{255, 0, 0, 255});
 	
 	// draw_phys_obj(get_player().obj, colour, lines = false);
 	// draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);

@@ -172,14 +172,17 @@ main :: proc() {
 			camera.scale = Vec2{cast(f32)window_width, cast(f32)window_height}
 		}
 
+		// TODO: order is neccessary (cant explain why)
+		// dont touch
+		update_portals(physics.bodies[1])
 		update_phys_world()
+
 		update_game_state(dt)
 		// update_portals();
-		update_portals(physics.bodies[1])
 		update_timers(dt)
 		update_particles(dt)
 
-
+		// portal_goto(1, 400, 0)
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))
