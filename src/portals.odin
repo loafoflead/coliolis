@@ -9,7 +9,8 @@ import "core:math"
 import "core:log"
 import "core:fmt"
 
-PORTAL_EXIT_SPEED_BOOST :: 10;
+PORTAL_EXIT_SPEED_BOOST :: 10
+PORTAL_OCCUPANTS_INITIAL_CAP :: 10
 
 PORTAL_WIDTH, PORTAL_HEIGHT :: f32(16), f32(80)
 @(rodata)
@@ -23,19 +24,25 @@ Portal_State :: enum {
 	Alive,
 }
 
+Portal_Occupant :: struct {
+	phys_id: Physics_Object_Id,
+	layers: Collision_Set,
+	last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
+	last_new_pos: Vec2,
+	tp_timer: ^Timer,
+}
+
 Portal :: struct {
 	obj: Physics_Object_Id,
 	state: bit_set[Portal_State],
-	occupant: Maybe(Physics_Object_Id),
-	occupant_layers: bit_set[Collision_Layer; u64],
-	occupant_last_side: f32, // dot(occupant_to_portal_surface, portal_surface)
-	occupant_last_new_pos: Vec2,
+	occupants: [dynamic]Portal_Occupant,
+	linked: int,
 }
 
 Portal_Handler :: struct {
 	portals: [2]Portal,
 	edge_colliders: [2]Physics_Object_Id,
-	teleported_timer: ^Timer,
+	// teleported_timer: ^Timer,
 	textures: [2]Texture_Id,
 	surface_particle: Particle_Def,
 }
@@ -117,10 +124,12 @@ initialise_portal_handler :: proc() {
 	portal_handler.textures[0], ok = load_texture("portal_a.png")
 	if !ok do log.panicf("missing portal texture")
 
-	for &ptl in portal_handler.portals {
+	for &ptl, i in portal_handler.portals {
+		if ptl.occupants != nil do delete(ptl.occupants)
 		ptl.state = {}
-		ptl.occupant = nil
+		ptl.occupants = make([dynamic]Portal_Occupant, len=0, cap=PORTAL_OCCUPANTS_INITIAL_CAP)
 		ptl.obj = PHYS_OBJ_INVALID
+		ptl.linked = 1 if i == 0 else 0
 	}
 
 	prtl_col_layers := Collision_Set{.Default, .L0}
@@ -201,8 +210,8 @@ initialise_portal_handler :: proc() {
 
 	for edge in portal_handler.edge_colliders do phys_obj_transform_sync_from_body(edge)
 
-	portal_handler.teleported_timer = 
-		create_named_timer("portal_tp", 1.0, flags={.Update_Automatically});
+	// portal_handler.teleported_timer = 
+		// create_named_timer("portal_tp", 1.0, flags={.Update_Automatically});
 }
 free_portal_handler :: proc() {}
 
@@ -217,13 +226,12 @@ draw_portals :: proc(selected_portal: int) {
 			case 1: value = 115; // Grüne
 			case: 	value = 0;	 // röt
 		}
-		_, occupied := portal.occupant.?;
-		if occupied {
+		if len(portal.occupants) > 0 {
 			// positive = behind
-			if portal.occupant_last_side > 0 do value = 0;
-			else do value = 115;
+			// if portal.occupant_last_side > 0 do value = 0;
+			value = 115;
 		}
-		if !is_timer_done("portal_tp") || .Connected not_in portal.state do sat = 0;
+		if .Connected not_in portal.state do sat = 0;
 		// TODO: messed up HSV pls fix it l8r
 		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
 		ntrans := phys_obj_transform_new_from_body(portal.obj)
@@ -256,70 +264,175 @@ portal_from_phys_id :: proc(id: Physics_Object_Id) -> (^Portal, bool) #optional_
 	return nil, false
 }
 
+teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_portal: ^Portal) {
+	occupant_id := occupant.phys_id
+	player := false
+
+	phys_obj_transform_sync_from_body(occupant_id, sync_rotation=false)
+	occupant_trans := phys_obj_transform(occupant_id)
+	if game_state.player == phys_obj_data(occupant_id).game_object.? {
+		occupant_trans = &get_player().transform
+		player = true
+	}
+	portal_trans := phys_obj_transform(portal.obj)
+
+	// log.infof("%#v", occupant_trans)
+	// debug_log("%v", obj.collide_with_layers, timed=false);
+
+	// debug_log("%v", obj.collide_with_layers)
+
+	to_occupant_centre := occupant_trans.pos - portal_trans.pos;
+	side := linalg.dot(to_occupant_centre, -transform_forward(portal_trans));
+
+	other_portal_trans := phys_obj_transform(other_portal.obj)
+
+	using linalg;
+	oportal_mat := other_portal_trans.mat;
+	portal_mat := portal_trans.mat;
+	obj_mat := occupant_trans.mat;
+
+	// mirror := Mat4x4 {
+	// 	-1, 0,  0, 0,
+	// 	0, 1, 	0, 0,
+	// 	0, 0, 	1, 0,
+	// 	0, 0, 0, 1,
+	// }
+	mirror := matrix4_rotate_f32(PI, Y_AXIS);
+	for i in 0..<3 do mirror[i, 3] = 0
+	for i in 0..<3 do mirror[3, i] = 0
+
+	obj_local := matrix4_inverse(portal_mat) * obj_mat;
+	relative_to_other_portal := mirror * obj_local;
+
+	fmat := oportal_mat * relative_to_other_portal;
+
+	ntr := transform_from_matrix(fmat);
+	// ntr.pos += other_portal_obj.pos;
+
+	fmt.println("teleportin")
+	noccupant := Portal_Occupant {
+		phys_id = occupant.phys_id,
+		last_side = 0,
+		layers = occupant.layers,
+		tp_timer = occupant.tp_timer,
+	}
+	reset_timer(occupant.tp_timer)
+	append(&other_portal.occupants, noccupant)
+
+	if player {
+		new_vel := normalize(ntr.pos - occupant.last_new_pos) * (linalg.length(get_player().vel) + PORTAL_EXIT_SPEED_BOOST)
+		get_player().transform = ntr
+		// get_player().vel = new_vel
+		get_player().vel = 0
+		// TODO: rotate velocity instead o doing this silly shit
+		get_player().teleporting = true
+	}
+	else {
+		new_vel := normalize(ntr.pos - occupant.last_new_pos) * (linalg.length(b2d.Body_GetLinearVelocity(occupant_id)) + PORTAL_EXIT_SPEED_BOOST)
+		new_pos := rl_to_b2d_pos(ntr.pos)
+		new_vel.y = -new_vel.y
+
+		b2d.Body_SetTransform(occupant_id, new_pos, transmute(b2d.Rot)angle_to_dir(ntr.rot))
+		// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
+		b2d.Body_SetLinearVelocity(occupant_id, new_vel)
+	}
+	// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
+	// transform_reset_rotation_plane(&ntr);
+	// obj.local = ntr;
+	// setpos(obj, ntr.pos);
+
+	// obj.collide_with_layers = portal.occupant_layers;
+}
+
 prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
 	portal := portal_from_phys_id(self)
 	if .Connected not_in portal.state do return
 
-	occupant_id, occupied := portal.occupant.?;
 	gobj, has_gobj := phys_obj_gobj(collided)
 	log.infof("hit: '%s', %t, %v", b2d.Body_GetName(collided), has_gobj, gobj.flags)
 	if !has_gobj do return
 	if .Portal_Traveller not_in gobj.flags do return
 
-	if !occupied && is_timer_done("portal_tp") {
-		ty := b2d.Body_GetType(collided)
-		if ty != b2d.BodyType.staticBody {
-			portal.occupant = collided;
+	// if is_timer_done("portal_tp") {
+	ty := b2d.Body_GetType(collided)
 
-			shape := phys_obj_shape(collided)
-			cur_filter := b2d.Shape_GetFilter(shape)
-			collides := transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits
-			belongs := transmute(bit_set[Collision_Layer; u64])cur_filter.categoryBits
-			portal.occupant_layers = collides
-			b2d.Shape_SetFilter(shape, b2d.Filter {
-				categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
-				maskBits = transmute(u64)Collision_Set{.L0},
-			})
+	for occupant in portal.occupants {
+		if occupant.phys_id == collided do return
+	}
 
-			TODO: the only real way to fix buggines when walking up to a portal
-			from a direction is to instead disable all colliders intersecting this portal
+	if ty != b2d.BodyType.staticBody {
 
-			// 	shape, phys_shape_filter(
-			// 	{},
-			// 	collides,
-			// ))
+		shape := phys_obj_shape(collided)
+		cur_filter := b2d.Shape_GetFilter(shape)
+		collides := transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits
+
+		to_occupant_centre := phys_obj_pos(collided) - phys_obj_pos(self);
+		side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(self)));
+
+		occupant := Portal_Occupant {
+			phys_id = collided,
+			layers = collides,
+			// TODO: this will eventually overflow the timers so maybe
+			// just make it updated in the update func
+			tp_timer = get_temp_timer(0.25, flags={.Update_Automatically}),
+			last_side = side,
 		}
+		log.info("gainer")
+		append(&portal.occupants, occupant)
+		// portal.occupant = collided;
+
+		// belongs := transmute(bit_set[Collision_Layer; u64])cur_filter.categoryBits
+		b2d.Shape_SetFilter(shape, b2d.Filter {
+			categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
+			maskBits = transmute(u64)Collision_Set{.L0},
+		})
+
+		// TODO: the only real way to fix buggines when walking up to a portal
+		// from a direction is to instead disable all colliders intersecting this portal
+
+		// 	shape, phys_shape_filter(
+		// 	{},
+		// 	collides,
+		// ))
 	}
-	else {
-		log.info("TODO: implement more than one portalgoer")
-	}
+	// }
 }
 
 prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
 	portal := portal_from_phys_id(self)
 	if .Connected not_in portal.state do return
 
-	occupant_id, occupied := portal.occupant.?;
+	retain := make([dynamic]Portal_Occupant, len=0, cap=len(portal.occupants))
 
-	if occupied && collided == occupant_id {
-		shape := phys_obj_shape(occupant_id)
-		cur_filter := b2d.Shape_GetFilter(shape)
-		b2d.Shape_SetFilter(shape, b2d.Filter {
-			categoryBits = cur_filter.categoryBits,//transmute(u64)portal.occupant_layers,
-			maskBits = transmute(u64)portal.occupant_layers,
-		})
-		if game_state.player == phys_obj_data(occupant_id).game_object.? {
-			get_player().teleporting = false
+	for occupant, i in portal.occupants {
+		if collided == occupant.phys_id {
+
+			to_occupant_centre := phys_obj_pos(collided) - phys_obj_pos(self);
+			side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(self)));
+
+			if side >= 0 && occupant.last_side < 0 {
+				teleport_occupant(occupant, portal, &portal_handler.portals[portal.linked])
+				continue
+			}
+
+			shape := phys_obj_shape(occupant.phys_id)
+			cur_filter := b2d.Shape_GetFilter(shape)
+			b2d.Shape_SetFilter(shape, b2d.Filter {
+				categoryBits = cur_filter.categoryBits,//transmute(u64)portal.occupant_layers,
+				maskBits = transmute(u64)occupant.layers,
+			})
+			if game_state.player == phys_obj_data(occupant.phys_id).game_object.? {
+				get_player().teleporting = false
+			}
+			log.info("goner")
 		}
-
-		// 	phys_shape_filter(
-		// 	transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits,
-		// 	portal.occupant_layers, 
-		// ))
-
-		portal.occupant = nil;
-		set_timer_done("portal_tp");
+		else {
+			append(&retain, occupant)
+		}
 	}
+
+	delete(portal.occupants)
+	portal.occupants = retain
 }
 
 // TODO: make player a global?
@@ -340,7 +453,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 	for &portal, i in portal_handler.portals {
 		if .Connected not_in portal.state do continue
 
-		occupant_id, occupied := portal.occupant.?;
+		if len(portal.occupants) == 0 do continue
 
 		// collided := check_phys_objects_collide(portal.obj, collider);
 		// if collided && !occupied && is_timer_done("portal_tp") {
@@ -365,91 +478,63 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		// 	}
 		// }
 
-		if !occupied do continue;
-
-
 		for edge in portal_handler.edge_colliders {
 			phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
 			// phys_obj_transform_sync_from_body(edge, sync_rotation=false)
 			phys_obj_goto_parent(edge)
 		}
 
-		player := false
+		remove := make([dynamic]int, len=0, cap=len(portal.occupants))
 
-		if !is_timer_done("portal_tp") do continue;
-		phys_obj_transform_sync_from_body(occupant_id, sync_rotation=false)
-		occupant_trans := phys_obj_transform(occupant_id)
-		if game_state.player == phys_obj_data(occupant_id).game_object.? {
-			occupant_trans := &get_player().transform
-			player = true
-		}
-		portal_trans := phys_obj_transform(portal.obj)
+		for &occupant, occ_idx in portal.occupants {
+			if !is_timer_done(occupant.tp_timer) do continue;
 
-		// log.infof("%#v", occupant_trans)
-		// debug_log("%v", obj.collide_with_layers, timed=false);
+			other_portal := &portal_handler.portals[1 if i == 0 else 0]
+			other_portal_trans := phys_obj_transform(other_portal.obj)
+			portal_trans := phys_obj_transform(portal.obj)
 
-		// debug_log("%v", obj.collide_with_layers)
-
-		to_occupant_centre := occupant_trans.pos - portal_trans.pos;
-		side := linalg.dot(to_occupant_centre, -transform_forward(portal_trans));
-
-		other_portal := &portal_handler.portals[1 if i == 0 else 0];
-		other_portal_trans := phys_obj_transform(other_portal.obj)
-
-		using linalg;
-		oportal_mat := other_portal_trans.mat;
-		portal_mat := portal_trans.mat;
-		obj_mat := occupant_trans.mat;
-
-		// mirror := Mat4x4 {
-		// 	-1, 0,  0, 0,
-		// 	0, 1, 	0, 0,
-		// 	0, 0, 	1, 0,
-		// 	0, 0, 0, 1,
-		// }
-		mirror := matrix4_rotate_f32(PI, Y_AXIS);
-		for i in 0..<3 do mirror[i, 3] = 0
-		for i in 0..<3 do mirror[3, i] = 0
-
-		obj_local := matrix4_inverse(portal_mat) * obj_mat;
-		relative_to_other_portal := mirror * obj_local;
-
-		fmat := oportal_mat * relative_to_other_portal;
-
-		ntr := transform_from_matrix(fmat);
-		// ntr.pos += other_portal_obj.pos;
-
-		if side >= 0 && portal.occupant_last_side < 0 {
-			fmt.println("teleportin")
-			reset_timer("portal_tp");
-			other_portal.occupant = occupant_id;
-			other_portal.occupant_layers = portal.occupant_layers;
-
-
-			if player {
-				new_vel := normalize(ntr.pos - portal.occupant_last_new_pos) * (linalg.length(get_player().vel) + PORTAL_EXIT_SPEED_BOOST)
-				get_player().transform = ntr
-				get_player().vel = new_vel
-				get_player().teleporting = true
+			phys_obj_transform_sync_from_body(occupant.phys_id, sync_rotation=false)
+			occupant_trans := phys_obj_transform(occupant.phys_id)
+			if game_state.player == phys_obj_data(occupant.phys_id).game_object.? {
+				occupant_trans = &get_player().transform
 			}
-			else {
-				new_vel := normalize(ntr.pos - portal.occupant_last_new_pos) * (linalg.length(b2d.Body_GetLinearVelocity(occupant_id)) + PORTAL_EXIT_SPEED_BOOST)
-				new_pos := rl_to_b2d_pos(ntr.pos)
-				new_vel.y = -new_vel.y
 
-				b2d.Body_SetTransform(occupant_id, new_pos, transmute(b2d.Rot)angle_to_dir(ntr.rot))
-				// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
-				b2d.Body_SetLinearVelocity(occupant_id, new_vel)
+			to_occupant_centre := phys_obj_pos(occupant.phys_id) - phys_obj_pos(portal.obj);
+			side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(portal.obj)));
+
+			using linalg;
+			oportal_mat := other_portal_trans.mat;
+			portal_mat := portal_trans.mat;
+			obj_mat := occupant_trans.mat;
+
+			// mirror := Mat4x4 {
+			// 	-1, 0,  0, 0,
+			// 	0, 1, 	0, 0,
+			// 	0, 0, 	1, 0,
+			// 	0, 0, 0, 1,
+			// }
+			mirror := matrix4_rotate_f32(PI, Y_AXIS);
+			for i in 0..<3 do mirror[i, 3] = 0
+			for i in 0..<3 do mirror[3, i] = 0
+
+			obj_local := matrix4_inverse(portal_mat) * obj_mat;
+			relative_to_other_portal := mirror * obj_local;
+
+			fmat := oportal_mat * relative_to_other_portal;
+
+			ntr := transform_from_matrix(fmat);
+
+			if side >= 0 && occupant.last_side < 0 {
+				teleport_occupant(occupant, &portal, other_portal)
+
+				append(&remove, occ_idx)
 			}
-			// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
-			// transform_reset_rotation_plane(&ntr);
-			// obj.local = ntr;
-			// setpos(obj, ntr.pos);
 
-			// obj.collide_with_layers = portal.occupant_layers;
-			portal.occupant = nil;
+			occupant.last_new_pos = ntr.pos;
+			occupant.last_side = side;
 		}
-		portal.occupant_last_new_pos = ntr.pos;
-		portal.occupant_last_side = side;
+		for idx in remove {
+			unordered_remove(&portal.occupants, idx)
+		}
 	}
 }

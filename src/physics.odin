@@ -42,7 +42,7 @@ PHYSICS_SUBSTEPS :: 2
 
 DEFAULT_FRICTION :: f32(0.4)
 
-B2D_SCALE_FACTOR :: f64(1.0/10.0)
+PIXELS_TO_METRES_RATIO :: f64(1.0/10.0)
 
 GRAVITY :: Vec2{0, -10}
 
@@ -140,6 +140,7 @@ initialise_phys_world :: proc() {
 
 	world_def := b2d.DefaultWorldDef() 
 	world_def.gravity = GRAVITY
+	world_def.enableContinuous = true
 	physics.world = b2d.CreateWorld(world_def)
 
 	physics.bodies = make([dynamic]Physics_Object_Id, allocator = arena)
@@ -192,6 +193,7 @@ reinit_phys_world :: proc() {
 
 	world_def := b2d.DefaultWorldDef()
 	world_def.gravity = GRAVITY
+	world_def.enableContinuous = true
 	// TODO: delete the old one? check if it increments the generation
 	physics.world = b2d.CreateWorld(world_def)
 	b2d.DestroyWorld(old)
@@ -212,11 +214,11 @@ reinit_phys_world :: proc() {
 }
 
 b2d_to_rl_pos :: proc(pos: Vec2) -> Vec2 {
-	return Vec2{f32(f64(pos.x) / B2D_SCALE_FACTOR), -f32(f64(pos.y) / B2D_SCALE_FACTOR)}
+	return Vec2{f32(f64(pos.x) / PIXELS_TO_METRES_RATIO), -f32(f64(pos.y) / PIXELS_TO_METRES_RATIO)}
 }
 
 rl_to_b2d_pos :: proc(pos: Vec2) -> Vec2 {
-	return Vec2{f32(f64(pos.x) * B2D_SCALE_FACTOR), -f32(f64(pos.y) * B2D_SCALE_FACTOR)}
+	return Vec2{f32(f64(pos.x) * PIXELS_TO_METRES_RATIO), -f32(f64(pos.y) * PIXELS_TO_METRES_RATIO)}
 }
 
 draw_phys_world :: proc() {
@@ -480,7 +482,7 @@ add_phys_object_aabb :: proc(
 		return {f32(v.x), f32(v.y)}
 	}
 
-	double := to_f64(scale) / 2 * B2D_SCALE_FACTOR
+	double := to_f64(scale) / 2 * PIXELS_TO_METRES_RATIO
 	scale := to_f32(double)
 	box := b2d.MakeBox(scale.x, scale.y)
 
@@ -653,7 +655,7 @@ phys_obj_aabb :: proc(id: Physics_Object_Id) -> b2d.AABB {
 phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool {
 	pos := phys_obj_pos(obj_id)
 	aabb := phys_obj_aabb(obj_id)
-	height := (aabb.upperBound.y - aabb.lowerBound.y) / f32(B2D_SCALE_FACTOR)
+	height := (aabb.upperBound.y - aabb.lowerBound.y) / f32(PIXELS_TO_METRES_RATIO)
 	trans := phys_obj_transform_new_from_body(obj_id)
 	_, hit := cast_ray_in_world(pos, transform_right(&trans) * (height), exclude = {obj_id})
 	return hit
@@ -756,8 +758,8 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	#partial switch ty {
 	case .capsuleShape:
 		capsule := b2d.Shape_GetCapsule(shapes[0])
-		draw_circle(phys_obj_pos(obj_id) + capsule.center1 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR),colour)
-		draw_circle(phys_obj_pos(obj_id) + capsule.center2 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR),colour)
+		draw_circle(phys_obj_pos(obj_id) + capsule.center1 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO),colour)
+		draw_circle(phys_obj_pos(obj_id) + capsule.center2 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO),colour)
 	case .polygonShape:
 		polygon := b2d.Shape_GetPolygon(shapes[0])
 		b2d_transform := b2d.Body_GetTransform(obj_id)

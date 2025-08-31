@@ -183,7 +183,7 @@ player_grounded_check :: proc() -> bool {
 	// pos := rl_to_b2d_pos(player_pos() /*+ transform_right(&player.transform) * 3*/)
 
 	// _ = b2d.World_CastShape( physics.world, proxy, pos, filter, callback, &ctx );
-	// draw_line(player_pos(), player_pos() + transform_right(&player.transform) * 3 / f32(B2D_SCALE_FACTOR))
+	// draw_line(player_pos(), player_pos() + transform_right(&player.transform) * 3 / f32(PIXELS_TO_METRES_RATIO))
 	// draw_line(player_pos(), b2d_to_rl_pos(ctx.position))
 	// return ctx.collided && math.abs(player.vel.y) <= 0.1 
 }
@@ -227,6 +227,9 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	if player.in_air {
 		// gravity
 		player.vel += Vec2{0, 4}
+	}
+	else {
+		player.vel.y = 0
 	}
 
 	// COPIED FROM:
@@ -448,10 +451,10 @@ draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
 	capsule := player_capsule()
 	player := game_obj(player, Player)
 
-	draw_circle(transform_point(&player.transform, b2d_to_rl_pos(capsule.center1)), capsule.radius / f32(B2D_SCALE_FACTOR), colour)
-	draw_circle(transform_point(&player.transform, b2d_to_rl_pos(capsule.center2)), capsule.radius / f32(B2D_SCALE_FACTOR), colour)
-	// draw_circle(player_pos() + capsule.center1 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR))
-	// draw_circle(player_pos() + capsule.center2 / f32(B2D_SCALE_FACTOR), capsule.radius / f32(B2D_SCALE_FACTOR))
+	draw_circle(transform_point(&player.transform, b2d_to_rl_pos(capsule.center1)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
+	draw_circle(transform_point(&player.transform, b2d_to_rl_pos(capsule.center2)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
+	// draw_circle(player_pos() + capsule.center1 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO))
+	// draw_circle(player_pos() + capsule.center2 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO))
 	// player := game_obj(player, Player)
 	// obj:=phys_obj(player.obj);
 	

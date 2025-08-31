@@ -1,6 +1,6 @@
 package main;
 
-import "core:fmt";
+import "core:log";
 
 Timer_Flags :: enum {
 	Update_Automatically,
@@ -9,7 +9,7 @@ Timer_Flags :: enum {
 	Just_Finished,
 }
 
-NUM_UNNAMED_TIMERS :: 16;
+NUM_UNNAMED_TIMERS :: 128;
 
 Timer_Handler :: struct #no_copy {
 	unnamed: [NUM_UNNAMED_TIMERS]Timer,
@@ -51,7 +51,7 @@ update_timers :: proc(dt: f32) {
 }
 
 get_named_timer :: proc(name: string) -> ^Timer {
-	if name not_in timers.named do panic("a named timer was not found");
+	if name not_in timers.named do log.panicf("a named timer was not found: %s", name);
 
 	return &timers.named[name];
 }
@@ -65,7 +65,7 @@ create_named_timer :: proc(name: string, duration: f32, current: f32 = 0, flags:
 
 get_temp_timer :: proc(duration: f32, current: f32 = 0, flags: bit_set[Timer_Flags] = {}) -> ^Timer {
 	if timers.timer_index >= NUM_UNNAMED_TIMERS {
-		fmt.println("[WARNING]: Overflowed temp timers");
+		log.warn("[WARNING]: Overflowed temp timers");
 		timers.timer_index = 0;
 	}
 	timers.timer_index += 1;
@@ -79,7 +79,7 @@ ref_timer_fraction :: proc(timer: ^Timer) -> f32 {
 }
 
 named_timer_fraction :: proc(name: string) -> f32 {
-	if name not_in timers.named do panic("a named timer was not found");
+	if name not_in timers.named do log.panicf("a named timer was not found: %s", name);
 
 	return ref_timer_fraction(&timers.named[name])
 }
@@ -117,27 +117,27 @@ ref_set_timer_done :: proc(timer: ^Timer) {
 }
 
 named_reset_timer :: proc(name: string) {
-	if name not_in timers.named do panic("a named timer was not found");
+	if name not_in timers.named do log.panicf("a named timer was not found: %s", name);
 
 	ref_reset_timer(&timers.named[name])
 }
 named_is_timer_done :: proc(name: string) -> bool {
-	if name not_in timers.named do panic("a named timer was not found");
+	if name not_in timers.named do log.panicf("a named timer was not found: %s", name);
 
 	return ref_is_timer_done(&timers.named[name])
 }
 named_is_timer_just_done :: proc(name: string) -> bool {
-	if name not_in timers.named do panic("a named timer was not found");
+	if name not_in timers.named do log.panicf("a named timer was not found: %s", name);
 
 	return ref_is_timer_just_done(&timers.named[name])
 }
 named_update_timer :: proc(name: string, dt: f32) {
-	if name not_in timers.named do panic("a named timer was not found");
+	if name not_in timers.named do log.panicf("a named timer was not found: %s", name);
 
 	ref_update_timer(&timers.named[name], dt)
 }
 named_set_timer_done :: proc(name: string) {
-	if name not_in timers.named do panic("a named timer was not found");
+	if name not_in timers.named do log.panicf("a named timer was not found: %s", name);
 
 	ref_set_timer_done(&timers.named[name])
 }
