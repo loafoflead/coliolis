@@ -12,7 +12,7 @@ import "core:fmt"
 PORTAL_EXIT_SPEED_BOOST :: 10
 PORTAL_OCCUPANTS_INITIAL_CAP :: 10
 
-PORTAL_WIDTH, PORTAL_HEIGHT :: f32(10), f32(80)
+PORTAL_WIDTH, PORTAL_HEIGHT :: f32(9), f32(80)
 
 @(rodata)
 PORTAL_COLOURS := [2]Colour {
@@ -95,14 +95,41 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// 	mat3[0, 2], mat3[1, 2], mat3[2, 2],
 	// )
 
+	right: Vec3
+	fwd := Vec3{facing.x, facing.y, 0}
+	// linalg.normalize(-Vec3{pos.x, pos.y, 0} + mpos)
+
+	right = fwd * linalg.matrix3_rotate_f32(linalg.π/2, Z_AXIS)
+
+	if facing.y <= 0 do fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
+	if facing.x <= 0 do fwd = fwd * linalg.matrix3_rotate_f32(-linalg.PI, right)
+	// else do fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
+
+	mat4 := linalg.matrix4_look_at_from_fru_f32(
+		eye = Vec3{pos.x, pos.y, 0},
+		f = fwd,
+		r = right,
+		u = up,
+	)
+	mat4 = mat4 * linalg.matrix4_rotate_f32(-linalg.PI/2, up)
+	// log.infof(
+	// 	"[\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f\n]", 
+	// 	mat4[0, 0], mat4[1, 0], mat4[2, 0], mat4[3, 0],
+	// 	mat4[0, 1], mat4[1, 1], mat4[2, 1], mat4[3, 1],
+	// 	mat4[0, 2], mat4[1, 2], mat4[2, 2], mat4[3, 2],
+	// 	mat4[0, 3], mat4[1, 3], mat4[2, 3], mat4[3, 3],
+	// )
+
 	trans := transform_new(pos, 0)//transform_from_matrix(mat4)
-	trans.mat[0, 0], trans.mat[0, 1] = mat3[0,0], mat3[2, 0]
-	trans.mat[1, 0], trans.mat[1, 1] = mat3[0,1], mat3[2, 1]
+	trans.mat[0, 0], trans.mat[0, 1] = mat4[0,0], mat4[2, 0]
+	trans.mat[1, 0], trans.mat[1, 1] = mat4[0,1], mat4[2, 1]
+	transform_align(&trans)
 	// log.infof("\n%#v", mat4)
-	// log.infof("\n%#v", trans)
-	// draw_rectangle_transform(&trans, Rect{0, 0, 190, 100})
+	// draw_rectangle_transform(&trans, Rect{0, 0, 200, 100})
+	// draw_line(trans.pos, trans.pos + transform_forward(&trans) * 1000, Colour{0, 255, 0, 255})
+	// draw_line(trans.pos, trans.pos + transform_right(&trans) * 1000)
 	phys_obj_set_transform(obj_id, trans)
-	phys_obj_goto(obj_id, pos, {math.round(trans.mat[0, 0]), -math.round(trans.mat[0, 1])})
+	phys_obj_goto(obj_id, pos, {trans.mat[0, 0], trans.mat[0, 1]})
 
 	// phys_obj_transform_sync_from_body(obj_id, sync_rotation=false)
 	// transform := phys_obj_transform(obj_id)
@@ -212,7 +239,7 @@ initialise_portal_handler :: proc() {
 			// 	({20 ,  -20} + Vec2{-10, 10}),
 			// },
 			pos = {0, -40},
-			scale = Vec2 { 11.5, 10.0 },
+			scale = Vec2 { 12, 10.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0, .Default},
 			friction = 1,
@@ -226,7 +253,7 @@ initialise_portal_handler :: proc() {
 			// 	// {10 , 10},
 			// },
 			pos = {0, 40},
-			scale = Vec2 { 11.5, 10.0 },
+			scale = Vec2 { 12, 10.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0, .Default},
 			friction = 1,
@@ -440,6 +467,12 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 			tp_timer = get_temp_timer(0.25, flags={.Update_Automatically}),
 			last_side = side,
 		}
+	
+		b2d.Shape_SetFilter(shape, b2d.Filter {
+			categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
+			maskBits = transmute(u64)Collision_Set{.L0},
+		})
+
 		log.info("gainer")
 		append(&portal.occupants, occupant)
 		// portal.occupant = collided;
@@ -455,8 +488,6 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 	// }
 }
 
-// FIXME: bug where if you go thru a portal the other portal beleive you're still
-// inside it until you collide in and out of it
 prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
 	portal := portal_from_phys_id(self)
 	if .Connected not_in portal.state do return
@@ -510,9 +541,84 @@ update_portals :: proc(collider: Physics_Object_Id) {
 	}
 
 	for &portal, i in portal_handler.portals {
-		if .Connected not_in portal.state do continue
+		if .Connected not_in portal.state {
+			continue
+		}
 
-		if len(portal.occupants) == 0 do continue
+		if len(portal.occupants) == 0 {
+			// for edge in portal_handler.edge_colliders {
+			// 	// TODO: why isn't this working?
+			// 	phys_obj_transform(edge).parent = nil
+			// 	phys_obj_goto(edge, Vec2(-100000))
+			// }
+		}
+		else {
+			for edge in portal_handler.edge_colliders {
+				phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
+				// phys_obj_transform_sync_from_body(edge, sync_rotation=false)
+				// phys_obj_goto(edge, phys_obj_pos(portal.obj))
+				phys_obj_goto_parent(edge)
+			}
+		}
+
+		CONTACT_DATA_BUF_SIZE :: 4
+
+		if len(portal.occupants) > 4 {
+			log.warn("Portal is occupied by more objects than it can keep track of:", len(portal.occupants))
+		}
+
+		// remove any objects that we are no longer colliding with from the occupant list
+
+		shape := phys_obj_shape(portal.obj)
+		// buffer: [CONTACT_DATA_BUF_SIZE]b2d.ContactData
+		buffer: [CONTACT_DATA_BUF_SIZE]b2d.ShapeId
+
+		// keep := make([dynamic]Portal_Occupant, len=0, cap=len(portal.occupants))
+		// copy(keep[:], portal.occupants[:])
+		contacts_count := b2d.Shape_GetSensorOverlaps(shape, raw_data(buffer[:]), CONTACT_DATA_BUF_SIZE)
+		contacts := buffer[:contacts_count]
+		// contact_data := b2d.Shape_GetContactData(shape, buffer[:])
+
+		for occupant in portal.occupants {
+			found: Maybe(Physics_Object_Id)
+
+			for contact in contacts {
+				body := b2d.Shape_GetBody(contact)
+
+				if body == occupant.phys_id {
+					found = body
+				}
+			}
+
+			if _, ok := found.?; !ok {
+				prtl_collide_end(portal.obj, occupant.phys_id, b2d.nullShapeId, b2d.nullShapeId)
+				log.info("lost boy!")
+			}
+		}
+
+		// for contact in contact_data {
+		// 	shape_a, shape_b := contact.shapeIdA, contact.shapeIdB
+
+		// 	body_a, body_b := b2d.Shape_GetBody(shape_a), b2d.Shape_GetBody(shape_b)
+
+		// 	body: Physics_Object_Id
+
+		// 	if body_a == portal.obj do body = body_b
+		// 	else do body = body_a
+
+		// 	log.info(portal.occupants[0].phys_id, body)
+		// 	for occupant in portal.occupants {
+		// 		if occupant.phys_id == body {
+		// 			prtl_collide_end(portal.obj, body, 0, 0)
+		// 		}
+		// 	}
+		// }
+
+		// if len(portal.occupants) != len(keep) {
+		// 	log.info("removing non colliding guys")
+		// }
+		// delete(portal.occupants)
+		// portal.occupants = keep
 
 		// collided := check_phys_objects_collide(portal.obj, collider);
 		// if collided && !occupied && is_timer_done("portal_tp") {
@@ -537,12 +643,12 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		// 	}
 		// }
 
-		for edge in portal_handler.edge_colliders {
-			phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
-			// phys_obj_transform_sync_from_body(edge, sync_rotation=false)
-			// phys_obj_goto(edge, phys_obj_pos(portal.obj))
-			phys_obj_goto_parent(edge)
-		}
+		// for edge in portal_handler.edge_colliders {
+		// 	phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
+		// 	// phys_obj_transform_sync_from_body(edge, sync_rotation=false)
+		// 	// phys_obj_goto(edge, phys_obj_pos(portal.obj))
+		// 	phys_obj_goto_parent(edge)
+		// }
 
 		remove := make([dynamic]int, len=0, cap=len(portal.occupants))
 
@@ -560,15 +666,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 				occupant_trans = &get_player().transform
 			}
 
-			shape := phys_obj_shape(occupant.phys_id)
-
-			cur_filter := b2d.Shape_GetFilter(shape)
 			
-			// if dist < 32 {
-				b2d.Shape_SetFilter(shape, b2d.Filter {
-					categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
-					maskBits = transmute(u64)Collision_Set{.L0},
-				})
 			// }
 			// else {
 			// 	b2d.Shape_SetFilter(shape, b2d.Filter {

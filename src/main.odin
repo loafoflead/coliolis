@@ -182,7 +182,7 @@ main :: proc() {
 		update_timers(dt)
 		update_particles(dt)
 
-		// portal_goto(1, 400, 0)
+		// if is_timer_done("game.level_loaded") do portal_goto(1, 400, 0)
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))
