@@ -637,7 +637,7 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	frame := game_obj(self, Portal_Fixture)
 
-	draw_line(frame.pos, frame.pos + frame.facing * 100)
+	// draw_line(frame.pos, frame.pos + frame.facing * 100)
 
 	// if condition_true(frame.condition) {
 	// 	portal_goto(frame.portal, frame.pos, frame.facing)

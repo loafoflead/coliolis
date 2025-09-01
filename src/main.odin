@@ -207,7 +207,6 @@ main :: proc() {
 			camera.pos = player_pos()
 		}
 
-
 		click: int
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) do click = 1
 		else if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) do click = 2

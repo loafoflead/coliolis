@@ -101,9 +101,15 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 
 	right = fwd * linalg.matrix3_rotate_f32(linalg.π/2, Z_AXIS)
 
-	if facing.y <= 0 do fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
+	if facing.y > 0 {
+		// fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
+		// fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
+	}
+	// else do fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
 	if facing.x <= 0 do fwd = fwd * linalg.matrix3_rotate_f32(-linalg.PI, right)
 	// else do fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
+
+	right = fwd * linalg.matrix3_rotate_f32(linalg.π/2, Z_AXIS)
 
 	mat4 := linalg.matrix4_look_at_from_fru_f32(
 		eye = Vec3{pos.x, pos.y, 0},
@@ -111,7 +117,11 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 		r = right,
 		u = up,
 	)
-	mat4 = mat4 * linalg.matrix4_rotate_f32(-linalg.PI/2, up)
+	mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI/2, up)
+
+	if facing.y > 0 do mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI, fwd)
+	if facing.x >= 0 do mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI, Z_AXIS)
+	else do mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI, fwd)
 	// log.infof(
 	// 	"[\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f\n]", 
 	// 	mat4[0, 0], mat4[1, 0], mat4[2, 0], mat4[3, 0],
@@ -326,25 +336,25 @@ draw_portals :: proc(selected_portal: int) {
 		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
 		ntrans := phys_obj_transform_new_from_body(portal.obj)
 		portal_handler.surface_particle.draw_info.colour = PORTAL_COLOURS[i]
-		// particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
+		particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
 
 		rotate(&ntrans, Rad(linalg.PI/2))
 		move(&ntrans, -transform_right(&ntrans) * 16)
-		// draw_rectangle_transform(
-		// 	&ntrans,
-		// 	Rect {0, 0, 100, 32},
-		// 	texture_id = portal_handler.textures[0],
-		// 	colour = PORTAL_COLOURS[i],
-		// )
+		draw_rectangle_transform(
+			&ntrans,
+			Rect {0, 0, 100, 32},
+			texture_id = portal_handler.textures[0],
+			colour = PORTAL_COLOURS[i],
+		)
 		// portal_handler.surface_particle.
-		draw_phys_obj(portal.obj, colour)
+		// draw_phys_obj(portal.obj, colour)
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 	}
-	for edge in portal_handler.edge_colliders {
-		colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
+	// for edge in portal_handler.edge_colliders {
+	// 	colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
 
-		draw_phys_obj(edge, colour);
-	}
+	// 	draw_phys_obj(edge, colour);
+	// }
 }
 
 portal_from_phys_id :: proc(id: Physics_Object_Id) -> (^Portal, bool) #optional_ok {
