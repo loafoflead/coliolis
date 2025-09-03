@@ -1,5 +1,9 @@
-package main;
-import rl "thirdparty/raylib";
+package rendering
+
+import rl "../thirdparty/raylib"
+
+Vec2 :: [2]f32
+Rect :: [4]f32
 
 /*
 	pos: the top left of the camera's viewport
@@ -13,9 +17,16 @@ Camera2D :: struct {
 	zoom: f32,
 }
 
-initialise_camera :: proc() {
+camera: Camera2D
+
+initialise_camera :: proc(window_width, window_height: i32, textures: ^[dynamic]rl.Texture2D) {
 	camera.scale = {f32(window_width), f32(window_height)};
 	camera.zoom = 1;
+	ext_textures = textures
+}
+
+resize_camera :: proc(window_width, window_height: i32) {
+	camera.scale = {f32(window_width), f32(window_height)};
 }
 
 camera_rect :: proc(camera: Camera2D) -> rl.Rectangle {
@@ -27,10 +38,15 @@ camera_rect :: proc(camera: Camera2D) -> rl.Rectangle {
 	};
 }
 
-is_rect_visible_to_camera :: proc(camera: Camera2D, rect: Rect) -> bool {
+is_rect_visible :: proc(camera: Camera2D, rect: Rect) -> bool {
 	r1 := camera_rect(camera);
 	r2 := transmute(rl.Rectangle) rect; // they are in fact, the same thing
 	return rl.CheckCollisionRecs(r1, r2);
+}
+
+
+get_mouse_pos :: proc() -> Vec2 {
+	return Vec2 { cast(f32) rl.GetMouseX(), cast(f32) rl.GetMouseY() };
 }
 
 world_pos_to_screen_pos :: proc(camera: Camera2D, pos: Vec2) -> Vec2 {
@@ -43,8 +59,4 @@ get_world_screen_centre :: proc() -> Vec2 {
 
 get_world_mouse_pos :: proc() -> Vec2 {
 	return ((camera.pos - camera.scale / camera.zoom / 2) + get_mouse_pos() / camera.zoom);
-}
-
-get_b2d_world_mouse_pos :: proc() -> Vec2 {
-	return rl_to_b2d_pos(get_world_mouse_pos())
 }

@@ -12,6 +12,11 @@ import "core:math/linalg"
 import rl "thirdparty/raylib"
 import b2d "thirdparty/box2d"
 
+import "transform"
+import "rendering"
+
+Transform :: transform.Transform
+
 PLAYER_HORIZ_ACCEL :: 5000.0; // newtons???
 PLAYER_JUMP_STR :: 100.0; // idk
 
@@ -63,10 +68,10 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	// );
 	arena := vmem.arena_allocator(&physics.arena)
 
-	player.transform = transform_new(0, 0)
+	player.transform = transform.new(0, 0)
 	body_def := b2d.DefaultBodyDef()
 	data := new(Phys_Body_Data, allocator = arena)
-	data.transform = transform_new(0, 0)
+	data.transform = transform.new(0, 0)
 	body_def.userData = data
 	body_def.name = "player"
 	body_def.type = b2d.BodyType.kinematicBody
@@ -104,7 +109,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 }
 
 player_goto :: proc(pos: Vec2) {
-	setpos(&get_player().transform, pos)
+	transform.setpos(&get_player().transform, pos)
 	// b2d.Body_SetTransform(get_player().logic_obj, rl_to_b2d_pos(pos), {1, 0})
 	// b2d.Body_SetTransform(get_player().dynamic_obj, rl_to_b2d_pos(pos), {1, 0})
 	// unimplemented("player_goto")
@@ -144,7 +149,7 @@ player_capsule :: proc() -> b2d.Capsule {
 player_grounded_check :: proc() -> bool {
 	player := get_player()
 
-	target := player_pos() + transform_right(&player.transform) * 21
+	target := player_pos() + transform.right(&player.transform) * 21
 	filter := b2d.Shape_GetFilter(phys_obj_shape(player.obj))
 	layers := transmute(Collision_Set)filter.maskBits
 
@@ -187,10 +192,10 @@ player_grounded_check :: proc() -> bool {
 	// 	// return fraction
 	// }
 
-	// pos := rl_to_b2d_pos(player_pos() /*+ transform_right(&player.transform) * 3*/)
+	// pos := rl_to_b2d_pos(player_pos() /*+ transform.right(&player.transform) * 3*/)
 
 	// _ = b2d.World_CastShape( physics.world, proxy, pos, filter, callback, &ctx );
-	// draw_line(player_pos(), player_pos() + transform_right(&player.transform) * 3 / f32(PIXELS_TO_METRES_RATIO))
+	// draw_line(player_pos(), player_pos() + transform.right(&player.transform) * 3 / f32(PIXELS_TO_METRES_RATIO))
 	// draw_line(player_pos(), b2d_to_rl_pos(ctx.position))
 	// return ctx.collided && math.abs(player.vel.y) <= 0.1 
 }
@@ -284,8 +289,8 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	for i:=0; i < PLAYER_MOVE_SUBSTEPS; i+=1 {
 		mctx.idx = 0
 		mover := player_capsule()
-		mover.center1 = rl_to_b2d_pos(transform_point(&player.transform, b2d_to_rl_pos(mover.center1)))
-		mover.center2 = rl_to_b2d_pos(transform_point(&player.transform, b2d_to_rl_pos(mover.center2)))
+		mover.center1 = rl_to_b2d_pos(transform.transform_point(&player.transform, b2d_to_rl_pos(mover.center1)))
+		mover.center2 = rl_to_b2d_pos(transform.transform_point(&player.transform, b2d_to_rl_pos(mover.center2)))
 
 		b2d.World_CollideMover(physics.world, mover, filter, result_proc, &mctx)
 		result := b2d.SolvePlanes( rl_to_b2d_pos(target) - rl_to_b2d_pos(player.transform.pos), mctx.planes[:mctx.idx]);
@@ -297,7 +302,7 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		delta := fraction * result.position;
 
 		target += b2d_to_rl_pos(delta)
-		setpos(&player.transform, target);
+		transform.setpos(&player.transform, target);
 
 		// idfk???
 		if ( b2d.LengthSquared( delta ) < tolerance * tolerance )
@@ -434,22 +439,22 @@ when PLAYER_STEPPING_UP {
 		// 	rotate(&player.transform, player.transform.rot * -0.05);
 		// }
 		// else {
-		// 	player.transform = transform_new(player.transform.pos, 0);
+		// 	player.transform = transform.new(player.transform.pos, 0);
 		// 	// setrot(player_obj, 0);
 		// }
 		// log.info(player.transform.rot)
 		if player.transform.rot < 0 && player.transform.rot > -linalg.PI {
-			rotate(&player.transform, 0.1);
+			transform.rotate(&player.transform, 0.1);
 		}
 		else if player.transform.rot > 0 && player.transform.rot < linalg.PI {
-			rotate(&player.transform, -0.1);
+			transform.rotate(&player.transform, -0.1);
 		}
 		if math.abs(player.transform.rot) < 0.1 {
 			// log.info("ABSOLUTE ZERO")
-			setrot(&player.transform, 0)
+			transform.setrot(&player.transform, 0)
 		}
 		else if math.abs(player.transform.rot - linalg.PI) < 0.1 {
-			setrot(&player.transform, 0)
+			transform.setrot(&player.transform, 0)
 		}
 	// }
 
@@ -464,8 +469,8 @@ draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
 	capsule := player_capsule()
 	player := game_obj(player, Player)
 
-	draw_circle(transform_point(&player.transform, b2d_to_rl_pos(capsule.center1)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
-	draw_circle(transform_point(&player.transform, b2d_to_rl_pos(capsule.center2)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
+	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center1)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
+	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center2)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
 	// draw_circle(player_pos() + capsule.center1 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO))
 	// draw_circle(player_pos() + capsule.center2 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO))
 	// player := game_obj(player, Player)

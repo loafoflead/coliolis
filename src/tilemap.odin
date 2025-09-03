@@ -1,6 +1,5 @@
 package main;
 import rl "thirdparty/raylib";
-import "tiled";
 
 import "core:strings"
 import "core:fmt"
@@ -11,6 +10,10 @@ import "core:math/linalg"
 
 import "core:encoding/json"
 import vmem "core:mem/virtual"
+
+import "tiled"
+import "transform"
+import "rendering"
 
 GENERATE_STATIC_COLLISION 	:: "static_collision"
 GENERATE_KILL_TRIGGER 		:: "hurt_box"
@@ -90,7 +93,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					switch value.classname {
 					case "Entry_Chute"		:
 						features.player_spawn = pos
-						features.player_spawn_facing = angle_to_dir(object.rot)
+						features.player_spawn_facing = transform.angle_to_dir(object.rot)
 					case "Exit_Chute"		:
 						exit: Level_Exit
 						features.level_exit = pos
@@ -99,23 +102,23 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					case "Portal_Fixture"	:
 						frame: Portal_Fixture
 						err = json.unmarshal_string(value.json_data, &frame, allocator = arena)
-						frame.pos, frame.dims, frame.facing = pos, object.dims, angle_to_dir(object.rot)
+						frame.pos, frame.dims, frame.facing = pos, object.dims, transform.angle_to_dir(object.rot)
 						obj_prtl_frame_new(frame)
 					case "Cube_Button":
 						btn: Cube_Button
 						err = json.unmarshal_string(value.json_data, &btn, allocator = arena)
-						btn.pos, btn.dims, btn.facing = pos, object.dims, angle_to_dir(object.rot)
+						btn.pos, btn.dims, btn.facing = pos, object.dims, transform.angle_to_dir(object.rot)
 						obj_cube_btn_new(btn)
 					case "Cube_Spawner":
 						spwnr: Cube_Spawner
 						err = json.unmarshal_string(value.json_data, &spwnr, allocator = arena)
-						spwnr.pos, spwnr.dims, spwnr.facing = pos, object.dims, angle_to_dir(object.rot)
+						spwnr.pos, spwnr.dims, spwnr.facing = pos, object.dims, transform.angle_to_dir(object.rot)
 						obj_cube_spawner_new(spwnr)
 					case "Sliding_Door":
 						door : Sliding_Door
 						err = json.unmarshal_string(value.json_data, &door, allocator = arena)
 						door.pos = pos + object.dims/2
-						door.dims, door.facing = object.dims, angle_to_dir(object.rot)
+						door.dims, door.facing = object.dims, transform.angle_to_dir(object.rot)
 						obj_sliding_door_new(door)
 					case "Trigger":
 						trigger : G_Trigger
@@ -318,7 +321,7 @@ draw_tilemap :: proc(id: Tilemap_Id, pos: Vec2) {
 					cast(f32) tileset.tilewidth,
 					cast(f32) tileset.tileheight,
 				};
-				draw_texture(src_idx, tile_pos, drawn_portion = drawn_portion, pixel_scale = Vec2{cast(f32)tileset.tilewidth, cast(f32)tileset.tileheight});
+				rendering.draw_texture(src_idx, tile_pos, drawn_portion = drawn_portion, pixel_scale = Vec2{cast(f32)tileset.tilewidth, cast(f32)tileset.tileheight});
 			}
 		}
 	}

@@ -18,6 +18,11 @@ import "base:runtime"
 
 import "core:c"
 
+import "rendering"
+import "transform"
+
+Rad :: transform.Rad
+
 // BINDINGS 
 // Get the touching contact data for a shape. The provided shapeId will be either shapeIdA or shapeIdB on the contact data.
 
@@ -285,14 +290,14 @@ phys_obj_goto_transform :: proc(id: Physics_Object_Id, transform: Transform) {
 }
 
 phys_obj_goto_parent :: proc(id: Physics_Object_Id) {
-	world := transform_to_world(phys_obj_transform(id))
+	world := transform.to_world(phys_obj_transform(id))
 	phys_obj_goto_transform(id, world)
 }
 
 // TODO: make less dookie
 phys_obj_rotate :: proc(id: Physics_Object_Id, rot: Rad) {
 	cur := b2d.Body_GetRotation(id)
-	nrot := transmute(b2d.Rot)b2d.RotateVector(transmute(b2d.Rot)angle_to_dir(rot), transmute(Vec2)cur)
+	nrot := transmute(b2d.Rot)b2d.RotateVector(transmute(b2d.Rot)transform.angle_to_dir(rot), transmute(Vec2)cur)
 	b2d.Body_SetTransform(id, b2d.Body_GetPosition(id), nrot)
 }
 
@@ -311,7 +316,7 @@ phys_obj_set_transform :: proc(id: Physics_Object_Id, transform: Transform) {
 }
 
 phys_obj_transform_sync_from_body :: proc(id: Physics_Object_Id, sync_rotation := false) {
-	t := transform_new(0, 0)
+	t := transform.new(0, 0)
 
 	b2d_pos := b2d.Body_GetPosition(id)
 	if sync_rotation {
@@ -327,7 +332,7 @@ phys_obj_transform_sync_from_body :: proc(id: Physics_Object_Id, sync_rotation :
 
 	// rows, then columns (y, then x)
 	t.mat[0, 3] = pos.x; t.mat[1, 3] = pos.y
-	transform_align(&t)
+	transform.align(&t)
 
 	phys_obj_set_transform(id, t)
 }
@@ -348,7 +353,7 @@ phys_obj_transform_new_from_body :: proc(id: Physics_Object_Id, sync_rotation :=
 	pos := b2d_to_rl_pos(b2d_pos)
 
 	t.mat[3][0] =pos.x; t.mat[3][1] = pos.y
-	transform_align(&t)
+	transform.align(&t)
 	return t
 }
 
@@ -406,7 +411,7 @@ index_to_id :: proc(index: int) -> Physics_Object_Id {
 }
 
 phys_obj_world_pos :: proc(obj: ^Physics_Object) -> Vec2 {
-	return transform_to_world(obj).pos;
+	return transform.to_world(obj).pos;
 }
 
 
@@ -526,7 +531,7 @@ add_phys_object :: proc(
 ) -> (id: Physics_Object_Id)
 {
 	if len(name) > 30 do log.panicf("phys obj can't have a name longer than 30 chars")
-	// local := transform_new(pos, rot=0, parent=parent);
+	// local := transform.new(pos, rot=0, parent=parent);
 	// obj := Physics_Object {
 	// 	vel = vel, 
 	// 	acc = acc, 
@@ -550,7 +555,7 @@ add_phys_object :: proc(
 
 	data := new(Phys_Body_Data, allocator = arena)
 	// TODO: rot
-	data.transform = transform_new(pos, 0)
+	data.transform = transform.new(pos, 0)
 
 	if gobj, valid := game_obj.?; valid {
 		data.game_object = gobj
@@ -661,7 +666,7 @@ phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool {
 	aabb := phys_obj_aabb(obj_id)
 	height := (aabb.upperBound.y - aabb.lowerBound.y) / f32(PIXELS_TO_METRES_RATIO)
 	trans := phys_obj_transform_new_from_body(obj_id)
-	_, hit := cast_ray_in_world(pos, transform_right(&trans) * (height), exclude = {obj_id})
+	_, hit := cast_ray_in_world(pos, transform.right(&trans) * (height), exclude = {obj_id})
 	return hit
 	// return cast_box_in_world(pos + Vec2{0, player_dims().y/2}, player_dims()/2, rot=Rad(0), exclude = {obj_id})
 }
@@ -762,15 +767,15 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	#partial switch ty {
 	case .capsuleShape:
 		capsule := b2d.Shape_GetCapsule(shapes[0])
-		draw_circle(phys_obj_pos(obj_id) + capsule.center1 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO),colour)
-		draw_circle(phys_obj_pos(obj_id) + capsule.center2 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO),colour)
+		rendering.draw_circle(phys_obj_pos(obj_id) + capsule.center1 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO),colour)
+		rendering.draw_circle(phys_obj_pos(obj_id) + capsule.center2 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO),colour)
 	case .polygonShape:
 		polygon := b2d.Shape_GetPolygon(shapes[0])
 		b2d_transform := b2d.Body_GetTransform(obj_id)
-		draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:], colour=colour)
+		rendering.draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:], colour=colour, b2d_to_rl_pos=b2d_to_rl_pos)
 		DEBUG_TRANSFORM :: false
 		when DEBUG_TRANSFORM {
-			draw_rectangle_transform(phys_obj_transform(obj_id), Rect{0,0, 50, 50})
+			rendering.draw_rectangle_transform(phys_obj_transform(obj_id), Rect{0,0, 50, 50})
 		}
 	case:
 		log.panicf("idk how to draw a ", ty)
@@ -779,11 +784,11 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	if !lines do return
 	trans := phys_obj_transform_new_from_body(obj_id, sync_rotation=false)
 
-	end := trans.pos + transform_forward(&trans) * 50 / camera.zoom;
-	draw_line(trans.pos, end);
+	end := trans.pos + transform.forward(&trans) * 50 / rendering.camera.zoom;
+	rendering.draw_line(trans.pos, end);
 	// right arrow
-	end = trans.pos + transform_right(&trans) * 50 / camera.zoom;
-	draw_line(trans.pos, end, colour=Colour{0, 0, 255, 255});
+	end = trans.pos + transform.right(&trans) * 50 / rendering.camera.zoom;
+	rendering.draw_line(trans.pos, end, colour=Colour{0, 0, 255, 255});
 
 	// draw_line(rl_to_b2d_pos(transform.p), rl_to_b2d_pos(transform.p) + transmute(Vec2)transform.q / camera.zoom * 50, Colour{2..<4=255})
 	// right := linalg.matrix2_rotate_f32(linalg.PI/2) * transmute(Vec2)transform.q

@@ -10,6 +10,11 @@ import "core:log"
 import "core:fmt"
 
 import "core:strings"
+import "transform"
+import "rendering"
+
+Vec3 :: linalg.Vector3f32
+Vec4 :: linalg.Vector4f32
 
 PORTAL_EXIT_SPEED_BOOST :: 10
 PORTAL_OCCUPANTS_INITIAL_CAP :: 10
@@ -47,7 +52,7 @@ Portal_Handler :: struct {
 	edge_colliders: [2]Physics_Object_Id,
 	// teleported_timer: ^Timer,
 	textures: [2]Texture_Id,
-	surface_particle: Particle_Def,
+	surface_particle: rendering.Particle_Def,
 }
 
 portal_dims :: proc() -> Vec2 {
@@ -59,7 +64,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 
 	og := Vec3{pos.x, pos.y, 0}
 	pt := og + Vec3{math.round(facing.x), math.round(facing.y), 0}
-	quat := linalg.quaternion_look_at(og, pt, Z_AXIS)
+	quat := linalg.quaternion_look_at(og, pt, transform.Z_AXIS)
 
 	x, y, z := linalg.euler_angles_xyz_from_quaternion(quat)
 	ang := z + linalg.PI/2
@@ -82,7 +87,6 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// and this business of always having to rotate by a quarter turn is so weird and pops
 	// up everywhere its so annoying
 	// fix it pls
-	mpos := Vec3{get_world_mouse_pos().x, get_world_mouse_pos().y, 0}
 
 	mat3 := linalg.matrix3_look_at_f32(
 		Vec3{pos.x, pos.y, 0},
@@ -101,7 +105,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	fwd := Vec3{facing.x, facing.y, 0}
 	// linalg.normalize(-Vec3{pos.x, pos.y, 0} + mpos)
 
-	right = fwd * linalg.matrix3_rotate_f32(linalg.π/2, Z_AXIS)
+	right = fwd * linalg.matrix3_rotate_f32(linalg.π/2, transform.Z_AXIS)
 
 	if facing.y > 0 {
 		// fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
@@ -111,7 +115,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	if facing.x <= 0 do fwd = fwd * linalg.matrix3_rotate_f32(-linalg.PI, right)
 	// else do fwd = fwd * linalg.matrix3_rotate_f32(linalg.PI, right)
 
-	right = fwd * linalg.matrix3_rotate_f32(linalg.π/2, Z_AXIS)
+	right = fwd * linalg.matrix3_rotate_f32(linalg.π/2, transform.Z_AXIS)
 
 	mat4 := linalg.matrix4_look_at_from_fru_f32(
 		eye = Vec3{pos.x, pos.y, 0},
@@ -122,7 +126,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI/2, up)
 
 	if facing.y > 0 do mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI, fwd)
-	if facing.x >= 0 do mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI, Z_AXIS)
+	if facing.x >= 0 do mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI, transform.Z_AXIS)
 	else do mat4 = mat4 * linalg.matrix4_rotate_f32(linalg.PI, fwd)
 	// log.infof(
 	// 	"[\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f,\n\t%f, %f, %f, %f\n]", 
@@ -132,14 +136,14 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// 	mat4[0, 3], mat4[1, 3], mat4[2, 3], mat4[3, 3],
 	// )
 
-	trans := transform_new(pos, 0)//transform_from_matrix(mat4)
+	trans := transform.new(pos, 0)//transform.from_matrix(mat4)
 	trans.mat[0, 0], trans.mat[0, 1] = mat4[0,0], mat4[2, 0]
 	trans.mat[1, 0], trans.mat[1, 1] = mat4[0,1], mat4[2, 1]
-	transform_align(&trans)
+	transform.align(&trans)
 	// log.infof("\n%#v", mat4)
 	// draw_rectangle_transform(&trans, Rect{0, 0, 200, 100})
-	// draw_line(trans.pos, trans.pos + transform_forward(&trans) * 1000, Colour{0, 255, 0, 255})
-	// draw_line(trans.pos, trans.pos + transform_right(&trans) * 1000)
+	// draw_line(trans.pos, trans.pos + transform.forward(&trans) * 1000, Colour{0, 255, 0, 255})
+	// draw_line(trans.pos, trans.pos + transform.right(&trans) * 1000)
 	phys_obj_set_transform(obj_id, trans)
 	phys_obj_goto(obj_id, pos, {trans.mat[0, 0], trans.mat[0, 1]})
 
@@ -147,14 +151,14 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// transform := phys_obj_transform(obj_id)
 	// setrot(transform, Rad(ang))
 	// // phys_obj_transform(obj_id, sync_rotation=true)
-	// // phys_obj_transform(obj_id) ^= transform_flip(phys_obj_transform(obj_id))
+	// // phys_obj_transform(obj_id) ^= transform.flip(phys_obj_transform(obj_id))
 	// if math.round(facing.y) != 0 {
 	// 	// up (for raylib)
 	// 	if facing.y < 0 {
 	// 		// do nothing
 	// 	}
 	// 	else {
-	// 		flup := transform_flip_vert(phys_obj_transform(obj_id))
+	// 		flup := transform.flip_vert(phys_obj_transform(obj_id))
 	// 		phys_obj_set_transform(obj_id, flup)
 	// 	}
 	// }
@@ -163,7 +167,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// 		rotate(transform, Rad(linalg.PI))
 	// 	}
 	// 	else {
-	// 		flup := transform_flip(phys_obj_transform(obj_id))
+	// 		flup := transform.flip(phys_obj_transform(obj_id))
 	// 		phys_obj_set_transform(obj_id, flup)
 	// 	}
 	// }
@@ -172,10 +176,10 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// 	if facing.y > 0 {
 	// 		phys_obj_rotate(obj_id, Rad(-linalg.PI))
 	// 	} else {
-	// 		flup := transform_flip(phys_obj_transform(obj_id))
+	// 		flup := transform.flip(phys_obj_transform(obj_id))
 	// 		phys_obj_set_transform(obj_id, flup)
 	// 		// log.infof("%#v", phys_obj_transform(obj_id))
-	// 		// phys_obj_transform(obj_id) ^= transform_flip(phys_obj_transform(obj_id))
+	// 		// phys_obj_transform(obj_id) ^= transform.flip(phys_obj_transform(obj_id))
 	// 		// log.infof("%#v", phys_obj_transform(obj_id))
 	// 	}
 	// }
@@ -183,9 +187,9 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// 	phys_obj_rotate(obj_id, Rad(linalg.PI))
 	// }
 	// else {
-	// 	flup := transform_flip(phys_obj_transform(obj_id))
+	// 	flup := transform.flip(phys_obj_transform(obj_id))
 	// 	phys_obj_set_transform(obj_id, flup)
-	// 	// phys_obj_transform(obj_id) ^= transform_flip(phys_obj_transform(obj_id))
+	// 	// phys_obj_transform(obj_id) ^= transform.flip(phys_obj_transform(obj_id))
 	// }
 	// phys_obj_transform(obj_id, sync_rotation=true)
 
@@ -287,8 +291,8 @@ initialise_portal_handler :: proc() {
 		// ),
 	};
 
-	portal_handler.surface_particle = Particle_Def {
-		draw_info = Particle_Draw_Info {
+	portal_handler.surface_particle = rendering.Particle_Def {
+		draw_info = rendering.Particle_Draw_Info {
 			shape = .Square,
 			// texture = portal_handler.textures[0],
 			scale = Vec2 {5, 5},
@@ -296,9 +300,9 @@ initialise_portal_handler :: proc() {
 			alpha_easing = .Bounce_Out,
 		},
 		lifetime_secs = 1,
-		movement = Particle_Physics {
+		movement = rendering.Particle_Physics {
 			perm_acc = Vec2{0, 1000},
-			initial_conds = Particle_Init_Random {
+			initial_conds = rendering.Particle_Init_Random {
 				vert_spread = PORTAL_HEIGHT,
 				vel_dir_min = -36,
 				vel_dir_max = 36,
@@ -343,7 +347,7 @@ when DEBUG_DRAW_PORTALS {
 		// display occupant count
 		text := strings.builder_make(allocator = context.temp_allocator)
 		strings.write_int(&text, len(portal.occupants))
-		w_pos := world_pos_to_screen_pos(camera, phys_obj_pos(portal.obj))
+		w_pos := rendering.world_pos_to_screen_pos(rendering.camera, phys_obj_pos(portal.obj))
 		rl.DrawText(strings.to_cstring(&text), i32(w_pos.x), i32(w_pos.y), fontSize = 20, color = rl.WHITE)
 		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 }
@@ -353,7 +357,7 @@ else {
 		particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
 
 		rotate(&ntrans, Rad(linalg.PI/2))
-		move(&ntrans, -transform_right(&ntrans) * 16)
+		move(&ntrans, -transform.right(&ntrans) * 16)
 		draw_rectangle_transform(
 			&ntrans,
 			Rect {0, 0, 100, 32},
@@ -396,7 +400,7 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	// debug_log("%v", obj.collide_with_layers)
 
 	to_occupant_centre := occupant_trans.pos - portal_trans.pos;
-	side := linalg.dot(to_occupant_centre, -transform_forward(portal_trans));
+	side := linalg.dot(to_occupant_centre, -transform.forward(portal_trans));
 
 	other_portal_trans := phys_obj_transform(other_portal.obj)
 
@@ -411,7 +415,7 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	// 	0, 0, 	1, 0,
 	// 	0, 0, 0, 1,
 	// }
-	mirror := matrix4_rotate_f32(PI, Y_AXIS);
+	mirror := matrix4_rotate_f32(PI, transform.Y_AXIS);
 	for i in 0..<3 do mirror[i, 3] = 0
 	for i in 0..<3 do mirror[3, i] = 0
 
@@ -420,7 +424,7 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 
 	fmat := oportal_mat * relative_to_other_portal;
 
-	ntr := transform_from_matrix(fmat);
+	ntr := transform.from_matrix(fmat);
 	// ntr.pos += other_portal_obj.pos;
 
 	fmt.println("teleportin")
@@ -447,7 +451,7 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 
 		// new_vel := normalize(ntr.pos - occupant.last_new_pos) * (linalg.length(get_player().vel) + PORTAL_EXIT_SPEED_BOOST)
 		get_player().transform = ntr
-		// get_player().vel = transform_point(&ntr, get_player().vel)
+		// get_player().vel = transform.point(&ntr, get_player().vel)
 		get_player().vel = vel
 		// TODO: rotate velocity instead o doing this silly shit
 		get_player().teleporting = true
@@ -481,7 +485,7 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	fmt.printfln("[\n %v \n %v\n]", ntr.pos, phys_obj_pos(occupant_id))
 	phys_obj_transform_sync_from_body(occupant_id)
 	// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
-	// transform_reset_rotation_plane(&ntr);
+	// transform.reset_rotation_plane(&ntr);
 	// obj.local = ntr;
 	// setpos(obj, ntr.pos);
 
@@ -511,7 +515,7 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 		collides := transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits
 
 		to_occupant_centre := phys_obj_pos(collided) - phys_obj_pos(self);
-		side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(self)));
+		side := linalg.dot(to_occupant_centre, -transform.forward(phys_obj_transform(self)));
 
 		occupant := Portal_Occupant {
 			phys_id = collided,
@@ -551,7 +555,7 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 		if collided == occupant.phys_id {
 
 			to_occupant_centre := phys_obj_pos(collided) - phys_obj_pos(self);
-			side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(self)));
+			side := linalg.dot(to_occupant_centre, -transform.forward(phys_obj_transform(self)));
 
 			if side >= 0 && occupant.last_side < 0 {
 				teleport_occupant(occupant, portal, &portal_handler.portals[portal.linked])
@@ -609,7 +613,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			for edge in portal_handler.edge_colliders {
 				phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
 				// phys_obj_goto(edge, phys_obj_pos(portal.obj))
-				world := transform_to_world(phys_obj_transform(edge))
+				world := transform.to_world(phys_obj_transform(edge))
 				phys_obj_goto(edge, world.pos)
 				// phys_obj_goto_parent(edge)
 				// phys_obj_goto_transform(edge, world)
@@ -745,7 +749,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			// }
 
 			to_occupant_centre := phys_obj_pos(occupant.phys_id) - phys_obj_pos(portal.obj);
-			side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(portal.obj)));
+			side := linalg.dot(to_occupant_centre, -transform.forward(phys_obj_transform(portal.obj)));
 
 			using linalg;
 			oportal_mat := other_portal_trans.mat;
@@ -758,7 +762,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 			// 	0, 0, 	1, 0,
 			// 	0, 0, 0, 1,
 			// }
-			mirror := matrix4_rotate_f32(PI, Y_AXIS);
+			mirror := matrix4_rotate_f32(PI, transform.Y_AXIS);
 			for i in 0..<3 do mirror[i, 3] = 0
 			for i in 0..<3 do mirror[3, i] = 0
 
@@ -767,7 +771,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 			fmat := oportal_mat * relative_to_other_portal;
 
-			ntr := transform_from_matrix(fmat);
+			ntr := transform.from_matrix(fmat);
 
 			if math.sign(side) != math.sign(occupant.last_side) {// >= 0 && occupant.last_side < 0 {
 				teleport_occupant(occupant, &portal, other_portal)
@@ -775,7 +779,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 				append(&remove, occ_idx)
 			}
 
-			draw_rectangle_transform(&ntr, Rect{0,0, 50,50})
+			rendering.draw_rectangle_transform(&ntr, Rect{0,0, 50,50})
 
 			occupant.last_new_pos = ntr.pos;
 			occupant.last_side = side;

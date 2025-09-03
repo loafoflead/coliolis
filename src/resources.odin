@@ -6,10 +6,12 @@ import "core:log";
 import "core:fmt";
 import vmem "core:mem/virtual"
 
+import rdr "rendering"
+
 ASSETS_PATH :: "./assets";
 
-Texture_Id :: distinct int
-TEXTURE_INVALID :: Texture_Id(-1)
+Texture_Id 		:: rdr.Texture_Id
+TEXTURE_INVALID :: rdr.TEXTURE_INVALID
 
 Tilemap_Id :: distinct int
 TILEMAP_INVALID :: Tilemap_Id(-1)

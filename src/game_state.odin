@@ -10,6 +10,9 @@ import "core:math/ease"
 import vmem "core:mem/virtual"
 
 import "tiled"
+import "rendering"
+
+Camera2D :: rendering.Camera2D
 
 // FEATURES CONFIG
 
@@ -32,7 +35,7 @@ Level_Features :: struct {
 
 Game_Object_On_Collide_Function :: #type proc(self, other: Game_Object_Id, self_phys, other_phys: ^Physics_Object)
 Game_Object_On_Update_Function  :: #type proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool)
-Game_Object_Render_Function     :: #type proc(self: Game_Object_Id, camera: Camera2D)
+Game_Object_Render_Function     :: #type proc(self: Game_Object_Id, camera: rendering.Camera2D)
 Game_Object_Event_Recv_Function :: #type proc(self: Game_Object_Id, event: ^Game_Event)
 Game_Object_Killed_Callback     :: #type proc(self: Game_Object_Id)
 
@@ -268,7 +271,7 @@ game_obj_col_exit :: proc(gobj_id, other_gobj: Game_Object_Id, obj, other_obj: P
 }
 
 
-render_game_objects :: proc(camera: Camera2D) {
+render_game_objects :: proc(camera: rendering.Camera2D) {
 	for obj, i in game_state.objects {
 		if .Dead in obj.flags do continue
 		if obj.on_render != nil do (obj.on_render)(Game_Object_Id(i), camera)

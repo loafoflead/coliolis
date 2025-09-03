@@ -1,10 +1,17 @@
-package main
+package rendering
 
 import "core:log"
 import "core:math/rand"
 import "core:math/linalg"
 import "core:math/ease"
 import "base:runtime"
+
+import "../transform"
+
+Rad :: transform.Rad
+
+@private
+particle_handler: Particle_Handler
 
 // i like determinism...
 PARTICLE_RANDOM_SEED :: u64(1337)
@@ -122,7 +129,7 @@ particle_render :: proc(particle: ^Particle) {
 		if ease_ty, ok := draw_info.alpha_easing.?; ok {
 			draw_info.colour.a = u8(ease.ease(ease_ty, frac) * 256)
 		}
-		trans:= transform_new(particle.pos, Rad(linalg.to_radians(particle.rot)))
+		trans:= transform.new(particle.pos, Rad(linalg.to_radians(particle.rot)))
 		tex := draw_info.texture.? or_else TEXTURE_INVALID
 
 		draw_rectangle_transform(
@@ -174,11 +181,11 @@ particle_spawn :: proc(pos: Vec2, rot: f32, def: Particle_Def) {
 			vel_ang := rand.float32_range(init.vel_dir_min, init.vel_dir_max, gen = particle_handler.rngen)
 			vel_mag := rand.float32_range(init.vel_mag_min, init.vel_mag_max, gen = particle_handler.rngen)
 
-			mv.vel = angle_to_dir(rot + vel_ang) * vel_mag
+			mv.vel = transform.angle_to_dir(rot + vel_ang) * vel_mag
 			mv.ang_vel = rand.float32_range(init.ang_vel_min, init.ang_vel_max, gen = particle_handler.rngen)
 
-			right := angle_to_dir(rot - 90)
-			fwd := angle_to_dir(rot)
+			right := transform.angle_to_dir(rot - 90)
+			fwd := transform.angle_to_dir(rot)
 			pos_along_vert := rand.float32_range(-init.vert_spread/2, init.vert_spread/2, gen = particle_handler.rngen)
 			particle.pos += right * pos_along_vert
 			pos_along_horiz := rand.float32_range(-init.horiz_spread/2, init.horiz_spread/2, gen = particle_handler.rngen)

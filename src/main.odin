@@ -14,16 +14,16 @@ import "core:os";
 
 import "core:log"
 
-import "tiled";
+import "tiled"
+import "rendering"
+import "transform"
 
 // -------------- GLOBALS --------------
 game_state  	: Game_State
-camera 			: Camera2D
 resources 		: Resources
 physics  		: Physics
 timers  		: Timer_Handler
 portal_handler 	: Portal_Handler
-particle_handler: Particle_Handler
 
 window_width : i32 = 600;
 window_height : i32 = 400;
@@ -41,9 +41,6 @@ get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
 }
 
-get_mouse_pos :: proc() -> Vec2 {
-	return Vec2 { cast(f32) rl.GetMouseX(), cast(f32) rl.GetMouseY() };
-}
 
 Vec2 :: [2]f32;
 Rect :: [4]f32;
@@ -53,21 +50,15 @@ ZERO_VEC2 :: Vec2{0,0};
 MARKER_VEC2 :: Vec2 { math.F32_MAX, math.F32_MAX };
 MARKER_RECT :: Rect { math.F32_MAX, math.F32_MAX, math.F32_MAX, math.F32_MAX };
 
-
-
-calculate_terminal_velocity :: proc(gravity, mass, drag: f32) -> f32 {
-	return math.sqrt((gravity * mass) / drag);
-}
-
-kg :: proc(num: f32) -> f32 {
-	return num * 1000.0;
-}
+get_mouse_pos :: rendering.get_mouse_pos
+get_world_mouse_pos :: rendering.get_world_mouse_pos
+draw_line :: rendering.draw_line
 
 draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colour) rl.RED) {
-	screen_pos := world_pos_to_screen_pos(camera, pos);
+	screen_pos := rendering.world_pos_to_screen_pos(rendering.camera, pos);
 	rec := rl.Rectangle {
 		screen_pos.x, screen_pos.y,
-		scale.x * camera.zoom, scale.y * camera.zoom,
+		scale.x * rendering.camera.zoom, scale.y * rendering.camera.zoom,
 	};
 	origin := transmute(rl.Vector2) Vec2{};// scale / 2;
 	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
@@ -89,11 +80,13 @@ main :: proc() {
 		context.logger = log.create_console_logger() // TODO: free? or not?
 	}
 
-	initialise_camera()
 
 	// TODO: make this not a global?
 	initialise_resources()
 	defer free_resources()
+	rendering.initialise_camera(window_width, window_height, &resources.textures)
+
+	camera := rendering.camera
 
 	initialise_phys_world()
 	defer free_phys_world()
@@ -101,8 +94,8 @@ main :: proc() {
 	initialise_timers()
 	defer free_timers()
 
-	initialise_particle_handler()
-	defer free_particle_handler()
+	rendering.initialise_particle_handler()
+	defer rendering.free_particle_handler()
 
 	initialise_game_state()
 	defer free_game_state()
@@ -142,8 +135,8 @@ main :: proc() {
 
 	collision: Maybe(Ray_Collision)
 
-	test_particle := Particle_Def {
-		draw_info = Particle_Draw_Info {
+	test_particle := rendering.Particle_Def {
+		draw_info = rendering.Particle_Draw_Info {
 			shape = .Square,
 			texture = dir_tex,
 			scale = Vec2(10),
@@ -151,9 +144,9 @@ main :: proc() {
 			alpha_easing = .Bounce_In,
 		},
 		lifetime_secs = 2,
-		movement = Particle_Physics {
+		movement = rendering.Particle_Physics {
 			perm_acc = Vec2(0),
-			initial_conds = Particle_Init_Random {
+			initial_conds = rendering.Particle_Init_Random {
 				vert_spread = 100,
 				horiz_spread = 100,
 				vel_dir_max = 360,
@@ -170,7 +163,7 @@ main :: proc() {
 		if rl.IsWindowResized() {
 			window_width = rl.GetScreenWidth()
 			window_height = rl.GetScreenHeight()
-			camera.scale = Vec2{cast(f32)window_width, cast(f32)window_height}
+			rendering.resize_camera(window_width, window_height)
 		}
 
 		// TODO: order is neccessary (cant explain why)
@@ -184,14 +177,14 @@ main :: proc() {
 		update_game_state(dt)
 		// update_portals();
 		update_timers(dt)
-		update_particles(dt)
+		rendering.update_particles(dt)
 
 		// if is_timer_done("game.level_loaded") do portal_goto(1, 400, 0)
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))
 
-		// ntrans := transform_new(0, 0)
+		// ntrans := transform.new(0, 0)
 		// draw_rectangle_transform(
 		// 	&ntrans,
 		// 	Rect {0, 0, 100, 30},
@@ -201,14 +194,14 @@ main :: proc() {
 		// particle_spawn({50, 50}, 35, test_particle)
 
 		// draw_phys_world()
-		render_game_objects(camera)
+		render_game_objects(rendering.camera)
 		// draw_texture(dir_tex, pos=rl_to_b2d_pos(get_world_mouse_pos()), scale=0.1)
 		draw_tilemap(state_level().tilemap, {0., 0.});
 		draw_portals(selected_portal);
-		render_particles()
+		rendering.render_particles()
 
 		if follow_player {
-			camera.pos = player_pos()
+			rendering.camera.pos = player_pos()
 		}
 
 		click: int
@@ -219,7 +212,7 @@ main :: proc() {
 			player_pos := player_pos()
 			col, hit := cast_ray_in_world(
 				player_pos,
-				linalg.normalize(get_world_mouse_pos() - player_pos) * PORTAL_RANGE,
+				linalg.normalize(rendering.get_world_mouse_pos() - player_pos) * PORTAL_RANGE,
 				exclude = {get_player().obj},
 				layers = {.Portal_Surface}
 			)
@@ -232,7 +225,7 @@ main :: proc() {
 			}
 		}
 		if col, ok := collision.?; ok {
-			draw_line(col.point.xy, col.point.xy + col.normal.xy * 100, Colour{1 = 255, 3 = 255})
+			rendering.draw_line(col.point.xy, col.point.xy + col.normal.xy * 100, Colour{1 = 255, 3 = 255})
 			// draw_phys_obj(phys_world.collision_placeholder, colour=Colour{2..<4=255})
 		}
 		// draw_line(player_pos, player_pos + linalg.normalize(get_world_mouse_pos() - player_pos) * 50)
@@ -453,22 +446,22 @@ when DEBUG {
 // 						if collision.normal.y < 0 {
 // 							rotate(prtl_obj, Rad(linalg.PI))
 // 						} else {
-// 							prtl_obj.local = transform_flip(prtl_obj)
+// 							prtl_obj.local = transform.flip(prtl_obj)
 // 						}
 // 					}
 // 					else if collision.normal.x < 0 {
 // 						rotate(prtl_obj, Rad(linalg.PI))
 // 					}
 // 					else {
-// 						prtl_obj.local = transform_flip(prtl_obj)
+// 						prtl_obj.local = transform.flip(prtl_obj)
 // 					}
 
 // 					portal_handler.portals[click - 1].state += {.Alive}
 
 // 					// prtl_obj.local.mat =
 // 					// 	linalg.matrix4_look_at_f32(og, og + pt * 10, Z_AXIS)
-// 					// transform_reset_rotation_plane(prtl_obj)
-// 					// transform_update(portal_obj)
+// 					// transform.reset_rotation_plane(prtl_obj)
+// 					// transform.update(portal_obj)
 // 					setpos(prtl_obj, collision.point.xy - collision.normal.xy * 8)
 // 				}
 // 			}

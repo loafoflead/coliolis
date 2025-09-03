@@ -1,9 +1,21 @@
-package main;
+package rendering
 
-import rlgl "thirdparty/raylib/rlgl";
-import rl "thirdparty/raylib";
+import rlgl "../thirdparty/raylib/rlgl";
+import rl "../thirdparty/raylib";
 
-import b2d "thirdparty/box2d"
+import b2d "../thirdparty/box2d"
+
+import "../transform"
+
+@private
+ext_textures: ^[dynamic]rl.Texture2D = nil
+
+Transform :: transform.Transform
+
+Colour :: [4]u8
+
+Texture_Id :: distinct int
+TEXTURE_INVALID :: Texture_Id(-1)
 
 UV_FULL_IMAGE : [4]Vec2 : {
 	{0,0},
@@ -29,6 +41,7 @@ draw_polygon_convex :: proc(
 	transform: b2d.Transform,
 	vertices: []Vec2,
 	colour: Colour = Colour(255),
+	b2d_to_rl_pos: #type proc(Vec2) -> Vec2,
 ) {
 	vertices := vertices
 	for &vert in vertices {
@@ -55,21 +68,21 @@ draw_circle :: proc(pos: Vec2, radius: f32, colour:=Colour(255)) {
 }
 
 draw_rectangle_transform :: proc(
-		transform: ^Transform, 
-		rect: Rect, 
-		colour: Colour = Colour(255),
-		texture_id := TEXTURE_INVALID,
-		uv: [4]Vec2 = UV_FULL_IMAGE,
+	trans: ^Transform, 
+	rect: Rect, 
+	colour: Colour = Colour(255),
+	texture_id := TEXTURE_INVALID,
+	uv: [4]Vec2 = UV_FULL_IMAGE,
 ) {
 	vertices := rect_to_points(rect);
 	for &vert in vertices {
 		vert -= rect.zw / 2;
-		vert = transform_point(transform, vert);
+		vert = transform.transform_point(trans, vert);
 		vert = world_pos_to_screen_pos(camera, vert);
 	}
 
 	if texture_id != TEXTURE_INVALID {
-		rlgl.SetTexture(resources.textures[texture_id].id);
+		rlgl.SetTexture((ext_textures^)[texture_id].id);
 	}
 	else do rlgl.SetTexture(rlgl.GetTextureIdDefault());
 
@@ -77,7 +90,7 @@ draw_rectangle_transform :: proc(
 	cam_scaled_rect.xy *= camera.zoom; // TODO: make this a proc in the camera file
 
 	// transform without rotation on the y and x axis
-	aligned_transform := transform_new(transform.pos, transform.rot)
+	aligned_transform := transform.new(trans.pos, trans.rot)
 
     rlgl.Begin(rlgl.QUADS);
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
@@ -103,16 +116,16 @@ draw_texture :: proc(
 	texture_id: Texture_Id, 
 	pos: Vec2, 
 	rotation: f32 = 0,
-	drawn_portion: Rect = MARKER_RECT,
-	scale: Vec2 = MARKER_VEC2,
-	pixel_scale: Vec2 = MARKER_VEC2,
+	drawn_portion: Maybe(Rect) = nil,
+	scale: Maybe(Vec2) = nil,
+	pixel_scale: Maybe(Vec2) = nil,
 	tint := Colour(255),
 ) {
-	if int(texture_id) >= len(resources.textures) {
+	if i32(texture_id) == -1 {
 		unimplemented("Tried to draw nonexistent texture");
 	}
 	screen_pos := world_pos_to_screen_pos(camera, pos);
-	tex := resources.textures[int(texture_id)];
+	tex := (ext_textures^)[int(texture_id)];
 
 	n_patch_info: rl.NPatchInfo;
 	dest: Rect;
@@ -126,33 +139,33 @@ draw_texture :: proc(
 	// dest = Rect{0, 0, cast(f32)tex.width - 350, cast(f32)tex.height - 350};
 
 	// TODO: bounds check this
-	if drawn_portion == MARKER_RECT {
+	if drawn_portion == nil {
 		n_patch_info.source = 
 			transmute(rl.Rectangle) Rect {0, 0, cast(f32)tex.width, cast(f32)tex.height};
 	}
 	else {
 		n_patch_info.source = //transmute(rl.Rectangle) Rect{0, 0, 32, 32};
-			transmute(rl.Rectangle) drawn_portion;
+			transmute(rl.Rectangle) drawn_portion.?;
 	}
 
-	if scale != MARKER_VEC2 && pixel_scale != MARKER_VEC2 do return;
+	if scale != nil && pixel_scale != nil do return;
 
-	if scale == MARKER_VEC2 && pixel_scale == MARKER_VEC2 {
+	if scale == nil && pixel_scale == nil {
 		dest = Rect {
 			0, 0,
 			cast(f32)tex.width, cast(f32)tex.height
 		};
 	}
-	else if scale != MARKER_VEC2 {
+	else if scale != nil {
 		dest = Rect {
 			0, 0,
-			scale.x * cast(f32)tex.width, scale.y * cast(f32)tex.height
+			scale.?.x * cast(f32)tex.width, scale.?.y * cast(f32)tex.height
 		};
 	}
-	else if pixel_scale != MARKER_VEC2 {
+	else if pixel_scale != nil {
 		dest = Rect {
 			0, 0,
-			pixel_scale.x, pixel_scale.y
+			pixel_scale.?.x, pixel_scale.?.y
 		};
 	}
 	else {

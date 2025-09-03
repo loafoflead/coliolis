@@ -1,6 +1,6 @@
-package main;
+package transform
 
-import b2d "thirdparty/box2d"
+import b2d "../thirdparty/box2d"
 
 import "core:math/linalg";
 import "core:math";
@@ -15,6 +15,7 @@ Deg :: distinct f32 // TODO: not needed(?)
 Mat3x3 :: linalg.Matrix3f32;
 Mat4x4 :: linalg.Matrix4f32;
 Mat2x2 :: linalg.Matrix2f32;
+Vec2 :: linalg.Vector2f32
 Vec3 :: linalg.Vector3f32;
 Vec4 :: linalg.Vector4f32;
 
@@ -53,32 +54,32 @@ b2d_to_mat4 :: proc(transform: b2d.Transform) -> Mat4x4 {
 	return matr
 }
 
-transform_new :: proc(pos: Vec2, rot: Rad, parent: ^Transform = nil) -> Transform {
-	new := transform_from_matrix(linalg.MATRIX4F32_IDENTITY);
+new :: proc(pos: Vec2, rot: Rad, parent: ^Transform = nil) -> Transform {
+	new := from_matrix(linalg.MATRIX4F32_IDENTITY);
 	rotate(&new, rot);
 	setpos(&new, pos);
 	new.parent = parent;
 	return new;
 }
 
-transform_reset_rotation_plane :: proc(transform: ^Transform) {
-	new := transform_new(transform.pos, transform.rot);
+reset_rotation_plane :: proc(transform: ^Transform) {
+	new := new(transform.pos, transform.rot);
 	transform^ = new;
 }
 
 rotate :: proc(transform: ^Transform, radians: Rad) {
 	transform.mat = transform.mat * linalg.matrix4_rotate_f32(f32(radians), Z_AXIS);
-	transform_align(transform);
+	align(transform);
 }
 
 move :: proc(transform: ^Transform, delta: Vec2) {
 	transform.mat[3].xy += delta;
-	transform_align(transform);
+	align(transform);
 }
 
 setpos :: proc(transform: ^Transform, pos: Vec2) {
 	transform.mat[3].xy = pos;
-	transform_align(transform);
+	align(transform);
 }
 
 setrot :: proc(transform: ^Transform, radians: Rad) {
@@ -93,7 +94,7 @@ setrot :: proc(transform: ^Transform, radians: Rad) {
 
 	transform.mat[1][1] = math.cos(rads)
 	transform.mat[0][1] = math.sin(rads)
-	transform_align(transform)
+	align(transform)
 }
 
 // realigns 'accessible' fields pos and rot to reflect the matrix
@@ -101,7 +102,7 @@ setrot :: proc(transform: ^Transform, radians: Rad) {
 // this is to allow users to do transform.rot and transform.pos, 
 // but it's stupid and outdated, only added bc i was too lazy to go 
 // everywhere to change it, will remove it (or not...)
-transform_align :: proc(transform: ^Transform) {
+align :: proc(transform: ^Transform) {
 	transform.pos = pos(transform);
 	transform.rot = rot(transform);
 }
@@ -126,29 +127,29 @@ pos :: proc(transform: ^Transform) -> Vec2 {
 // 	return factor * mat;
 // }
 
-transform_flip :: proc(transform: ^Transform) -> Transform {
+flip :: proc(transform: ^Transform) -> Transform {
 	mirror := linalg.matrix4_rotate_f32(linalg.PI, Y_AXIS);
 	for i in 0..<3 do mirror[i, 3] = 0
 	for i in 0..<3 do mirror[3, i] = 0
 
 	mirrored := transform.mat * mirror;
 
-	ntr := transform_from_matrix(mirrored);
+	ntr := from_matrix(mirrored);
 	return ntr;
 }
 
-transform_flip_vert :: proc(transform: ^Transform) -> Transform {
+flip_vert :: proc(transform: ^Transform) -> Transform {
 	mirror := linalg.matrix4_rotate_f32(-linalg.PI, X_AXIS);
 	for i in 0..<3 do mirror[i, 3] = 0
 	for i in 0..<3 do mirror[3, i] = 0
 
 	mirrored := transform.mat * mirror;
 
-	ntr := transform_from_matrix(mirrored);
+	ntr := from_matrix(mirrored);
 	return ntr;
 }
 
-transform_forward :: proc(transform: ^Transform) -> Vec2 {
+forward :: proc(transform: ^Transform) -> Vec2 {
 	// https://stackoverflow.com/questions/53608944/getting-a-forward-vector-from-rotation-and-position
 	// const mat4 inverted = glm::inverse(transformationMatrix);
 	// const vec3 forward = normalize(glm::vec3(inverted[2]));
@@ -157,7 +158,7 @@ transform_forward :: proc(transform: ^Transform) -> Vec2 {
 	return fwd;
 }
 
-transform_right :: proc(transform: ^Transform) -> Vec2 {
+right :: proc(transform: ^Transform) -> Vec2 {
 	// fwd := linalg.normalize(transform.mat[0]);
 	right_mat := linalg.matrix4_rotate_f32(linalg.π/2, Z_AXIS);
 	return (transform.mat * right_mat)[0].xy;
@@ -168,26 +169,26 @@ transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {
 	return res.xy;
 }
 
-transform_from_matrix :: proc(mat: Mat4x4) -> Transform {
+from_matrix :: proc(mat: Mat4x4) -> Transform {
 	t := Transform {
 		mat = mat
 	};
-	transform_align(&t);
+	align(&t);
 	return t;
 }
 
-transform_to_world :: proc(transform: ^Transform) -> Transform {
+to_world :: proc(transform: ^Transform) -> Transform {
 	if transform.parent == nil {
 		return transform^;
 	}
 	else {
-		parent := transform_to_world(transform.parent);
+		parent := to_world(transform.parent);
 		res := parent.mat * transform.mat;
 
 		// rot_mat := matrix2_rotate_f32(transform.parent.rot);
 		// mag := linalg.length(transform.pos);
 		// smth := Vec2 { math.cos(transform.parent.rot - transform.rot), math.sin(transform.parent.rot - transform.rot) };
 		// pos := transform.parent.pos + mag*smth;
-		return transform_from_matrix(res);
+		return from_matrix(res);
 	}
 }
