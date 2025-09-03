@@ -9,6 +9,8 @@ import "core:math"
 import "core:log"
 import "core:fmt"
 
+import "core:strings"
+
 PORTAL_EXIT_SPEED_BOOST :: 10
 PORTAL_OCCUPANTS_INITIAL_CAP :: 10
 
@@ -221,8 +223,8 @@ initialise_portal_handler :: proc() {
 		pos = Vec2 {5, 0},
 		// scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},
-		on_collision_enter = prtl_collide_begin,
-		on_collision_exit = prtl_collide_end,
+		// on_collision_enter = prtl_collide_begin,
+		// on_collision_exit = prtl_collide_end,
 		collision_layers = prtl_col_layers,
 		collide_with = COLLISION_LAYERS_ALL,
 	);
@@ -236,8 +238,8 @@ initialise_portal_handler :: proc() {
 		pos = Vec2 {5, 0},
 		// scale = Vec2 { PORTAL_WIDTH, PORTAL_HEIGHT },
 		flags = {.Non_Kinematic, .Trigger},
-		on_collision_enter = prtl_collide_begin,
-		on_collision_exit = prtl_collide_end,
+		// on_collision_enter = prtl_collide_begin,
+		// on_collision_exit = prtl_collide_end,
 		collision_layers = prtl_col_layers,
 		collide_with = COLLISION_LAYERS_ALL,
 	);
@@ -316,8 +318,10 @@ initialise_portal_handler :: proc() {
 free_portal_handler :: proc() {}
 
 draw_portals :: proc(selected_portal: int) {
+	DEBUG_DRAW_PORTALS :: true
 	for &portal, i in portal_handler.portals {
-		if .Alive not_in portal.state do continue
+		if .Alive not_in portal.state do continue	
+when DEBUG_DRAW_PORTALS {
 		value: f32;
 		hue := f32(1);
 		sat := f32(1);
@@ -334,6 +338,16 @@ draw_portals :: proc(selected_portal: int) {
 		if .Connected not_in portal.state do sat = 0;
 		// TODO: messed up HSV pls fix it l8r
 		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
+
+		draw_phys_obj(portal.obj, colour)
+		// display occupant count
+		text := strings.builder_make(allocator = context.temp_allocator)
+		strings.write_int(&text, len(portal.occupants))
+		w_pos := world_pos_to_screen_pos(camera, phys_obj_pos(portal.obj))
+		rl.DrawText(strings.to_cstring(&text), i32(w_pos.x), i32(w_pos.y), fontSize = 20, color = rl.WHITE)
+		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
+}
+else {
 		ntrans := phys_obj_transform_new_from_body(portal.obj)
 		portal_handler.surface_particle.draw_info.colour = PORTAL_COLOURS[i]
 		particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
@@ -347,14 +361,13 @@ draw_portals :: proc(selected_portal: int) {
 			colour = PORTAL_COLOURS[i],
 		)
 		// portal_handler.surface_particle.
-		// draw_phys_obj(portal.obj, colour)
-		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
+} // DEBUG_DRAW_PORTALS
 	}
-	// for edge in portal_handler.edge_colliders {
-	// 	colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
+	for edge in portal_handler.edge_colliders {
+		colour := transmute(Colour) rl.ColorFromHSV(1.0, 1.0, 134);
 
-	// 	draw_phys_obj(edge, colour);
-	// }
+		draw_phys_obj(edge, colour);
+	}
 }
 
 portal_from_phys_id :: proc(id: Physics_Object_Id) -> (^Portal, bool) #optional_ok {
@@ -368,8 +381,9 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	occupant_id := occupant.phys_id
 	player := false
 
-	phys_obj_transform_sync_from_body(occupant_id, sync_rotation=false)
+	phys_obj_transform_sync_from_body(occupant_id, sync_rotation=true)
 	occupant_trans := phys_obj_transform(occupant_id)
+	log.infof("[\n %v \n %v\n]", occupant_trans.pos, phys_obj_pos(occupant_id))
 	if game_state.player == phys_obj_data(occupant_id).game_object.? {
 		occupant_trans = &get_player().transform
 		player = true
@@ -420,22 +434,52 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	append(&other_portal.occupants, noccupant)
 
 	if player {
-		new_vel := normalize(ntr.pos - occupant.last_new_pos) * (linalg.length(get_player().vel) + PORTAL_EXIT_SPEED_BOOST)
+		velocity := Vec4{get_player().vel.x, get_player().vel.y, 0, 1}
+
+		// world_vel := matrix4_inverse(portal_mat) * velocity_mat;
+		// flipped_world_vel := world_vel * linalg.matrix4_rotate_f32(linalg.PI, Z_AXIS);
+
+		relative_to_other := 
+			velocity * linalg.matrix4_inverse(portal_mat) * oportal_mat
+
+		vel := Vec2{relative_to_other[0], relative_to_other[1]}
+		if linalg.length(vel) < 10 do vel = linalg.normalize(vel) * PORTAL_EXIT_SPEED_BOOST / f32(PIXELS_TO_METRES_RATIO)
+
+		// new_vel := normalize(ntr.pos - occupant.last_new_pos) * (linalg.length(get_player().vel) + PORTAL_EXIT_SPEED_BOOST)
 		get_player().transform = ntr
-		// get_player().vel = new_vel
-		get_player().vel = 0
+		// get_player().vel = transform_point(&ntr, get_player().vel)
+		get_player().vel = vel
 		// TODO: rotate velocity instead o doing this silly shit
 		get_player().teleporting = true
 	}
 	else {
-		new_vel := normalize(ntr.pos - occupant.last_new_pos) * (linalg.length(b2d.Body_GetLinearVelocity(occupant_id)) + PORTAL_EXIT_SPEED_BOOST)
+		og_vel := b2d.Body_GetLinearVelocity(occupant_id) / f32(PIXELS_TO_METRES_RATIO)
+		velocity := Vec4{og_vel.x, -og_vel.y, 0, 1}
+
+		// world_vel := matrix4_inverse(portal_mat) * velocity_mat;
+		// flipped_world_vel := world_vel * linalg.matrix4_rotate_f32(linalg.PI, Z_AXIS);
+
+		relative_to_other := 
+			(velocity * linalg.matrix4_inverse(portal_mat)) * oportal_mat
+
+		fmt.println(velocity)
+		fmt.println(relative_to_other)
+
+		vel := Vec2{relative_to_other[0], relative_to_other[1]}
+		// if linalg.length(vel) < 100 do vel = linalg.normalize(vel) * 100
+
+		new_vel := vel * f32(PIXELS_TO_METRES_RATIO)
 		new_pos := rl_to_b2d_pos(ntr.pos)
 		new_vel.y = -new_vel.y
 
-		b2d.Body_SetTransform(occupant_id, new_pos, transmute(b2d.Rot)angle_to_dir(ntr.rot))
-		// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
 		b2d.Body_SetLinearVelocity(occupant_id, new_vel)
+
+		b2d.Body_SetTransform(occupant_id, new_pos, {ntr.mat[0, 0], ntr.mat[0, 1]})
+		// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
 	}
+
+	fmt.printfln("[\n %v \n %v\n]", ntr.pos, phys_obj_pos(occupant_id))
+	phys_obj_transform_sync_from_body(occupant_id)
 	// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
 	// transform_reset_rotation_plane(&ntr);
 	// obj.local = ntr;
@@ -483,7 +527,6 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 			maskBits = transmute(u64)Collision_Set{.L0},
 		})
 
-		log.info("gainer")
 		append(&portal.occupants, occupant)
 		// portal.occupant = collided;
 
@@ -510,12 +553,12 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 			to_occupant_centre := phys_obj_pos(collided) - phys_obj_pos(self);
 			side := linalg.dot(to_occupant_centre, -transform_forward(phys_obj_transform(self)));
 
-			log.infof("goner: %v", portal)
 			if side >= 0 && occupant.last_side < 0 {
 				teleport_occupant(occupant, portal, &portal_handler.portals[portal.linked])
-				// continue
+				continue
 			}
 
+			log.error("resetting collision")
 			shape := phys_obj_shape(occupant.phys_id)
 			cur_filter := b2d.Shape_GetFilter(shape)
 			b2d.Shape_SetFilter(shape, b2d.Filter {
@@ -565,15 +608,17 @@ update_portals :: proc(collider: Physics_Object_Id) {
 		else {
 			for edge in portal_handler.edge_colliders {
 				phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
-				// phys_obj_transform_sync_from_body(edge, sync_rotation=false)
 				// phys_obj_goto(edge, phys_obj_pos(portal.obj))
-				phys_obj_goto_parent(edge)
+				world := transform_to_world(phys_obj_transform(edge))
+				phys_obj_goto(edge, world.pos)
+				// phys_obj_goto_parent(edge)
+				// phys_obj_goto_transform(edge, world)
 			}
 		}
 
-		CONTACT_DATA_BUF_SIZE :: 4
+		CONTACT_DATA_BUF_SIZE :: 10
 
-		if len(portal.occupants) > 4 {
+		if len(portal.occupants) > CONTACT_DATA_BUF_SIZE {
 			log.warn("Portal is occupied by more objects than it can keep track of:", len(portal.occupants))
 		}
 
@@ -604,6 +649,20 @@ update_portals :: proc(collider: Physics_Object_Id) {
 				prtl_collide_end(portal.obj, occupant.phys_id, b2d.nullShapeId, b2d.nullShapeId)
 				log.info("lost boy!")
 			}
+		}
+
+		for contact in contacts {
+			body := b2d.Shape_GetBody(contact)
+			known: bool
+			ty := b2d.Body_GetType(body)
+			if (ty == b2d.BodyType.kinematicBody && get_player().obj != body) || ty == b2d.BodyType.staticBody do continue
+			if .Portal_Traveller not_in phys_obj_gobj(body).flags do continue
+
+			for occ in portal.occupants {
+				if occ.phys_id == body do known = true
+			}
+
+			if !known do prtl_collide_begin(portal.obj, body, b2d.nullShapeId, b2d.nullShapeId)
 		}
 
 		// for contact in contact_data {
@@ -710,11 +769,13 @@ update_portals :: proc(collider: Physics_Object_Id) {
 
 			ntr := transform_from_matrix(fmat);
 
-			if side >= 0 && occupant.last_side < 0 {
+			if math.sign(side) != math.sign(occupant.last_side) {// >= 0 && occupant.last_side < 0 {
 				teleport_occupant(occupant, &portal, other_portal)
 
 				append(&remove, occ_idx)
 			}
+
+			draw_rectangle_transform(&ntr, Rect{0,0, 50,50})
 
 			occupant.last_new_pos = ntr.pos;
 			occupant.last_side = side;

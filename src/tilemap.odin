@@ -299,16 +299,13 @@ draw_tilemap :: proc(id: Tilemap_Id, pos: Vec2) {
 				// NOTE: zero seems to mean nothing, so all offsets have one added to them
 				if tile == 0 do continue;
 
-				tileset, first_gid := tiled.get_tile_tileset(tilemap(id), tile)
-				src_idx := tm.textures[first_gid]
+				tileset, idx := tiled.get_tile_tileset(tilemap(id), tile)
+				src_idx := tm.textures[idx]
 				tile_id := uint(tile)
 
-				// TODO: fix odd numbered levels completely failing to find their correct 
-				// tiles
-
-				tile_id -= 1;
-				tile_id -= first_gid;
-				if tile_id >= 1610612788 do continue; //tile == 1610612806 || tile == 1610612807 || tile == 1610612797 || tile == 1610612788 do continue;
+				// tile_id -= 1
+				tile_id -= tileset.firstgid
+				// tile_id -= uint(idx);
 
 				// the index of the tile in the source image
 				tile_x := tile_id % tileset.columns;

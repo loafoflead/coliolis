@@ -178,20 +178,30 @@ find_layers_with_property :: proc(tilemap: ^Tilemap, property, value: string) ->
 	return
 }
 
-get_tile_tileset :: proc(tilemap: ^Tilemap, tile: Tile) -> (set: ^Tileset, idx: uint) {
-	if len(tilemap.tilesets) == 1 do return &tilemap.tilesets[0], 0
-	lwr_bound, upper_bound := uint(1), tilemap.tilesets[1].firstgid
-	for i in 1..<len(tilemap.tilesets) {
-		tset := tilemap.tilesets[i]
-		if uint(tile) <= upper_bound && uint(tile) > lwr_bound {
-			return &tilemap.tilesets[idx], idx
-		}
-		else if uint(tile) > upper_bound {
-			lwr_bound = upper_bound
-			upper_bound = tset.firstgid if i != len(tilemap.tilesets)-1 else 9999999999999
-			idx += 1
+get_tile_tileset :: proc(tilemap: ^Tilemap, tile: Tile) -> (set: ^Tileset, idx: int) {
+	NOT_EXACTLY_UINT_MAX :: uint(9999090909090909)
+	next_gid := NOT_EXACTLY_UINT_MAX // there's no UINT_MAX in core:math :( (2025)
+	for i in 0..<len(tilemap.tilesets) {
+		if i+1 == len(tilemap.tilesets) do next_gid = NOT_EXACTLY_UINT_MAX
+		else do next_gid = tilemap.tilesets[i+1].firstgid
+
+		if uint(tile) >= tilemap.tilesets[i].firstgid && uint(tile) < next_gid {
+			return &tilemap.tilesets[i], i
 		}
 	}
+	// if len(tilemap.tilesets) == 1 do return &tilemap.tilesets[0], 0
+	// lwr_bound, upper_bound := uint(1), tilemap.tilesets[1].firstgid
+	// for i in 1..<len(tilemap.tilesets) {
+	// 	tset := tilemap.tilesets[i]
+	// 	if uint(tile) <= upper_bound && uint(tile) > lwr_bound {
+	// 		return &tilemap.tilesets[idx], idx
+	// 	}
+	// 	else if uint(tile) > upper_bound {
+	// 		lwr_bound = upper_bound
+	// 		upper_bound = tset.firstgid if i != len(tilemap.tilesets)-1 else 9999999999999
+	// 		idx += 1
+	// 	}
+	// }
 	return &tilemap.tilesets[idx], idx
 }
 

@@ -38,7 +38,7 @@ Physics_Object_Id :: b2d.BodyId;
 PHYS_OBJ_INVALID :: Physics_Object_Id{}
 
 PHYSICS_TIMESTEP :: f32(1.0/60.0)
-PHYSICS_SUBSTEPS :: 2
+PHYSICS_SUBSTEPS :: 4
 
 DEFAULT_FRICTION :: f32(0.4)
 
@@ -281,7 +281,7 @@ phys_obj_goto :: proc(id: Physics_Object_Id, pos: Vec2 = MARKER_VEC2, rot:= MARK
 }
 
 phys_obj_goto_transform :: proc(id: Physics_Object_Id, transform: Transform) {
-	b2d.Body_SetTransform(id, rl_to_b2d_pos({transform.mat[3][0], transform.mat[3][1]}), {transform.mat[0][0], transform.mat[0][1]})
+	b2d.Body_SetTransform(id, rl_to_b2d_pos({transform.mat[3, 0], transform.mat[3, 1]}), {transform.mat[0, 0], transform.mat[1, 0]})
 }
 
 phys_obj_goto_parent :: proc(id: Physics_Object_Id) {
@@ -311,7 +311,7 @@ phys_obj_set_transform :: proc(id: Physics_Object_Id, transform: Transform) {
 }
 
 phys_obj_transform_sync_from_body :: proc(id: Physics_Object_Id, sync_rotation := false) {
-	t := phys_obj_transform(id)
+	t := transform_new(0, 0)
 
 	b2d_pos := b2d.Body_GetPosition(id)
 	if sync_rotation {
@@ -319,14 +319,17 @@ phys_obj_transform_sync_from_body :: proc(id: Physics_Object_Id, sync_rotation :
 		// Z-axis (what our physics rotations are around)
 		// cos(theta) -sin(theta)
 		// sin(theta)  cos(theta)
-		t.mat[0][0] =  b2d_rot.c; t.mat[1][0] = -b2d_rot.s
-		t.mat[0][1] =  b2d_rot.s; t.mat[1][1] =  b2d_rot.c
+		t.mat[0, 0] =  b2d_rot.c; t.mat[0, 1] = -b2d_rot.s
+		t.mat[1, 0] =  b2d_rot.s; t.mat[1, 1] =  b2d_rot.c
 	}
 
 	pos := b2d_to_rl_pos(b2d_pos)
 
-	t.mat[3][0] =pos.x; t.mat[3][1] = pos.y
-	transform_align(t)
+	// rows, then columns (y, then x)
+	t.mat[0, 3] = pos.x; t.mat[1, 3] = pos.y
+	transform_align(&t)
+
+	phys_obj_set_transform(id, t)
 }
 
 phys_obj_transform_new_from_body :: proc(id: Physics_Object_Id, sync_rotation := false) -> Transform {
@@ -351,7 +354,7 @@ phys_obj_transform_new_from_body :: proc(id: Physics_Object_Id, sync_rotation :=
 
 phys_obj_transform_apply_to_body :: proc(id: Physics_Object_Id) {
 	transform := phys_obj_transform(id)
-	b2d.Body_SetTransform(id, rl_to_b2d_pos({transform.mat[3][0], transform.mat[3][1]}), {transform.mat[0][0], transform.mat[0][1]})
+	b2d.Body_SetTransform(id, rl_to_b2d_pos({transform.mat[3, 0], transform.mat[3, 1]}), {transform.mat[0, 0], -transform.mat[0, 1]})
 }
 
 phys_obj_pos :: proc(id: Physics_Object_Id) -> Vec2 {
@@ -546,7 +549,8 @@ add_phys_object :: proc(
 	}
 
 	data := new(Phys_Body_Data, allocator = arena)
-	data.transform = transform_new(body_def.position, 0)
+	// TODO: rot
+	data.transform = transform_new(pos, 0)
 
 	if gobj, valid := game_obj.?; valid {
 		data.game_object = gobj
@@ -764,6 +768,10 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 		polygon := b2d.Shape_GetPolygon(shapes[0])
 		b2d_transform := b2d.Body_GetTransform(obj_id)
 		draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:], colour=colour)
+		DEBUG_TRANSFORM :: false
+		when DEBUG_TRANSFORM {
+			draw_rectangle_transform(phys_obj_transform(obj_id), Rect{0,0, 50, 50})
+		}
 	case:
 		log.panicf("idk how to draw a ", ty)
 	}
