@@ -11,6 +11,14 @@ import vmem "core:mem/virtual"
 
 import "tiled"
 
+// FEATURES CONFIG
+
+// button is a physically simulated joint
+PHYSICS_BUTTON :: false
+
+
+// END FEATURES CONFIG
+
 Level_Features :: struct {
 	player_spawn, player_spawn_facing: Vec2,
 	level_exit: Vec2,
@@ -311,7 +319,7 @@ Level_Entrance :: struct {
 }
 
 CUBE_BTN_PRESSED :: 1.3
-// TODO: store people weighing it down?
+
 Cube_Button :: struct {
 	using common: Level_Feature_Common,
 	on_pressed: string,
@@ -319,6 +327,7 @@ Cube_Button :: struct {
 	channel: Game_Event_Category,
 	joint: b2d.JointId,
 	pressed: bool,
+	occupants_count: int,
 }
 
 Cube :: struct {
@@ -378,7 +387,7 @@ obj_cube_new :: proc(pos: Vec2, respawn_event: string = "") -> (id: Game_Object_
 		data = cube,
 		on_render = game_obj_collider_render,
 		on_killed = cube_on_kill,
-		flags = {.Weak_To_Being_Vaporised, .Portal_Traveller},
+		flags = {.Weak_To_Being_Vaporised, .Portal_Traveller, .Weigh_Down_Buttons},
 	})
 	pair_physics(id, obj)
 
@@ -393,6 +402,7 @@ obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 		scale = door.dims,
 		flags = {.Non_Kinematic},
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
+		name="sliding_door",
 		// collide_with = {}
 	)
 
@@ -414,18 +424,29 @@ obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
 
+	flags: bit_set[Physics_Object_Flag]
+
+	when PHYSICS_BUTTON {
+		flags = {.Fixed_Rotation}
+	}
+	else {
+		flags = {.Fixed_Rotation, .Trigger, .Non_Kinematic}
+	}
+
 	obj := add_phys_object_aabb(
 		pos = btn.pos - btn.dims * btn.facing - Vec2{0, 16},
 		// TODO: rot
 		scale = {32*2, 20},
-		flags = {.Fixed_Rotation},
-		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
-		// on_collision_enter = cube_btn_collide,
-		// on_collision_exit = cube_btn_exit,
+		flags = flags,
+		collide_with = PHYS_OBJ_DEFAULT_COLLIDE_WITH + {.Player},
+		on_collision_enter = cube_btn_collide,
+		on_collision_exit = cube_btn_exit,
+		name="cube_button",
 	)
 
 	btn := btn
 
+when PHYSICS_BUTTON {
 	anchor_def := b2d.DefaultBodyDef()
 	anchor_def.position = rl_to_b2d_pos(btn.pos - btn.dims * btn.facing - Vec2{0, 16})
 	origin_anchor := b2d.CreateBody(physics.world, anchor_def)
@@ -463,7 +484,7 @@ obj_cube_btn_new :: proc(btn: Cube_Button) -> (id: Game_Object_Id) {
 	prism_joint_def.upperTranslation = 1.5
 
 	btn.joint = b2d.CreatePrismaticJoint(physics.world, prism_joint_def)
-
+}
 
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
@@ -520,6 +541,7 @@ obj_trigger_new :: proc(trigger: G_Trigger) -> (id: Game_Object_Id) {
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 		on_collision_enter = trigger_on_collide,
 		collide_with = PHYS_OBJ_DEFAULT_COLLIDE_WITH + {.Player},
+		name="trigger_?"
 		// collide_with = {}
 	)
 
@@ -552,6 +574,7 @@ obj_trigger_new_from_ty :: proc(type: G_Trigger_Type, obj: Physics_Object_Id = P
 				collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 				collide_with = PHYS_OBJ_DEFAULT_COLLIDE_WITH + {.Player},
 				on_collision_enter = trigger_on_collide,
+				name="trigger_typed(todo)",
 			)
 		case:
 			log.errorf("obj_trigger_new_from_ty does not support %v, only Level_Exit and Kill, please use obj_trigger_new", type)
@@ -592,24 +615,52 @@ cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 	other_gobj := phys_obj_gobj(collided)
 
 	if .Weigh_Down_Buttons in other_gobj.flags {
-		send_game_event(Game_Event {
-			name = btn.on_pressed,
-			payload = Activation_Event {
-				activated = true
-			}
-		})
+		btn.occupants_count += 1
+
+		if btn.occupants_count == 1 {
+			btn.pressed = true
+
+			send_game_event(Game_Event {
+				name = btn.on_pressed,
+				payload = Activation_Event {
+					activated = true
+				}
+			})
+		}
 	}
 }
 
 cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 	btn, _ := phys_obj_gobj(self, Cube_Button)
-	
-	send_game_event(Game_Event {
-		name = btn.on_unpressed,
-		payload = Activation_Event {
-			activated = false
+	other_gobj := phys_obj_gobj(collided)
+
+	// TODO: this may be a logic error bc it doesnt check if the thing leaving is 
+	// an occupant
+	if btn.pressed && .Weigh_Down_Buttons in other_gobj.flags {
+		if btn.occupants_count == 0 {
+			log.panic("TODO: fix when a button loses someone it doesn't have")
 		}
-	})	
+
+		btn.occupants_count -= 1
+		if btn.occupants_count == 0 {
+			btn.pressed = false
+
+			send_game_event(Game_Event {
+				name = btn.on_pressed,
+				payload = Activation_Event {
+					activated = false
+				}
+			})
+			if btn.on_unpressed != "" {
+				send_game_event(Game_Event {
+					name = btn.on_unpressed,
+					payload = Activation_Event {
+						activated = true
+					}
+				})
+			}
+		}
+	}
 }
 
 trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
@@ -650,8 +701,9 @@ update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool
 update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	btn := game_obj(self, Cube_Button)
 
-	if !is_timer_done("game.level_loaded") do return false
+	if !is_timer_done("game.level_loaded") do return
 
+when PHYSICS_BUTTON {
 	j_transl := b2d.PrismaticJoint_GetTranslation(btn.joint)
 	if j_transl > CUBE_BTN_PRESSED {
 		if !btn.pressed {
@@ -683,8 +735,13 @@ update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool =
 			}
 		}
 	}
+}
+else {
+	// TODO: make a second phys object below the button trigger that goes down when 
+	// the button is pressed
+}
 
-	return false
+	return
 }
 
 sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
