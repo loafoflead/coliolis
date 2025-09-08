@@ -67,6 +67,7 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 	([dynamic]Portal_Ray_Hit, bool) 
 {
 	collisions := make([dynamic]Portal_Ray_Hit, allocator = allocator)
+	portal_objs := [2]Physics_Object_Id {portal_handler.portals[0].obj, portal_handler.portals[1].obj}
 
 	MAX_PORTAL_RAYCAST_DEPTH :: 5
 
@@ -75,7 +76,7 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 
 	for _ in 0..<MAX_PORTAL_RAYCAST_DEPTH {
 		// TODO: this is shit but we need to accept triggers to be able to hit portals...
-		collision, hit := cast_ray_in_world(og, to_end, exclude, layers, triggers=true)
+		collision, hit := cast_ray_in_world(og, to_end, exclude, layers, triggers=true, specific_triggers=portal_objs[:])
 		if !hit do break
 
 		hit_portal: bool
@@ -94,7 +95,7 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 			break
 		}
 
-		// portal := portal_from_phys_id(collision.obj_id)
+		portal := portal_from_phys_id(collision.obj_id)
 		// portal_mat := phys_obj_transform(collision.obj_id).mat
 		// oportal_mat := phys_obj_transform(portal_handler.portals[portal.linked].obj).mat
 
@@ -102,7 +103,7 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		// len := linalg.length(to_end)
 
 		dir4 := Vec4 {dir.x, dir.y, 0, 1}
-		og4 := Vec4 { collision.point.x, collision.point.y, 0, 1 }
+		// og4 := Vec4 { collision.point.x, collision.point.y, 0, 1 }
 
 		// mirror := transform.Mat4x4 {
 		// 	0, -1, 0, 0,
@@ -111,8 +112,8 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		// 	0, 0, 0, 1,
 		// }
 
-		teleported := og4
-		rotated := dir4 * 0//linalg.matrix4_rotate_f32(linalg.PI, transform.Z_AXIS)
+		teleported := Vec4(0)
+		rotated := dir4// * linalg.matrix4_rotate_f32(linalg.PI, transform.Z_AXIS)
 
 		// obj_local := og4 * linalg.matrix4_inverse(portal_mat);
 		// relative_to_other_portal := mirror * obj_local;
@@ -122,8 +123,8 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		// rotated := dir4 * oportal_mat * linalg.matrix4_inverse(portal_mat)
 		// teleported := og4 * (oportal_mat * linalg.matrix4_inverse(portal_mat))
 
-		og = teleported.xy//phys_obj_transform(portal_handler.portals[portal.linked].obj).pos//teleported.xy
-		to_end = rotated.xy * 100//transform.facing(phys_obj_transform(portal_handler.portals[portal.linked].obj))//rotated.xy
+		og = phys_obj_transform(portal_handler.portals[portal.linked].obj).pos//teleported.xy
+		to_end = transform.facing(phys_obj_transform(portal_handler.portals[portal.linked].obj))//rotated.xy
 		// cast_ray_in_world(teleported.xy, rotated.xy * len, exclude, layers, triggers, allocator)
 	}
 

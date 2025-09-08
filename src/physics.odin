@@ -710,7 +710,7 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u6
 	return {}, false
 }
 
-cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, triggers := true) -> (Ray_Collision, bool) { 
+cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, triggers := true, specific_triggers : []Physics_Object_Id = nil) -> (Ray_Collision, bool) { 
 	filter := b2d.DefaultQueryFilter()
 
 	if layers != COLLISION_LAYERS_ALL {
@@ -723,6 +723,7 @@ cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, l
 		fraction: f32,
 		exclude: []Physics_Object_Id,
 		triggers: bool,
+		specific_triggers: []Physics_Object_Id,
 		position, normal: Vec2,
 		obj: Physics_Object_Id,
 	}
@@ -737,16 +738,33 @@ cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, l
 		obj := b2d.Shape_GetBody(shape_id)
 		context = runtime.default_context()
 
-		if b2d.Shape_IsSensor(shape_id) && !dat.triggers do return fraction
+		is_object_acceptable := bool(!slice.contains(dat.exclude, obj) && fraction < dat.fraction)
 
-		if !slice.contains(dat.exclude, obj) && fraction < dat.fraction {
+		found_specified_trigger: bool
+
+		if b2d.Shape_IsSensor(shape_id) && !dat.triggers {
+			return fraction
+		}
+		else if dat.triggers && len(dat.specific_triggers) != 0 {
+			if slice.contains(dat.specific_triggers[:], obj) && is_object_acceptable {
+				dat.collided = true
+				dat.position = point
+				dat.normal = normal
+				dat.obj = obj
+				dat.fraction = fraction
+				// https://box2d.org/doc_version_2_4/classb2_ray_cast_callback.html
+				return fraction
+			}
+		}
+
+		if is_object_acceptable {
 			dat.collided = true
 			dat.position = point
 			dat.normal = normal
 			dat.obj = obj
 			dat.fraction = fraction
 			// https://box2d.org/doc_version_2_4/classb2_ray_cast_callback.html
-			return fraction // stop here
+			return fraction
 		}
 		return fraction
 	}
