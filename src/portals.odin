@@ -59,6 +59,83 @@ portal_dims :: proc() -> Vec2 {
 	return {PORTAL_WIDTH, PORTAL_HEIGHT}
 }
 
+Portal_Ray_Hit :: struct {
+	collision: Ray_Collision,
+	origin, direction: Vec2,
+}
+
+portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, triggers := true, allocator := context.temp_allocator) -> 
+	([dynamic]Portal_Ray_Hit, bool) 
+{
+	collisions := make([dynamic]Portal_Ray_Hit, allocator = allocator)
+
+	MAX_PORTAL_RAYCAST_DEPTH :: 5
+
+	og := og
+	to_end := to_end
+
+	for i in 0..<MAX_PORTAL_RAYCAST_DEPTH {
+		// TODO: this is shit but we need to accept triggers to be able to hit portals...
+		collision, hit := cast_ray_in_world(og, to_end, exclude, layers, triggers=true)
+		if !hit do break
+
+		hit_portal: bool
+
+		for portal in portal_handler.portals {
+			if collision.obj_id == portal.obj do hit_portal = true 
+		}
+
+		append(&collisions, Portal_Ray_Hit{
+			collision = collision,
+			origin = og,
+			direction = linalg.normalize(to_end),
+		})
+
+		if !hit_portal {
+			break
+		}
+
+		portal := portal_from_phys_id(collision.obj_id)
+		portal_mat := phys_obj_transform(collision.obj_id).mat
+		oportal_mat := phys_obj_transform(portal_handler.portals[portal.linked].obj).mat
+
+		dir := linalg.normalize(to_end)
+		len := linalg.length(to_end)
+
+		dir4 := Vec4 {dir.x, dir.y, 0, 1}
+		og4 := Vec4 { collision.point.x, collision.point.y, 0, 1 }
+
+		mirror := transform.Mat4x4 {
+			0, -1, 0, 0,
+			1, 0, 0, 0, 
+			0, 0, 1, 0, 
+			0, 0, 0, 1,
+		}
+
+		teleported := og4
+		rotated := dir4 * 0//linalg.matrix4_rotate_f32(linalg.PI, transform.Z_AXIS)
+
+		// obj_local := og4 * linalg.matrix4_inverse(portal_mat);
+		// relative_to_other_portal := mirror * obj_local;
+
+		// teleported := oportal_mat * relative_to_other_portal;
+
+		// rotated := dir4 * oportal_mat * linalg.matrix4_inverse(portal_mat)
+		// teleported := og4 * (oportal_mat * linalg.matrix4_inverse(portal_mat))
+
+		og = teleported.xy//phys_obj_transform(portal_handler.portals[portal.linked].obj).pos//teleported.xy
+		to_end := rotated.xy * 100//transform.facing(phys_obj_transform(portal_handler.portals[portal.linked].obj))//rotated.xy
+		// cast_ray_in_world(teleported.xy, rotated.xy * len, exclude, layers, triggers, allocator)
+	}
+
+	if len(collisions) > 0 {
+		return collisions, true
+	}
+	else {
+		return {}, false
+	}
+}
+
 portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	assert(portal > 0 && portal < 3)
 
@@ -341,24 +418,23 @@ when DEBUG_DRAW_PORTALS {
 		}
 		if .Connected not_in portal.state do sat = 0;
 		// TODO: messed up HSV pls fix it l8r
-		colour := transmute(Colour) rl.ColorFromHSV(value, sat, hue);
+		colour := Colour{255, 255, 0, 255}//transmute(Colour) rl.ColorFromHSV(hue, sat, hue);
 
-		draw_phys_obj(portal.obj, colour)
+		draw_phys_obj(portal.obj, Colour(255))
 		// display occupant count
 		text := strings.builder_make(allocator = context.temp_allocator)
 		strings.write_int(&text, len(portal.occupants))
 		w_pos := rendering.world_pos_to_screen_pos(rendering.camera, phys_obj_pos(portal.obj))
 		rl.DrawText(strings.to_cstring(&text), i32(w_pos.x), i32(w_pos.y), fontSize = 20, color = rl.WHITE)
-		// draw_rectangle(pos=obj.pos, scale=obj.hitbox, rot=obj.rot, col=colour);
 }
 else {
 		ntrans := phys_obj_transform_new_from_body(portal.obj)
 		portal_handler.surface_particle.draw_info.colour = PORTAL_COLOURS[i]
-		particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
+		rendering.particle_spawn(ntrans.pos, linalg.to_degrees(f32(ntrans.rot)), portal_handler.surface_particle)
 
-		rotate(&ntrans, Rad(linalg.PI/2))
-		move(&ntrans, -transform.right(&ntrans) * 16)
-		draw_rectangle_transform(
+		transform.rotate(&ntrans, Rad(linalg.PI/2))
+		transform.move(&ntrans, -transform.right(&ntrans) * 16)
+		rendering.draw_rectangle_transform(
 			&ntrans,
 			Rect {0, 0, 100, 32},
 			texture_id = portal_handler.textures[0],
@@ -385,7 +461,7 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	occupant_id := occupant.phys_id
 	player := false
 
-	phys_obj_transform_sync_from_body(occupant_id, sync_rotation=true)
+	phys_obj_transform_sync_from_body(occupant_id)
 	occupant_trans := phys_obj_transform(occupant_id)
 	log.infof("[\n %v \n %v\n]", occupant_trans.pos, phys_obj_pos(occupant_id))
 	if game_state.player == phys_obj_data(occupant_id).game_object.? {
@@ -444,15 +520,15 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 		// flipped_world_vel := world_vel * linalg.matrix4_rotate_f32(linalg.PI, Z_AXIS);
 
 		relative_to_other := 
-			velocity * linalg.matrix4_inverse(portal_mat) * oportal_mat
+			(velocity * linalg.matrix4_inverse(portal_mat)) * oportal_mat
 
 		vel := Vec2{relative_to_other[0], relative_to_other[1]}
-		if linalg.length(vel) < 10 do vel = linalg.normalize(vel) * PORTAL_EXIT_SPEED_BOOST / f32(PIXELS_TO_METRES_RATIO)
+		// if linalg.length(vel) < 10 do vel = linalg.normalize(vel) * PORTAL_EXIT_SPEED_BOOST / f32(PIXELS_TO_METRES_RATIO)
 
 		// new_vel := normalize(ntr.pos - occupant.last_new_pos) * (linalg.length(get_player().vel) + PORTAL_EXIT_SPEED_BOOST)
 		get_player().transform = ntr
 		// get_player().vel = transform.point(&ntr, get_player().vel)
-		get_player().vel = vel
+		// get_player().vel = vel
 		// TODO: rotate velocity instead o doing this silly shit
 		get_player().teleporting = true
 	}
@@ -466,9 +542,6 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 		relative_to_other := 
 			(velocity * linalg.matrix4_inverse(portal_mat)) * oportal_mat
 
-		fmt.println(velocity)
-		fmt.println(relative_to_other)
-
 		vel := Vec2{relative_to_other[0], relative_to_other[1]}
 		// if linalg.length(vel) < 100 do vel = linalg.normalize(vel) * 100
 
@@ -478,12 +551,13 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 
 		b2d.Body_SetLinearVelocity(occupant_id, new_vel)
 
+		// TODO: do the same to angular velocity altho idk exactly if necessary?
 		b2d.Body_SetTransform(occupant_id, new_pos, {ntr.mat[0, 0], ntr.mat[0, 1]})
 		// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
 	}
 
 	fmt.printfln("[\n %v \n %v\n]", ntr.pos, phys_obj_pos(occupant_id))
-	phys_obj_transform_sync_from_body(occupant_id)
+	// phys_obj_transform_sync_from_body(occupant_id)
 	// obj.acc = normalize(ntr.pos - portal.occupant_last_new_pos) * (length(obj.acc) + PORTAL_EXIT_SPEED_BOOST);
 	// transform.reset_rotation_plane(&ntr);
 	// obj.local = ntr;
@@ -583,7 +657,7 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 }
 
 // TODO: make player a global?
-update_portals :: proc(collider: Physics_Object_Id) {
+update_portals :: proc() {
 	if !is_timer_done("game.level_loaded") do return
 
 	if .Alive in portal_handler.portals[0].state && .Alive in portal_handler.portals[1].state {
@@ -779,7 +853,7 @@ update_portals :: proc(collider: Physics_Object_Id) {
 				append(&remove, occ_idx)
 			}
 
-			rendering.draw_rectangle_transform(&ntr, Rect{0,0, 50,50})
+			// rendering.draw_rectangle_transform(&ntr, Rect{0,0, 50,50})
 
 			occupant.last_new_pos = ntr.pos;
 			occupant.last_side = side;

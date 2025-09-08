@@ -137,12 +137,12 @@ player_capsule :: proc() -> b2d.Capsule {
 	// 	mover.center2 = mover.center1
 	// }
 	// else {
-		mover.center1 = Vec2{0, 1}
-		mover.center2 = -Vec2{0, 1}
+		mover.center1 = Vec2{0, 0.315}
+		mover.center2 = -Vec2{0, 0.315}
 	// }
 	// mover.center1 = b2d.TransformPoint( m_transform, m_capsule.center1 );
 	// mover.center2 = b2d.TransformPoint( m_transform, m_capsule.center2 );
-	mover.radius = 1
+	mover.radius = 32.0/100.0
 	return mover
 }
 
@@ -289,8 +289,10 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	for i:=0; i < PLAYER_MOVE_SUBSTEPS; i+=1 {
 		mctx.idx = 0
 		mover := player_capsule()
-		mover.center1 = rl_to_b2d_pos(transform.transform_point(&player.transform, b2d_to_rl_pos(mover.center1)))
-		mover.center2 = rl_to_b2d_pos(transform.transform_point(&player.transform, b2d_to_rl_pos(mover.center2)))
+		mover.center1 = 
+			rl_to_b2d_pos(transform.transform_point(&player.transform, b2d_to_rl_pos(mover.center1)))
+		mover.center2 = 
+			rl_to_b2d_pos(transform.transform_point(&player.transform, b2d_to_rl_pos(mover.center2)))
 
 		b2d.World_CollideMover(physics.world, mover, filter, result_proc, &mctx)
 		result := b2d.SolvePlanes( rl_to_b2d_pos(target) - rl_to_b2d_pos(player.transform.pos), mctx.planes[:mctx.idx]);
@@ -468,6 +470,25 @@ draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
 
 	capsule := player_capsule()
 	player := game_obj(player, Player)
+
+	mpos := rendering.get_world_mouse_pos()
+	og := get_player().transform.pos
+	to_end := mpos - og
+	cols, hit := portal_aware_raycast(og, to_end, exclude = {get_player().obj})
+	if hit {
+		draw_line(og, cols[0].collision.point, colour=Colour{0, 255, 0, 255})	
+		// log.info("------------")
+		for i in 0..<len(cols) {
+			col := cols[i]
+			// log.info(col.origin)
+			draw_rectangle(col.origin, {100, 10}, math.to_degrees(math.atan2(col.direction.y, col.direction.x)))
+			draw_line(col.origin, col.collision.point, colour=Colour{0, 255, 0, 255})
+		}
+		// log.info("------------")
+	} else {
+		draw_line(og, mpos, colour=Colour{255, 0, 0, 255})
+	}
+	// portal_aware_raycast(get_player().transform.pos, get_player().transform.pos - mpos)
 
 	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center1)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
 	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center2)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)

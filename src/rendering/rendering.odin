@@ -7,6 +7,8 @@ import b2d "../thirdparty/box2d"
 
 import "../transform"
 
+import "core:log"
+
 @private
 ext_textures: ^[dynamic]rl.Texture2D = nil
 
@@ -51,12 +53,14 @@ draw_polygon_convex :: proc(
 		// TODO: rot
 	}
 
+	// log.info(len(vertices))
+
 	rlgl.Begin(rlgl.QUADS);
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
         rlgl.Normal3f(0, 0, 1); // TODO: find out what this does
 
     	for vert, i in vertices {
-        	// rlgl.TexCoord2f(uv[i].x, uv[i].y);
+        	// rlgl.TexCoord2f(1, 1);
         	rlgl.Vertex2f(vert.x, vert.y);
         }
     rlgl.End();

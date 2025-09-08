@@ -47,7 +47,8 @@ PHYSICS_SUBSTEPS :: 4
 
 DEFAULT_FRICTION :: f32(0.4)
 
-PIXELS_TO_METRES_RATIO :: f64(1.0/10.0)
+PIXELS_PER_METRE :: 32
+PIXELS_TO_METRES_RATIO :: f64(1.0/f64(PIXELS_PER_METRE))
 
 GRAVITY :: Vec2{0, -10}
 
@@ -444,7 +445,7 @@ add_phys_object_polygon :: proc(
 		vert = rl_to_b2d_pos(vert)
 	}
 	hull := b2d.ComputeHull(vertices)
-	radius := f32(0.1) // no idea wtf this does :)
+	radius := f32(0.0) // no idea wtf this does :)
 	polygon := b2d.MakePolygon(hull, radius)
 	area := f32(10) // idfk
 
@@ -483,16 +484,18 @@ add_phys_object_aabb :: proc(
 	name: cstring = "",
 ) -> (id: Physics_Object_Id)
 {
-	to_f64 := proc(v: Vec2) -> [2]f64 {
-		return {f64(v.x), f64(v.y)}
-	}
-	to_f32 := proc(v: [2]f64) -> Vec2 {
-		return {f32(v.x), f32(v.y)}
-	}
+	// to_f64 := proc(v: Vec2) -> [2]f64 {
+	// 	return {f64(v.x), f64(v.y)}
+	// }
+	// to_f32 := proc(v: [2]f64) -> Vec2 {
+	// 	return {f32(v.x), f32(v.y)}
+	// }
 
-	double := to_f64(scale) / 2 * PIXELS_TO_METRES_RATIO
-	scale := to_f32(double)
-	box := b2d.MakeBox(scale.x, scale.y)
+	// double := to_f64(scale) / 2.0 * PIXELS_TO_METRES_RATIO
+	// scale := to_f32(double)
+	scale := scale / 2.0
+	metre_scale := scale / f32(PIXELS_PER_METRE)
+	box := b2d.MakeBox(metre_scale.x, metre_scale.y)
 
 	id = add_phys_object(
 		scale.x * scale.y,
@@ -633,7 +636,10 @@ add_phys_object :: proc(
 }
 
 update_phys_world :: proc() {
-	b2d.World_Step(physics.world, PHYSICS_TIMESTEP, PHYSICS_SUBSTEPS)
+	for i in 0..<PHYSICS_SUBSTEPS {
+		update_portals()
+		b2d.World_Step(physics.world, PHYSICS_TIMESTEP/PHYSICS_SUBSTEPS, 1)
+	}
 
 	sensor_events := b2d.World_GetSensorEvents(physics.world)
 
@@ -753,7 +759,7 @@ cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, l
 		obj_id = ctx.obj
 	}, true
 
-	return {}, false 
+	return {}, false
 }
 
 phys_obj_to_rect :: proc(obj: ^Physics_Object) -> Rect { return {} }
@@ -771,8 +777,9 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 		rendering.draw_circle(phys_obj_pos(obj_id) + capsule.center2 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO),colour)
 	case .polygonShape:
 		polygon := b2d.Shape_GetPolygon(shapes[0])
+		// log.info(polygon.vertices[:polygon.count])
 		b2d_transform := b2d.Body_GetTransform(obj_id)
-		rendering.draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:], colour=colour, b2d_to_rl_pos=b2d_to_rl_pos)
+		rendering.draw_polygon_convex(b2d_transform, vertices = polygon.vertices[:polygon.count], colour=colour, b2d_to_rl_pos=b2d_to_rl_pos)
 		DEBUG_TRANSFORM :: false
 		when DEBUG_TRANSFORM {
 			rendering.draw_rectangle_transform(phys_obj_transform(obj_id), Rect{0,0, 50, 50})

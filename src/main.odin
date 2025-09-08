@@ -86,7 +86,7 @@ main :: proc() {
 	defer free_resources()
 	rendering.initialise_camera(window_width, window_height, &resources.textures)
 
-	camera := rendering.camera
+	camera := &rendering.camera
 
 	initialise_phys_world()
 	defer free_phys_world()
@@ -168,7 +168,7 @@ main :: proc() {
 
 		// TODO: order is neccessary (cant explain why)
 		// dont touch
-		for i in 0..<5 do update_portals(physics.bodies[1])
+		update_portals()
 		
 		if run_physics do update_phys_world()
 		if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics

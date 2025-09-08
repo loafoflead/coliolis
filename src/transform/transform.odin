@@ -115,6 +115,10 @@ pos :: proc(transform: ^Transform) -> Vec2 {
 	return transform.mat[3].xy;
 }
 
+facing :: proc(transform: ^Transform) -> Vec2 {
+	return transform.mat[0].xy
+}
+
 // // stole from: https://math.stackexchange.com/questions/525082/reflection-across-a-line
 // matrix_reflect :: proc(mat: Mat2x2, line: Vec2) -> Mat2x2 {
 // 	// y = mx
