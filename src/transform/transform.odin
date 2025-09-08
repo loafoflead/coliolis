@@ -6,7 +6,6 @@ import "core:math/linalg";
 import "core:math";
 
 // when ODIN_DEBUG { can't do dis..
-	import "core:fmt";
 // }
 
 Rad :: distinct f32
@@ -175,7 +174,7 @@ transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {
 
 from_matrix :: proc(mat: Mat4x4) -> Transform {
 	t := Transform {
-		mat = mat
+		mat = mat,
 	};
 	align(&t);
 	return t;

@@ -4,19 +4,14 @@ import rl "thirdparty/raylib";
 import rlgl "thirdparty/raylib/rlgl"
 import b2d "thirdparty/box2d"
 import "core:math";
-import "core:fmt";
-import "core:mem";
 
 import "core:math/linalg";
-import "core:math/ease"
 
 import "core:os";
 
 import "core:log"
 
-import "tiled"
 import "rendering"
-import "transform"
 
 // -------------- GLOBALS --------------
 game_state  	: Game_State
@@ -61,7 +56,7 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 		scale.x * rendering.camera.zoom, scale.y * rendering.camera.zoom,
 	};
 	origin := transmute(rl.Vector2) Vec2{};// scale / 2;
-	rl.DrawRectanglePro(rec, origin, rot, transmute(rl.Color) col);
+	rl.DrawRectanglePro(rec, origin, rot, cast(rl.Color) col);
 }
 
 // TODO: GET RID GET RID GET RID OMG
@@ -103,8 +98,9 @@ main :: proc() {
 	initialise_portal_handler();
 	defer free_portal_handler();
 
-	five_w, ok := load_texture("5W.png")
-	if !ok do os.exit(1)
+	ok: bool
+	// five_w, ok := load_texture("5W.png")
+	// if !ok do os.exit(1)
 
 	dir_tex, ok = load_texture("nesw_sprite.png")
 	if !ok do os.exit(1)
@@ -122,7 +118,6 @@ main :: proc() {
 	mouse_joint: b2d.JointId
 
 	selected: Maybe(Physics_Object_Id);
-	selected_is_static: bool
 	og_ty: b2d.BodyType;
 
 	dragging: bool;
@@ -153,8 +148,8 @@ main :: proc() {
 				vel_mag_max = 20,
 				ang_vel_min = -100,
 				ang_vel_max = 100,
-			}
-		}
+			},
+		},
 	}
 
 	for !rl.WindowShouldClose() {
@@ -191,7 +186,7 @@ main :: proc() {
 		// 	texture_id = portal_handler.textures[0],
 		// )
 
-		// particle_spawn({50, 50}, 35, test_particle)
+		rendering.particle_spawn({50, 50}, 35, test_particle)
 
 		// draw_phys_world()
 		render_game_objects(rendering.camera)
@@ -214,7 +209,7 @@ main :: proc() {
 				player_pos,
 				linalg.normalize(rendering.get_world_mouse_pos() - player_pos) * PORTAL_RANGE,
 				exclude = {get_player().obj},
-				layers = {.Portal_Surface}
+				layers = {.Portal_Surface},
 			)
 			if hit {
 				portal_goto(i32(click), col.point, col.normal)
@@ -304,12 +299,11 @@ main :: proc() {
 			dist_frac := dist / PLAYER_REACH
 			if dist_frac == 0 do dist_frac = 0.01
 			green := f32(105)
-			red := f32(0)
 			hue := green - (green * dist_frac)
 			draw_line(
 				player_pos,
 				target, 
-				cast(Colour)rl.ColorFromHSV(hue, 1, 1)
+				cast(Colour)rl.ColorFromHSV(hue, 1, 1),
 			)
 
 			mouse_last_pos = get_world_mouse_pos();
@@ -329,7 +323,7 @@ when DEBUG {
 		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
 
 		if debug_mode {
-			selected_id, any_selected := selected.?
+			_, any_selected := selected.?
 			// if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) && dragging == false {
 			// 	obj_id, ok := point_collides_in_world(get_world_mouse_pos());
 			// 	log.info(obj_id)
@@ -393,8 +387,6 @@ when DEBUG {
 			if dragging {
 				camera.pos = drag_og - (get_mouse_pos() / camera.zoom);
 			}
-
-			portal_obj := portal_handler.portals[selected_portal].obj
 
 			mouse_move := rl.GetMouseWheelMove();
 			if mouse_move != 0 {

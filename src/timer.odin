@@ -27,7 +27,7 @@ timer_new :: proc(duration: f32, current := f32(0), flags : bit_set[Timer_Flags]
 	return Timer {
 		duration = duration,
 		current = current,
-		flags = flags
+		flags = flags,
 	}
 }
 

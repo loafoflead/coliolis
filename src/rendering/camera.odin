@@ -34,7 +34,7 @@ camera_rect :: proc(camera: Camera2D) -> rl.Rectangle {
 		camera.pos.x, 
 		camera.pos.y, 
 		camera.scale.x,
-		camera.scale.y
+		camera.scale.y,
 	};
 }
 

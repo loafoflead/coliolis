@@ -107,8 +107,8 @@ initialise_particle_handler :: proc() {
 				vel_mag_max = 50,
 				ang_vel_min = -100,
 				ang_vel_max = 100,
-			}
-		}
+			},
+		},
 	}
 }
 

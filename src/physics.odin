@@ -5,12 +5,9 @@ package main;
 
 import "core:log"
 import "core:c/libc"
-import "core:fmt"
-import "core:math"
 import "core:math/linalg"
 import "core:slice"
 import vmem "core:mem/virtual"
-import rl "thirdparty/raylib"
 
 import b2d "thirdparty/box2d"
 
@@ -250,6 +247,7 @@ phys_obj_gobj_typed :: proc(id: Physics_Object_Id, $T: typeid) -> (gobj: ^T, gam
 	data := phys_obj_data(id)
 	ok: bool
 	gobj_id, found := data.game_object.?
+	assert(found, "mistyped game object request")
 
 	gobj, ok = game_obj(gobj_id, T)
 	game_object, ok = game_obj(gobj_id)
@@ -260,6 +258,7 @@ phys_obj_gobj_typed :: proc(id: Physics_Object_Id, $T: typeid) -> (gobj: ^T, gam
 phys_obj_gobj_untyped :: proc(id: Physics_Object_Id) -> (game_object: ^Game_Object, ok: bool) #optional_ok {
 	data := phys_obj_data(id) or_return
 	gobj_id, found := data.game_object.?
+	assert(found, "nonexistent gobj")
 
 	game_object, ok = game_obj(gobj_id)
 
@@ -377,7 +376,7 @@ phys_shape_filter :: proc(belong_to_layers: bit_set[Collision_Layer; u64], colli
 	return b2d.Filter {
 		maskBits = transmute(u64) collide_with,
 		categoryBits = transmute(u64) belong_to_layers,
-		groupIndex = 0
+		groupIndex = 0,
 	}
 }
 
@@ -623,7 +622,7 @@ add_phys_object :: proc(
 	{
 		log.warnf(
 			"TODO: remove/replace old flags: %v",
-			flags & {.No_Velocity_Dampening, .No_Collisions, .Drag_Exception, .Weigh_Down_Buttons}
+			flags & {.No_Velocity_Dampening, .No_Collisions, .Drag_Exception, .Weigh_Down_Buttons},
 		)
 	}
 	// log.info(collision_layers, transmute(u64)collision_layers)
@@ -636,7 +635,7 @@ add_phys_object :: proc(
 }
 
 update_phys_world :: proc() {
-	for i in 0..<PHYSICS_SUBSTEPS {
+	for _ in 0..<PHYSICS_SUBSTEPS {
 		update_portals()
 		b2d.World_Step(physics.world, PHYSICS_TIMESTEP/PHYSICS_SUBSTEPS, 1)
 	}
@@ -679,7 +678,7 @@ phys_obj_grounded :: proc(obj_id: Physics_Object_Id) -> bool {
 
 point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, exclude: []Physics_Object_Id = {}, ignore_triggers := true) -> (
 	collided_with: Physics_Object_Id = {},
-	success: bool = false
+	success: bool = false,
 )
 {
 	point := rl_to_b2d_pos(point)
@@ -703,7 +702,7 @@ point_collides_in_world :: proc(point: Vec2, layers: bit_set[Collision_Layer; u6
 	filtre := b2d.DefaultQueryFilter()
 	filtre.maskBits = transmute(u64)COLLISION_LAYERS_ALL
 	filtre.categoryBits = transmute(u64)COLLISION_LAYERS_ALL
-	result := b2d.World_OverlapAABB(physics.world, aabb, filtre, fcn = get_res, ctx = &body)
+	_ = b2d.World_OverlapAABB(physics.world, aabb, filtre, fcn = get_res, ctx = &body)
 	// result := b2d.World_CastRayClosest(physics.world, point, point, filter = {}) 
 	if body != PHYS_OBJ_INVALID {
 		return body, true
@@ -751,12 +750,12 @@ cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, l
 		}
 		return fraction
 	}
-	tree := b2d.World_CastRay(physics.world, rl_to_b2d_pos(og), rl_to_b2d_pos(to_end), filter, callback, ctx = &ctx)
+	_ = b2d.World_CastRay(physics.world, rl_to_b2d_pos(og), rl_to_b2d_pos(to_end), filter, callback, ctx = &ctx)
 	ctx.normal.y = -ctx.normal.y
 	if ctx.collided do return Ray_Collision {
 		point = b2d_to_rl_pos(ctx.position),
 		normal = ctx.normal,
-		obj_id = ctx.obj
+		obj_id = ctx.obj,
 	}, true
 
 	return {}, false
@@ -871,7 +870,7 @@ cast_box_in_world :: proc(centre, dimensions: Vec2, rot: Rad, exclude: []Physics
 	diagonal := linalg.length(aabb.upperBound - aabb.lowerBound)
 	shape_prxy := b2d.MakeProxy(
 		rect.vertices[:],
-		radius = diagonal
+		radius = diagonal,
 	)
 	filter := b2d.DefaultQueryFilter()
 
@@ -897,7 +896,7 @@ cast_box_in_world :: proc(centre, dimensions: Vec2, rot: Rad, exclude: []Physics
 		}
 		return fraction
 	}
-	_tree := b2d.World_CastShape(physics.world, shape_prxy, centre, filter, callback, ctx = &ctx)
+	_ = b2d.World_CastShape(physics.world, shape_prxy, centre, filter, callback, ctx = &ctx)
 	// TODO: could prob use the tree to check how many cols but will keep this for when i add layer checks etc..
 	if ctx.collided do return true
 

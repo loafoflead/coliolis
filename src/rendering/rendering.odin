@@ -7,8 +7,6 @@ import b2d "../thirdparty/box2d"
 
 import "../transform"
 
-import "core:log"
-
 @private
 ext_textures: ^[dynamic]rl.Texture2D = nil
 
@@ -59,7 +57,7 @@ draw_polygon_convex :: proc(
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
         rlgl.Normal3f(0, 0, 1); // TODO: find out what this does
 
-    	for vert, i in vertices {
+    	for vert in vertices {
         	// rlgl.TexCoord2f(1, 1);
         	rlgl.Vertex2f(vert.x, vert.y);
         }
@@ -92,9 +90,6 @@ draw_rectangle_transform :: proc(
 
 	cam_scaled_rect := rect;
 	cam_scaled_rect.xy *= camera.zoom; // TODO: make this a proc in the camera file
-
-	// transform without rotation on the y and x axis
-	aligned_transform := transform.new(trans.pos, trans.rot)
 
     rlgl.Begin(rlgl.QUADS);
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
@@ -157,19 +152,19 @@ draw_texture :: proc(
 	if scale == nil && pixel_scale == nil {
 		dest = Rect {
 			0, 0,
-			cast(f32)tex.width, cast(f32)tex.height
+			cast(f32)tex.width, cast(f32)tex.height,
 		};
 	}
 	else if scale != nil {
 		dest = Rect {
 			0, 0,
-			scale.?.x * cast(f32)tex.width, scale.?.y * cast(f32)tex.height
+			scale.?.x * cast(f32)tex.width, scale.?.y * cast(f32)tex.height,
 		};
 	}
 	else if pixel_scale != nil {
 		dest = Rect {
 			0, 0,
-			pixel_scale.?.x, pixel_scale.?.y
+			pixel_scale.?.x, pixel_scale.?.y,
 		};
 	}
 	else {
@@ -182,7 +177,7 @@ draw_texture :: proc(
 		tex, 
 		n_patch_info, 
 		transmute(rl.Rectangle) dest, // destination
-		transmute(rl.Vector2) -screen_pos + dest.zw / 2, 
+		-screen_pos + dest.zw / 2, 
 		rotation,
 		cast(rl.Color)tint,
 	);
@@ -192,5 +187,5 @@ draw_line :: proc(start, end: Vec2, colour: Colour = Colour{255, 0,0,255}) {
 	screen_start := world_pos_to_screen_pos(camera, start);
 	screen_end := world_pos_to_screen_pos(camera, end);
 
-	rl.DrawLineV(transmute(rl.Vector2) screen_start, transmute(rl.Vector2) screen_end, transmute(rl.Color) colour);
+	rl.DrawLineV(screen_start, screen_end, cast(rl.Color) colour);
 }

@@ -4,12 +4,10 @@ import b2d "thirdparty/box2d"
 
 import "core:log"
 import "core:container/queue"
-import "core:slice"
 import "core:math/ease"
 
-import vmem "core:mem/virtual"
+// import vmem "core:mem/virtual"
 
-import "tiled"
 import "rendering"
 
 Camera2D :: rendering.Camera2D
@@ -120,15 +118,15 @@ game_load_level_from_tilemap :: proc(path: string) {
 	generate_kill_triggers_for_tilemap(tmap)
 	lvl, any_found := level_features_from_tilemap(tmap)
 
-	// if !any_found {
-	// 	log.error("Failed to load level features from tilemap", path)
-	// 	return
-	// }
+	if !any_found {
+		log.error("Failed to load level features from tilemap", path)
+		return
+	}
+
 	lvl.tilemap = tmap
 	game_state.current_level = lvl
 
 	player_gobj_id := obj_player_new(dir_tex)
-	player := game_obj(player_gobj_id, Player)
 	player_goto(state_get_player_spawn())
 	// phys_obj_goto(player.obj, state_get_player_spawn())
 	game_state.player = player_gobj_id
@@ -259,13 +257,11 @@ update_game_state :: proc(dt: f32) {
 }
 
 game_obj_col_enter :: proc(gobj_id, other_gobj: Game_Object_Id, obj, other_obj: Physics_Object_Id) {
-	gobj := game_obj(gobj_id)
 	log.error("deprecated: game_obj_col_enter")
 	// if gobj.on_collide_enter != nil do (gobj.on_collide_enter)(gobj_id, other_gobj, phys_obj(obj), phys_obj(other_obj))
 }
 
 game_obj_col_exit :: proc(gobj_id, other_gobj: Game_Object_Id, obj, other_obj: Physics_Object_Id) {
-	gobj := game_obj(gobj_id)
 	log.error("deprecated: game_obj_col_enter")
 	// if gobj.on_collide_exit != nil do (gobj.on_collide_exit)(gobj_id, other_gobj, phys_obj(obj), phys_obj(other_obj))
 }
@@ -544,7 +540,7 @@ obj_trigger_new :: proc(trigger: G_Trigger) -> (id: Game_Object_Id) {
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 		on_collision_enter = trigger_on_collide,
 		collide_with = PHYS_OBJ_DEFAULT_COLLIDE_WITH + {.Player},
-		name="trigger_?"
+		name="trigger_?",
 		// collide_with = {}
 	)
 
@@ -626,8 +622,8 @@ cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 			send_game_event(Game_Event {
 				name = btn.on_pressed,
 				payload = Activation_Event {
-					activated = true
-				}
+					activated = true,
+				},
 			})
 		}
 	}
@@ -651,15 +647,15 @@ cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 			send_game_event(Game_Event {
 				name = btn.on_pressed,
 				payload = Activation_Event {
-					activated = false
-				}
+					activated = false,
+				},
 			})
 			if btn.on_unpressed != "" {
 				send_game_event(Game_Event {
 					name = btn.on_unpressed,
 					payload = Activation_Event {
-						activated = true
-					}
+						activated = true,
+					},
 				})
 			}
 		}
@@ -690,7 +686,7 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 }
 
 update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
-	frame := game_obj(self, Portal_Fixture)
+	// frame := game_obj(self, Portal_Fixture)
 
 	// draw_line(frame.pos, frame.pos + frame.facing * 100)
 
@@ -702,7 +698,7 @@ update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool
 }
 
 update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
-	btn := game_obj(self, Cube_Button)
+	// btn := game_obj(self, Cube_Button)
 
 	if !is_timer_done("game.level_loaded") do return
 
@@ -714,8 +710,8 @@ when PHYSICS_BUTTON {
 			send_game_event(Game_Event {
 				name = btn.on_pressed,
 				payload = Activation_Event {
-					activated = true
-				}
+					activated = true,
+				},
 			})
 		}
 	}
@@ -725,15 +721,15 @@ when PHYSICS_BUTTON {
 			send_game_event(Game_Event {
 				name = btn.on_pressed,
 				payload = Activation_Event {
-					activated = false
-				}
+					activated = false,
+				},
 			})
 			if btn.on_unpressed != "" {
 				send_game_event(Game_Event {
 					name = btn.on_unpressed,
 					payload = Activation_Event {
-						activated = true
-					}
+						activated = true,
+					},
 				})
 			}
 		}
@@ -753,7 +749,7 @@ sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bo
 	obj := game_obj(self).obj.?
 
 	origin := door.pos
-	target := door.pos + door.dims * transmute(Vec2)door.facing 
+	target := door.pos + door.dims * door.facing 
 
 	if door.open {
 		door.open_percent += SLIDING_DOOR_SPEED_MS * dt
@@ -850,6 +846,6 @@ cube_on_kill :: proc(self: Game_Object_Id) {
 		name = self.respawn_event,
 		payload = Cube_Die {
 			event_name = self.respawn_event,
-		}
+		},
 	})
 }

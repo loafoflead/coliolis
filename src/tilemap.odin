@@ -1,12 +1,7 @@
 package main;
 import rl "thirdparty/raylib";
 
-import "core:strings"
-import "core:fmt"
 import "core:log"
-
-import "core:math"
-import "core:math/linalg"
 
 import "core:encoding/json"
 import vmem "core:mem/virtual"
@@ -195,7 +190,7 @@ generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
 				for x in 0..<layer.width {
 					tile := layer.data[y * layer.width + x]
 					// NOTE: zero seems to mean nothing, so all offsets have one added to them
-					if tile == 0 do continue;
+					if tile.guid == 0 do continue;
 
 					tileset, _ := tiled.get_tile_tileset(tilemap(id), tile);
 
@@ -206,10 +201,10 @@ generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
 						mass = 0,
 						scale = Vec2 {
 							cast(f32) tileset.tilewidth, 
-							cast(f32) tileset.tileheight 
+							cast(f32) tileset.tileheight, 
 						},
 						flags = {.Non_Kinematic, .Fixed},
-						collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface}
+						collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS + {.Portal_Surface},
 					);
 				}
 			}
@@ -218,7 +213,7 @@ generate_static_physics_for_tilemap :: proc(id: Tilemap_Id) {
 	for &object in tm.objects {
 		pos := object.pos - Vec2(32/2)
 		// object.pos = rl_to_b2d_pos(object.pos)
-		for name, prop in object.properties {
+		for _, prop in object.properties {
 			#partial switch data in prop {
 			case tiled.Tilemap_Enum:
 				if data.value == "Static_Collision" {
@@ -265,7 +260,7 @@ generate_kill_triggers_for_tilemap :: proc(id: Tilemap_Id) {
 			for x in 0..<layer.width {
 				tile := layer.data[y * layer.width + x];
 				// NOTE: zero seems to mean nothing, so all offsets have one added to them
-				if tile == 0 do continue;
+				if tile.guid == 0 do continue;
 
 				tileset, _ := tiled.get_tile_tileset(tilemap(id), tile)
 
@@ -275,7 +270,7 @@ generate_kill_triggers_for_tilemap :: proc(id: Tilemap_Id) {
 					pos = pos, 
 					scale = Vec2 { 
 						cast(f32) tileset.tilewidth, 
-						cast(f32) tileset.tileheight 
+						cast(f32) tileset.tileheight ,
 					},
 					flags = {.Non_Kinematic, .No_Gravity, .Fixed, .Trigger},
 				);
@@ -300,11 +295,11 @@ draw_tilemap :: proc(id: Tilemap_Id, pos: Vec2) {
 			for x in 0..<layer.width {
 				tile := layer.data[y * layer.width + x]
 				// NOTE: zero seems to mean nothing, so all offsets have one added to them
-				if tile == 0 do continue;
+				if tile.guid == 0 do continue;
 
 				tileset, idx := tiled.get_tile_tileset(tilemap(id), tile)
 				src_idx := tm.textures[idx]
-				tile_id := uint(tile)
+				tile_id := tile.guid
 
 				// tile_id -= 1
 				tile_id -= tileset.firstgid

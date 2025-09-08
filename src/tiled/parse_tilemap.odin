@@ -4,7 +4,6 @@ package tiled;
 // https://discourse.mapeditor.org/t/tiled-csv-format-has-exceptionally-large-tile-values-solved/4765
 // https://discourse.mapeditor.org/t/how-to-know-which-tileset-uses-a-tile-in-a-tilemap/4869
 
-import xml "core:encoding/xml"
 import "core:encoding/json"
 import "core:strconv"
 import "core:os"
@@ -144,17 +143,21 @@ Tilemap_Object :: struct {
 	properties: map[string]Tilemap_Object_Property,
 }
 
+Tile_Orientation :: enum {
+	Flip_Horiz, 
+	Flip_Vert,
+	Flip_Diagonal,
+}
 
-Tile 	   :: distinct uint
+Tile_Orientation_Set :: bit_set[Tile_Orientation; u32]
 
-import "core:mem"
+Tile :: struct {
+	guid: uint,
+	orientation: Tile_Orientation_Set,
+}
 
 free_tilemap :: proc(tilemap: ^Tilemap) {
 	vmem.arena_destroy(&tilemap.arena)
-}
-
-tile_from_id :: proc(id: uint) -> Tile {
-	return Tile(id)
 }
 
 // https://discourse.mapeditor.org/t/how-to-know-which-tileset-uses-a-tile-in-a-tilemap/4869
@@ -164,7 +167,7 @@ tilemap_tile_belongs_to_set :: proc() {
 
 find_layers_with_property :: proc(tilemap: ^Tilemap, property, value: string) -> (layers: [dynamic]^Tilemap_Layer, found: bool) {
 	layers = make([dynamic]^Tilemap_Layer)
-	for &layer, i in tilemap.layers {
+	for &layer in tilemap.layers {
 		if property in layer.properties {
 			str, ok := layer.properties[property].(string)
 			if !ok do continue
@@ -185,7 +188,7 @@ get_tile_tileset :: proc(tilemap: ^Tilemap, tile: Tile) -> (set: ^Tileset, idx: 
 		if i+1 == len(tilemap.tilesets) do next_gid = NOT_EXACTLY_UINT_MAX
 		else do next_gid = tilemap.tilesets[i+1].firstgid
 
-		if uint(tile) >= tilemap.tilesets[i].firstgid && uint(tile) < next_gid {
+		if tile.guid >= tilemap.tilesets[i].firstgid && tile.guid < next_gid {
 			return &tilemap.tilesets[i], i
 		}
 	}
@@ -222,7 +225,7 @@ tilemap_parse_property :: proc(arena: runtime.Allocator, property: Tilemap_Json_
 		}
 		prop = Tilemap_Class{
 			classname = property.propertytype,
-			json_data = strings.to_string(builda)
+			json_data = strings.to_string(builda),
 		}
 	case "string":
 		if property.propertytype != "" {
@@ -527,7 +530,18 @@ tiled_data_to_tile :: proc(data: uint) -> (tile: Tile) {
 	horizontal_flip := data & 0x80000000
 	vertical_flip := data & 0x40000000
 	diagonal_flip := data & 0x20000000
-	tile = tile_from_id(data & ~(uint(0x80000000) | uint(0x40000000) | uint(0x20000000))) //clear the flags
+	guid := data & ~(uint(0x80000000) | uint(0x40000000) | uint(0x20000000)) //clear the flags
+
+	orientation: Tile_Orientation_Set
+
+	if bool(horizontal_flip) do orientation += {.Flip_Horiz}
+	if bool(vertical_flip) do orientation += {.Flip_Vert}
+	if bool(diagonal_flip) do orientation += {.Flip_Diagonal}
+
+	tile = Tile {
+		guid = guid,
+		orientation = orientation,
+	}
 
 	return
 }

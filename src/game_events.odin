@@ -57,9 +57,6 @@ queue_inform_game_object :: proc(obj: Game_Object_Id, payload: Game_Object_Messa
 inform_game_object :: proc(obj: Game_Object_Id, payload: Game_Object_Message_Payload) {
 	assert(obj != GAME_OBJECT_INVALID && int(obj) < len(game_state.objects) )
 
-	// gobj is so funny to me idk why
-	gobj := game_obj(obj)
-
 	switch data in payload {
 	}
 }
@@ -123,7 +120,7 @@ send_game_event_done :: proc(event: Game_Event) {
 send_new_game_event :: proc(channel: string, payload: Game_Event_Payload) {
 	send_game_event_done(Game_Event {
 		name = channel,
-		payload = payload
+		payload = payload,
 	})
 }
 

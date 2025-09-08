@@ -6,7 +6,6 @@ import "core:c/libc"
 import "core:log"
 
 import "core:math"
-import "core:math/ease";
 import "core:math/linalg"
 
 import rl "thirdparty/raylib"
@@ -84,7 +83,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	shape.filter = b2d.Filter {
 		transmute(u64)Collision_Set{.Player},
 		transmute(u64)Collision_Set{.Default},
-		0
+		0,
 	}
 	shape.enableSensorEvents = true
 
@@ -263,8 +262,6 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 			// log.panicf("bad bad booboo")
 		}
 		// libc.printf("crazy? i was crazy once\n")
-
-		body := b2d.Shape_GetBody(shapeId)
 
 		if b2d.Shape_IsSensor(shapeId) do return true
 
