@@ -1,4 +1,8 @@
-package main;
+package main
+
+// when !#config(__GEN_ASSETS__, false) {
+// 	#panic("Generate assets before building project")
+// }
 
 import rl "thirdparty/raylib";
 import rlgl "thirdparty/raylib/rlgl"
