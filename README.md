@@ -13,8 +13,12 @@ You will need the [Odin compiler](https://odin-lang.org/docs/install/) in your P
 ## Prerequisites:
 
 - You need clang to compile Odin on Linux, on Debian that's: ```apt install clang```, but I imagine it's much the same for different package maangers.
-- Box2d vendor needs to be built, need curl, cmake, TODO better explain
+- Box2d vendor needs to be built, need curl, cmake, *(TODO better explain)*
 - The game uses Odin's vendored Raylib bindings, which are expected to be in the ```src/thirdparty/raylib``` folder. In order to build the project you need to copy the vendored raylib from your installation of Odin to this folder, like so (on Linux, on Windows you may prefer to use the file manager):
+
+- Note: The version of these bindings are from the Odin installation ```dev-2025-07-nightly``` 
+  + Raylib Version: 4.2.0
+  + Box2D Version: v3.0
 
 ```
 $ pwd
@@ -27,22 +31,25 @@ $ ls src/thirdparty
 raylib
 ```
 
-- Finally, create a file called ```bin``` in the root directory of the project, if you're using Make.
+# Use the Odin compiler to build the project:
 
-## With Make:
+The project's build system is inspired by Tsoding's [NoBuild](https://github.com/tsoding/nobuild/blob/master/nobuild.h) project. 
 
-Navigate to the root folder ```coliolis/``` for me, and just run 'make'
+Run: 
+```terminal
+$ odin build build.odin -file
+$ ls
+src/
+assets/
+build.odin
+build
+<...>
+```
+
+Then to build the project, simply run ./build. Thanks to innovative ```GO_REBUILD_URSELF(tm)``` technology, changes to the build script will cause it to automagically rebuild itself (so will moving it between directories but oh well).
 
 ```
-$ pwd
-/home/user/<whatever>/coliolis
-$ ls
-assets/
-bin/
-src/
-makefile
-README.md
-$ make
+$ ./build
 odin run src -out:bin/main
 INFO: Initializing raylib 5.5
 INFO: Platform backend: DESKTOP (GLFW)
@@ -53,27 +60,19 @@ INFO:     > rcore:..... loaded (mandatory)
 
 And if everything works (and the code compiles...) it should run.
 
-## Without Make:
+## Current flags available:
 
-I just used make to output to the right folder, so without it you have to navigate to the ```src/``` folder and run the contents of the makefile:
-
-```
-$ pwd
-/home/user/<whatever>/coliolis
-$ odin run src -out:bin/main
-INFO: Initializing raylib 5.5
-INFO: Platform backend: DESKTOP (GLFW)
-INFO: Supported raylib modules:
-<...>
-```
-
-Good luck!
+- 'debug': compiles with ggdb debug symbols
+- 'and_run': compiles and runs
+- 'vet': add extra strict vet rules
 
 # Useful code: 
 
-1. The section of the project that parses 'Tiled' tilemaps might be useful to others, it's in the ```tiled``` folder. The code is dead simple though, just about worth copy pasting the ```parse_tileset``` function.
-1. ```update_phys_obj``` procedure showcases Odin's excellent swizzling, maths, fixed array programming stuff, and it's brilliant.
-1. ```main``` procedure illustrates how to very simply use Raylib in Odin.
+1. The section of the project that parses 'Tiled' tilemaps might be useful to others, it's in the ```tiled``` folder. The code is dead simple though, just about worth copy pasting the ```parse_tileset``` function
+1. ```physics.odin``` demonstrates usage of Box2D (messy...)
+1. ```build.odin``` shows how to create a very basic build system in a single file 
+1. ```portals.odin``` shows odin lang's excellent swizzling and linear algebra support
+1. ```main``` procedure illustrates how to very simply use Raylib in Odin
 
 # How to play
 
@@ -83,15 +82,13 @@ The game itself is currently unfinished, any controls or gameplay listed below c
 
 - A, D (WASD)	: movement from left to right for the player
 - SPACE			: jump for the player (hold = longer jump)
-- LCONTROL 		: focus camera on player position
+- LCONTROL 		: hold down for mouse clicks to fire portals
 
 ## Debug/testing keybinds
 
-- LALT 			: switch selected portal
-- F 			: flip facing direction of selected portal
-- LEFT, RIGHT 	: rotate selected portal by 90 degrees in either direction
-- G, H 			: rotate player object in the left or right direction while held
 - B 			: enable continuous debug printing
+- L 			: Unlock a portal
+- J 			: enable debug mode (move the camera)
 
 ## Mouse
 
@@ -110,40 +107,14 @@ Levels are made using the Tiled editor (credits below)
 
 ### Naming conventions
 
-- Player spawn
-```json 
-{
-	"name": "<whatever you want>",
-	"tiled_class": "Point",
-	"properties": {
-		"type": "player_spawn"
-	}
-}
-```
-
-- Layer properties
- + 'generate' property (arguments: string)
-  + 'static_collision'	: generate collision boxes for each tile on this layer
-  + 'hurt'				: generate hurt boxes for each tile on this layer
- + 'no_render' property (arguments: none \[technically a string but nothing is expected\])
-Will skip rendering this layer
-- Object types
- + 'marker' type, indicates that this is a marker (spawnpoint, camera focus point, etc...)
-  + 'type' property of the 'marker' type, indicates what this marker is, one of (may be out of date!):
-   1. cam_focus_point: exclusive focus point for the camera in this level
-   1. player_spawn: player respawn point
-   1. level_exit: location of the level exit trigger
+(TODO, if you want info you'll need to look thru the levels for now to see what properties spawn different game objects)
 
 # Credits:
 
 - Tileset (assets/level_tileset.png), created by [aimen23b](https://www.fiverr.com/aimen23b), distributed by (i guess owned by?) [foozle](www.foozle.io): https://foozlecc.itch.io/sci-fi-lab-tileset-decor-traps
 - Tilemap generation software ([Tiled](http://www.mapeditor.org/)), the edition used: http://www.mapeditor.org/2025/01/28/tiled-1-11-2-released.html
 
-
 # TODO:
 
-- [X] fix player collision sometimes freezing against flat surfaces
-- [ ] add diagonal colliders (non AABB)
-- [X] change player movement speed, jump str, and gravity to better suit movement through portals
-- [X] fix just_teleported_to variable, make it a delay instead of a lock? or a percent of collision instead of complete non-intersection
+- [ ] change player movement speed, jump str, and gravity to better suit movement through portals
 - [ ] notion of 'Rendered' object, so that portal can render half of a thing through itself

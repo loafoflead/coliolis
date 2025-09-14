@@ -23,11 +23,10 @@ auto_rebuild :: proc(args: []string, allocator := context.allocator) -> (should_
 	if time.since(bin_modif) > time.since(src_modif) {
 		log.info("Rebuilding the build script...")
 		cmd := command_new("odin", "build", source_path, "-file", "-out:build")
-		if command_run(&cmd) != 0 do return true
+		if command_run(&cmd, silent=true) != 0 do return true
 
 		command_append(&cmd, "./build")
 		command_append(&cmd, ..args[1:])
-		log.info("Running the build script: ")
 		if command_run(&cmd) != 0 do return true
 		should_return = true
 	}
@@ -79,14 +78,14 @@ command_new :: proc(name: string, args: ..string, allocator := context.allocator
 	return c
 }
 
-command_run :: proc(c: ^Command, and_clear := true, allocator := context.temp_allocator) -> (return_code: i32) {
+command_run :: proc(c: ^Command, and_clear := true, silent: bool = false, allocator := context.temp_allocator) -> (return_code: i32) {
 	s := strings.builder_make(allocator)
 	for val in c.values {
 		strings.write_string(&s, val)
 		strings.write_string(&s, " ")
 	}
 	str := strings.to_string(s)
-	log.infof("--> %s", str)
+	if !silent do log.infof("%s", str)
 
 	ret := libc.system(strings.to_cstring(&s))
 
@@ -95,6 +94,38 @@ command_run :: proc(c: ^Command, and_clear := true, allocator := context.temp_al
 	}
 
 	return ret
+}
+
+make_dir :: proc(path: string, allow_exists : bool = true) -> (ok: bool) {
+	// if allow_exists && os.exists(path) {
+	// 	log.infof("Directory '%s' exists already, nothing changed.", path)
+	// 	return true
+	// }
+	// else {
+	// 	log.errorf("Failed to create directory '%s', it already exists.", path)
+	// 	return false
+	// }
+
+	direrror := os.make_directory(path)
+	if direrror == nil {
+		log.infof("Created directory '%s'", path)
+		return true	
+	}
+	
+	switch direrror {
+	case os.EEXIST:
+		if !allow_exists {
+			log.errorf("Failed to create directory '%s', it already exists.", path)
+			return false
+		}
+		else {
+			log.warnf("Directory '%s' exists already, nothing changed.", path)
+			return true
+		}
+	case:
+		log.errorf("Failed to create directory '%s': %s", path, os.error_string(direrror))
+	}
+	return false
 }
 
 import "core:flags"
@@ -121,13 +152,7 @@ main :: proc() {
 		return
 	}
 
-	if !os.exists("./build") {
-		direrror := os.make_directory("./build")
-		if direrror != nil {
-			log.fatalf("Failed to create build directory: %v", direrror)
-			return
-		}
-	}
+	make_dir("./bin")
 
 	c: Command
 	command_append(&c, "odin")
