@@ -71,17 +71,17 @@ rotate :: proc(transform: ^Transform, radians: Rad) {
 	align(transform);
 }
 
-move :: proc(transform: ^Transform, delta: Vec2) {
+move :: proc(transform: ^Transform, delta: Vec2) #no_bounds_check {
 	transform.mat[3].xy += delta;
 	align(transform);
 }
 
-setpos :: proc(transform: ^Transform, pos: Vec2) {
+setpos :: proc(transform: ^Transform, pos: Vec2) #no_bounds_check {
 	transform.mat[3].xy = pos;
 	align(transform);
 }
 
-setrot :: proc(transform: ^Transform, radians: Rad) {
+setrot :: proc(transform: ^Transform, radians: Rad) #no_bounds_check {
 	// z-axis rot:
 	// cos(a) -sin(a) .. ..
 	// sin(a) cos(a)  .. ..
@@ -106,16 +106,22 @@ align :: proc(transform: ^Transform) {
 	transform.rot = rot(transform);
 }
 
-rot :: proc(transform: ^Transform) -> Rad {
-	return Rad(math.atan2(transform.mat[0][1], transform.mat[0][0]));
+rot :: proc(transform: ^Transform) -> Rad #no_bounds_check {
+	return Rad(math.atan2(transform.mat[0][1], transform.mat[0][0]))
 }
 
-pos :: proc(transform: ^Transform) -> Vec2 {
+pos :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
 	return transform.mat[3].xy;
 }
 
-facing :: proc(transform: ^Transform) -> Vec2 {
+facing :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
 	return transform.mat[0].xy
+}
+
+euler_angles_xyz :: proc(transform: ^Transform) -> (Rad, Rad, Rad) #no_bounds_check {
+	return Rad(math.atan2(transform.mat[1][2], transform.mat[2][2])),
+		Rad(math.atan2(transform.mat[3][0], transform.mat[0][0])),
+		Rad(math.atan2(transform.mat[0][1], transform.mat[0][0]))
 }
 
 // // stole from: https://math.stackexchange.com/questions/525082/reflection-across-a-line
@@ -130,7 +136,7 @@ facing :: proc(transform: ^Transform) -> Vec2 {
 // 	return factor * mat;
 // }
 
-flip :: proc(transform: ^Transform) -> Transform {
+flip :: proc(transform: ^Transform) -> Transform #no_bounds_check {
 	mirror := linalg.matrix4_rotate_f32(linalg.PI, Y_AXIS);
 	for i in 0..<3 do mirror[i, 3] = 0
 	for i in 0..<3 do mirror[3, i] = 0
@@ -141,7 +147,7 @@ flip :: proc(transform: ^Transform) -> Transform {
 	return ntr;
 }
 
-flip_vert :: proc(transform: ^Transform) -> Transform {
+flip_vert :: proc(transform: ^Transform) -> Transform #no_bounds_check {
 	mirror := linalg.matrix4_rotate_f32(-linalg.PI, X_AXIS);
 	for i in 0..<3 do mirror[i, 3] = 0
 	for i in 0..<3 do mirror[3, i] = 0
@@ -152,7 +158,7 @@ flip_vert :: proc(transform: ^Transform) -> Transform {
 	return ntr;
 }
 
-forward :: proc(transform: ^Transform) -> Vec2 {
+forward :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
 	// https://stackoverflow.com/questions/53608944/getting-a-forward-vector-from-rotation-and-position
 	// const mat4 inverted = glm::inverse(transformationMatrix);
 	// const vec3 forward = normalize(glm::vec3(inverted[2]));
@@ -161,13 +167,12 @@ forward :: proc(transform: ^Transform) -> Vec2 {
 	return fwd;
 }
 
-right :: proc(transform: ^Transform) -> Vec2 {
-	// fwd := linalg.normalize(transform.mat[0]);
-	right_mat := linalg.matrix4_rotate_f32(linalg.π/2, Z_AXIS);
-	return (transform.mat * right_mat)[0].xy;
+right :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
+	fwd := forward(transform)
+	return {fwd.y, -fwd.x}
 }
 
-transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 {
+transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 #no_bounds_check {
 	res := transform.mat * Vec4 { point.x, point.y, 0, 1 };
 	return res.xy;
 }

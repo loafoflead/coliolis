@@ -7,10 +7,18 @@ import b2d "../thirdparty/box2d"
 
 import "../transform"
 
+import "core:log"
+
 @private
 ext_textures: ^[dynamic]rl.Texture2D = nil
 
+@private
+end :: proc(slice: $Array_t/[]$Any_t) -> int {
+	return len(slice)-1
+}
+
 Transform :: transform.Transform
+Vec4 :: transform.Vec4
 
 Colour :: [4]u8
 
@@ -53,12 +61,22 @@ draw_polygon_convex :: proc(
 
 	// log.info(len(vertices))
 
-	rlgl.Begin(rlgl.QUADS);
+	rlgl.Begin(rlgl.LINES);
         rlgl.Color4ub(colour.r, colour.g ,colour.b ,colour.a);
         rlgl.Normal3f(0, 0, 1); // TODO: find out what this does
 
+        // 1 -> 2, 3 -> 4, 5 -> 6, ...
     	for vert in vertices {
         	// rlgl.TexCoord2f(1, 1);
+        	rlgl.Vertex2f(vert.x, vert.y);
+        }
+
+        start_vert, end_vert := vertices[0], vertices[end(vertices)]
+        rlgl.Vertex2f(start_vert.x, start_vert.y)
+        rlgl.Vertex2f(end_vert.x, end_vert.y)
+        // 2 -> 3, 4 -> 5, ...
+        for i := 1; i < len(vertices)-1; i += 1 {
+        	vert := vertices[i]
         	rlgl.Vertex2f(vert.x, vert.y);
         }
     rlgl.End();
@@ -75,13 +93,24 @@ draw_rectangle_transform :: proc(
 	colour: Colour = Colour(255),
 	texture_id := TEXTURE_INVALID,
 	uv: [4]Vec2 = UV_FULL_IMAGE,
+	d:=false,
 ) {
 	vertices := rect_to_points(rect);
+	if d do log.error(vertices, trans)
+	aligned := trans//transform.new(trans.pos, trans.rot)
+	// TODO: instead of this find some way to sort 
+	// the transformed vertices or preserve their order :(	
 	for &vert in vertices {
 		vert -= rect.zw / 2;
-		vert = transform.transform_point(trans, vert);
+		four := aligned.mat * Vec4{vert.x, vert.y, 0, 1}
+		vert = four.xy
+		if d {
+			log.infof("%v * mat = %v", vert, four)
+		}
+		// vert = transform.transform_point(trans, vert);
 		vert = world_pos_to_screen_pos(camera, vert);
 	}
+	if d do log.panic(vertices)
 
 	if texture_id != TEXTURE_INVALID {
 		rlgl.SetTexture((ext_textures^)[texture_id].id);

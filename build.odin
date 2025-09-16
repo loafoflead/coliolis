@@ -130,11 +130,17 @@ make_dir :: proc(path: string, allow_exists : bool = true) -> (ok: bool) {
 
 import "core:flags"
 
+Build_Mode :: enum {
+	build,
+	run,
+	check,
+}
+
 Cmd_Options :: struct {
 	debug: bool,
 	vet: bool,
 	assets: bool,
-	and_run: bool,
+	mode: Build_Mode,
 }
 
 main :: proc() {
@@ -152,14 +158,16 @@ main :: proc() {
 		return
 	}
 
-	make_dir("./bin")
+	if !make_dir("./bin") do return
 
 	c: Command
 	command_append(&c, "odin")
-	if opts.and_run {
+	switch opts.mode {
+	case .run:
 		command_append(&c, "run")
-	}
-	else {
+	case .check:
+		command_append(&c, "check")
+	case .build:
 		command_append(&c, "build")
 	}
 	command_append(&c, "src")
@@ -171,11 +179,13 @@ main :: proc() {
 		command_append(&c, "-vet-unused")
 	}
 
-	if opts.debug {
-		command_append(&c, "-debug", "-out:bin/debug")
-	}
-	else {
-		command_append(&c, "-out:bin/main")
+	if opts.mode != .check {
+		if opts.debug {
+			command_append(&c, "-debug", "-out:bin/debug")
+		}
+		else {
+			command_append(&c, "-out:bin/main")
+		}
 	}
 
 	if opts.assets {

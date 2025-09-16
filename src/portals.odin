@@ -85,6 +85,10 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 			if collision.obj_id == portal.obj do hit_portal = true 
 		}
 
+		if !hit_portal {
+			collision.point += to_end
+		}
+
 		append(&collisions, Portal_Ray_Hit{
 			collision = collision,
 			origin = og,
@@ -94,25 +98,44 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		if !hit_portal {
 			break
 		}
-
 		portal := portal_from_phys_id(collision.obj_id)
-		// portal_mat := phys_obj_transform(collision.obj_id).mat
-		// oportal_mat := phys_obj_transform(portal_handler.portals[portal.linked].obj).mat
+		portal_mat := phys_obj_transform(collision.obj_id).mat
+		oportal_mat := phys_obj_transform(portal_handler.portals[portal.linked].obj).mat
+
+		mirror := transform.Mat4x4 {
+			-1, -0, 0, 0,
+			0, -1, 0, 0, 
+			0, 0, 1, 0, 
+			0, 0, 0, 1,
+		}
+
+		og4 := transform.new(collision.point, 0).mat//Vec4 { collision.point.x, collision.point.y, 0, 1 }
+		obj_local := og4 * linalg.matrix4_inverse(portal_mat)
+		relative_to_other_portal := mirror * obj_local
+
+		// teleported := oportal_mat * relative_to_other_portal
+
+		// rotated := dir4 * oportal_mat * linalg.matrix4_inverse(portal_mat)
+		teleported := oportal_mat * (mirror * (linalg.matrix4_inverse(og4) * portal_mat))
+
+		og = teleported[3].xy
+			// phys_obj_transform(portal_handler.portals[portal.linked].obj).pos
+		collision.point = og + to_end
+
+		append(&collisions, Portal_Ray_Hit{
+			collision = collision,
+			origin = og,
+			direction = linalg.normalize(to_end),
+		})
+
 
 		dir := linalg.normalize(to_end)
 		// len := linalg.length(to_end)
 
 		dir4 := Vec4 {dir.x, dir.y, 0, 1}
-		// og4 := Vec4 { collision.point.x, collision.point.y, 0, 1 }
 
-		// mirror := transform.Mat4x4 {
-		// 	0, -1, 0, 0,
-		// 	1, 0, 0, 0, 
-		// 	0, 0, 1, 0, 
-		// 	0, 0, 0, 1,
-		// }
 
-		teleported := Vec4(0)
+		// teleported := Vec4(0)
 		rotated := dir4// * linalg.matrix4_rotate_f32(linalg.PI, transform.Z_AXIS)
 
 		// obj_local := og4 * linalg.matrix4_inverse(portal_mat);
@@ -124,7 +147,7 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		// teleported := og4 * (oportal_mat * linalg.matrix4_inverse(portal_mat))
 
 		og = phys_obj_transform(portal_handler.portals[portal.linked].obj).pos//teleported.xy
-		to_end = transform.facing(phys_obj_transform(portal_handler.portals[portal.linked].obj))//rotated.xy
+		to_end = transform.facing(phys_obj_transform(portal_handler.portals[portal.linked].obj)) * 100//rotated.xy
 		// cast_ray_in_world(teleported.xy, rotated.xy * len, exclude, layers, triggers, allocator)
 	}
 
@@ -150,6 +173,8 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	obj_id := portal_handler.portals[portal - 1].obj
 
 	up := Vec3{0, 0, 1}
+	facing3 := Vec3{math.round(facing.x), math.round(facing.y), 0}
+	pos3 := Vec3{pos.x, pos.y, 0}
 
 	// TODO: seriously figure out wtf the deal is with this
 	// i mean this is seriously just trial and error, absolutely no science to it
@@ -179,6 +204,45 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// 	mat3[0, 2], mat3[1, 2], mat3[2, 2],
 	// )
 
+	// log.infof("%#v",linalg.matrix4_rotate_f32(0.34, transform.X_AXIS))
+	// log.infof("%#v",linalg.matrix4_rotate_f32(0.34, transform.Y_AXIS))
+	// log.infof("%#v",linalg.matrix4_rotate_f32(0.34, transform.Z_AXIS))
+	// log.infof("%#v",linalg.matrix4_look_at_from_fru_f32(pos3, transform.X_AXIS, transform.Y_AXIS, transform.Z_AXIS))
+
+when true {
+	right: Vec3 = transform.Y_AXIS
+
+	// so called 'free thinkers' when someone asks them to name a small quantity:
+	ε := f32(0.01)
+	not_ortho := bool(math.abs(facing.x) > ε && math.abs(facing.y) > ε)
+
+
+	if not_ortho do unimplemented("be smart and figure out how to find the 'right' for diagonal portals")
+
+	if math.abs(facing.x) > ε {
+		right = transform.Y_AXIS
+	}
+	else if math.abs(facing.y) > ε {
+		right = transform.X_AXIS
+	}
+
+	log.info(facing3, right, transform.Z_AXIS)
+	rot4 := linalg.matrix4_look_at_from_fru_f32(pos3, right, facing3, transform.Z_AXIS)
+	rot := cast(matrix[3,3]f32)rot4
+	mat := cast(matrix[4,4]f32)rot
+
+	mat[3][0], mat[3][1] = pos.x, pos.y
+	log.infof("%#v",mat)
+
+	trans := transform.new(0, 0)
+	trans.mat = mat
+	transform.align(&trans)
+	log.info(transform.euler_angles_xyz(&trans))
+	
+	phys_obj_set_transform(obj_id, trans)
+	phys_obj_goto(obj_id, pos, facing)
+}
+else {
 	right: Vec3
 	fwd := Vec3{facing.x, facing.y, 0}
 	// linalg.normalize(-Vec3{pos.x, pos.y, 0} + mpos)
@@ -274,6 +338,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// phys_obj_transform_sync(obj_id)
 
 	// phys_obj_transform(obj_id, sync_rotation=true)
+}
 	portal_handler.portals[portal - 1].state += {.Alive}
 }
 
@@ -422,6 +487,7 @@ when DEBUG_DRAW_PORTALS {
 		colour := cast(Colour) rl.ColorFromHSV(hue, sat, value);
 
 		draw_phys_obj(portal.obj, colour)
+		rendering.draw_rectangle_transform(phys_obj_transform(portal.obj), Rect{0,0,40,120}, d=false)
 		// display occupant count
 		text := strings.builder_make(allocator = context.temp_allocator)
 		strings.write_int(&text, len(portal.occupants))

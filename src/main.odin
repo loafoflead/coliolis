@@ -63,6 +63,10 @@ draw_rectangle :: proc(pos, scale: Vec2, rot: f32 = 0.0, col: Colour = cast(Colo
 	rl.DrawRectanglePro(rec, origin, rot, cast(rl.Color) col);
 }
 
+end :: proc(slice: $Array_t/[]$Any_t) -> int {
+	return len(slice)-1
+}
+
 // TODO: GET RID GET RID GET RID OMG
 dir_tex: Texture_Id
 
@@ -163,6 +167,13 @@ main :: proc() {
 			window_width = rl.GetScreenWidth()
 			window_height = rl.GetScreenHeight()
 			rendering.resize_camera(window_width, window_height)
+		}
+
+		if rl.IsKeyPressed(rl.KeyboardKey.G) {
+			portal_goto(1, Vec2(400), {1, 0})
+		}
+		else if rl.IsKeyPressed(rl.KeyboardKey.H) {
+			portal_goto(1, Vec2(400), {0, 1})
 		}
 
 		// TODO: order is neccessary (cant explain why)

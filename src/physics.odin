@@ -274,6 +274,10 @@ phys_obj_data :: proc(id: Physics_Object_Id) -> (^Phys_Body_Data, bool) #optiona
 	return cast(^Phys_Body_Data)raw, true
 }
 
+ang_to_b2d_rot :: proc(ang: Rad) -> Vec2 {
+	return transmute(Vec2) b2d.MakeRot(f32(ang))
+}
+
 phys_obj_goto :: proc(id: Physics_Object_Id, pos: Vec2 = MARKER_VEC2, rot:= MARKER_VEC2) {
 	pos := rl_to_b2d_pos(pos)
 	dir: b2d.Rot
@@ -740,8 +744,6 @@ cast_ray_in_world :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, l
 
 		is_object_acceptable := bool(!slice.contains(dat.exclude, obj) && fraction < dat.fraction)
 
-		found_specified_trigger: bool
-
 		if b2d.Shape_IsSensor(shape_id) && !dat.triggers {
 			return fraction
 		}
@@ -806,7 +808,7 @@ draw_phys_obj :: proc(obj_id: Physics_Object_Id, colour: Colour = Colour(255), t
 	}
 
 	if !lines do return
-	trans := phys_obj_transform_new_from_body(obj_id, sync_rotation=false)
+	trans := phys_obj_transform_new_from_body(obj_id, sync_rotation=true)
 
 	end := trans.pos + transform.forward(&trans) * 50 / rendering.camera.zoom;
 	rendering.draw_line(trans.pos, end);

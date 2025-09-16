@@ -474,7 +474,7 @@ draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
 	cols, hit := portal_aware_raycast(og, to_end, exclude = {get_player().obj})
 	if hit {
 		draw_line(og, cols[0].collision.point, colour=Colour{0, 255, 0, 255})	
-		log.info(len(cols))
+		// log.info(len(cols))
 		// log.info("------------")
 		for i in 0..<len(cols) {
 			col := cols[i]
