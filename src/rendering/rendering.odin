@@ -102,8 +102,8 @@ draw_rectangle_transform :: proc(
 	// the transformed vertices or preserve their order :(	
 	for &vert in vertices {
 		vert -= rect.zw / 2;
-		four := aligned.mat * Vec4{vert.x, vert.y, 0, 1}
-		vert = four.xy
+		four := transform.transform_point(aligned, vert)
+		vert = four
 		if d {
 			log.infof("%v * mat = %v", vert, four)
 		}

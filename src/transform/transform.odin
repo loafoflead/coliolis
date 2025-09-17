@@ -27,8 +27,7 @@ Z_AXIS :: Vec3 {0, 0, 1};
 
 Transform :: struct {
 	pos: Vec2,
-	rot: Rad,
-	mat: Mat4x4,
+	facing: Vec2,
 	// TODO: this pointer is invalidated if the parent is updated... :(
 	parent: ^Transform,
 }
@@ -54,31 +53,42 @@ b2d_to_mat4 :: proc(transform: b2d.Transform) -> Mat4x4 {
 }
 
 new :: proc(pos: Vec2, rot: Rad, parent: ^Transform = nil) -> Transform {
-	new := from_matrix(linalg.MATRIX4F32_IDENTITY);
-	rotate(&new, rot);
-	setpos(&new, pos);
+	// new := from_matrix(linalg.MATRIX4F32_IDENTITY);
+	// rotate(&new, rot);
+	// setpos(&new, pos);
+	new := Transform {
+		pos = pos,
+		facing = angle_to_dir(rot),
+	}
 	new.parent = parent;
 	return new;
 }
 
+@(deprecated="no longer needed")
 reset_rotation_plane :: proc(transform: ^Transform) {
-	new := new(transform.pos, transform.rot);
-	transform^ = new;
+	// new := new(transform.pos, transform.rot);
+	// transform^ = new;
+}
+
+get_mat :: proc(transform: ^Transform) -> Mat3x3 {
+	return Mat3x3 {
+		transform.facing.x, -transform.facing.y, transform.pos.x,
+		transform.facing.y,  transform.facing.x, transform.pos.y,
+		0, 					 0, 			     1,
+	}
 }
 
 rotate :: proc(transform: ^Transform, radians: Rad) {
-	transform.mat = transform.mat * linalg.matrix4_rotate_f32(f32(radians), Z_AXIS);
-	align(transform);
+	mat := get_mat(transform) * linalg.matrix3_rotate_f32(f32(radians), Z_AXIS);
+	transform^ = from_matrix(mat)
 }
 
 move :: proc(transform: ^Transform, delta: Vec2) #no_bounds_check {
-	transform.mat[3].xy += delta;
-	align(transform);
+	transform.pos += delta;
 }
 
 setpos :: proc(transform: ^Transform, pos: Vec2) #no_bounds_check {
-	transform.mat[3].xy = pos;
-	align(transform);
+	transform.pos = pos;
 }
 
 setrot :: proc(transform: ^Transform, radians: Rad) #no_bounds_check {
@@ -87,13 +97,7 @@ setrot :: proc(transform: ^Transform, radians: Rad) #no_bounds_check {
 	// sin(a) cos(a)  .. ..
 	// ..  	  ..	  .. ..
 	// 0 	  0 	  0  0
-	rads := f32(radians)
-	transform.mat[0][0] = math.cos(rads)
-	transform.mat[1][0] = -math.sin(rads)
-
-	transform.mat[1][1] = math.cos(rads)
-	transform.mat[0][1] = math.sin(rads)
-	align(transform)
+	transform.facing = angle_to_dir(radians)
 }
 
 // realigns 'accessible' fields pos and rot to reflect the matrix
@@ -101,27 +105,27 @@ setrot :: proc(transform: ^Transform, radians: Rad) #no_bounds_check {
 // this is to allow users to do transform.rot and transform.pos, 
 // but it's stupid and outdated, only added bc i was too lazy to go 
 // everywhere to change it, will remove it (or not...)
+@(deprecated="no longer useful")
 align :: proc(transform: ^Transform) {
-	transform.pos = pos(transform);
-	transform.rot = rot(transform);
+	// transform.pos = pos(transform);
+	// transform.rot = rot(transform);
 }
 
-rot :: proc(transform: ^Transform) -> Rad #no_bounds_check {
-	return Rad(math.atan2(transform.mat[0][1], transform.mat[0][0]))
+rot :: proc(transform: ^Transform) -> Rad {
+	return Rad(math.atan2(transform.facing.y, transform.facing.x))
 }
 
-pos :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
-	return transform.mat[3].xy;
+pos :: proc(transform: ^Transform) -> Vec2 {
+	return transform.pos;
 }
 
-facing :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
-	return transform.mat[0].xy
+facing :: proc(transform: ^Transform) -> Vec2 {
+	return transform.facing
 }
 
-euler_angles_xyz :: proc(transform: ^Transform) -> (Rad, Rad, Rad) #no_bounds_check {
-	return Rad(math.atan2(transform.mat[1][2], transform.mat[2][2])),
-		Rad(math.atan2(transform.mat[3][0], transform.mat[0][0])),
-		Rad(math.atan2(transform.mat[0][1], transform.mat[0][0]))
+@(deprecated="No longer used")
+euler_angles_xyz :: proc(transform: ^Transform) -> (Rad, Rad, Rad) {
+	return Rad(0), Rad(0), Rad(0)
 }
 
 // // stole from: https://math.stackexchange.com/questions/525082/reflection-across-a-line
@@ -136,26 +140,14 @@ euler_angles_xyz :: proc(transform: ^Transform) -> (Rad, Rad, Rad) #no_bounds_ch
 // 	return factor * mat;
 // }
 
-flip :: proc(transform: ^Transform) -> Transform #no_bounds_check {
-	mirror := linalg.matrix4_rotate_f32(linalg.PI, Y_AXIS);
-	for i in 0..<3 do mirror[i, 3] = 0
-	for i in 0..<3 do mirror[3, i] = 0
-
-	mirrored := transform.mat * mirror;
-
-	ntr := from_matrix(mirrored);
-	return ntr;
+@(deprecated="flipping is graphical now")
+flip :: proc(transform: ^Transform) -> Transform {
+	return new(0, 0)
 }
 
-flip_vert :: proc(transform: ^Transform) -> Transform #no_bounds_check {
-	mirror := linalg.matrix4_rotate_f32(-linalg.PI, X_AXIS);
-	for i in 0..<3 do mirror[i, 3] = 0
-	for i in 0..<3 do mirror[3, i] = 0
-
-	mirrored := transform.mat * mirror;
-
-	ntr := from_matrix(mirrored);
-	return ntr;
+@(deprecated="flipping is graphical now")
+flip_vert :: proc(transform: ^Transform) -> Transform {
+	return new(0, 0)
 }
 
 forward :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
@@ -163,7 +155,7 @@ forward :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
 	// const mat4 inverted = glm::inverse(transformationMatrix);
 	// const vec3 forward = normalize(glm::vec3(inverted[2]));
 	// inverted := linalg.matrix4_inverse(transform.mat);
-	fwd := linalg.normalize(transform.mat[0].xy);
+	fwd := linalg.normalize(transform.facing);
 	return fwd;
 }
 
@@ -173,16 +165,17 @@ right :: proc(transform: ^Transform) -> Vec2 #no_bounds_check {
 }
 
 transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 #no_bounds_check {
-	res := transform.mat * Vec4 { point.x, point.y, 0, 1 };
+	res := get_mat(transform) * Vec3 { point.x, point.y, 1 };
 	return res.xy;
 }
 
-from_matrix :: proc(mat: Mat4x4) -> Transform {
+from_matrix :: proc(mat: Mat3x3) -> Transform {
 	t := Transform {
-		mat = mat,
-	};
-	align(&t);
-	return t;
+		pos = mat[2].xy,
+		facing = mat[0].xy,
+		parent = nil,
+	}
+	return t
 }
 
 to_world :: proc(transform: ^Transform) -> Transform {
@@ -191,7 +184,7 @@ to_world :: proc(transform: ^Transform) -> Transform {
 	}
 	else {
 		parent := to_world(transform.parent);
-		res := parent.mat * transform.mat;
+		res := get_mat(&parent) * get_mat(transform);
 
 		// rot_mat := matrix2_rotate_f32(transform.parent.rot);
 		// mag := linalg.length(transform.pos);

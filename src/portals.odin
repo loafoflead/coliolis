@@ -98,6 +98,8 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		if !hit_portal {
 			break
 		}
+when false {
+
 		portal := portal_from_phys_id(collision.obj_id)
 		portal_mat := phys_obj_transform(collision.obj_id).mat
 		oportal_mat := phys_obj_transform(portal_handler.portals[portal.linked].obj).mat
@@ -149,6 +151,7 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		og = phys_obj_transform(portal_handler.portals[portal.linked].obj).pos//teleported.xy
 		to_end = transform.facing(phys_obj_transform(portal_handler.portals[portal.linked].obj)) * 100//rotated.xy
 		// cast_ray_in_world(teleported.xy, rotated.xy * len, exclude, layers, triggers, allocator)
+}
 	}
 
 	if len(collisions) > 0 {
@@ -209,7 +212,7 @@ portal_goto :: proc(portal: i32, pos, facing: Vec2) {
 	// log.infof("%#v",linalg.matrix4_rotate_f32(0.34, transform.Z_AXIS))
 	// log.infof("%#v",linalg.matrix4_look_at_from_fru_f32(pos3, transform.X_AXIS, transform.Y_AXIS, transform.Z_AXIS))
 
-when true {
+when false {
 	right: Vec3 = transform.Y_AXIS
 
 	// so called 'free thinkers' when someone asks them to name a small quantity:
@@ -242,7 +245,7 @@ when true {
 	phys_obj_set_transform(obj_id, trans)
 	phys_obj_goto(obj_id, pos, facing)
 }
-else {
+else when false {
 	right: Vec3
 	fwd := Vec3{facing.x, facing.y, 0}
 	// linalg.normalize(-Vec3{pos.x, pos.y, 0} + mpos)
@@ -544,9 +547,9 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 
 	other_portal_trans := phys_obj_transform(other_portal.obj)
 
-	oportal_mat := other_portal_trans.mat;
-	portal_mat := portal_trans.mat;
-	obj_mat := occupant_trans.mat;
+	oportal_mat := transform.get_mat(other_portal_trans);
+	portal_mat := transform.get_mat(portal_trans);
+	obj_mat := transform.get_mat(occupant_trans);
 
 	// mirror := Mat4x4 {
 	// 	-1, 0,  0, 0,
@@ -554,11 +557,11 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	// 	0, 0, 	1, 0,
 	// 	0, 0, 0, 1,
 	// }
-	mirror := linalg.matrix4_rotate_f32(linalg.PI, transform.Y_AXIS);
-	for i in 0..<3 do mirror[i, 3] = 0
-	for i in 0..<3 do mirror[3, i] = 0
+	mirror := linalg.matrix3_rotate_f32(linalg.PI, transform.Y_AXIS);
+	for i in 0..<2 do mirror[i, 2] = 0
+	for i in 0..<2 do mirror[2, i] = 0
 
-	obj_local := linalg.matrix4_inverse(portal_mat) * obj_mat;
+	obj_local := linalg.matrix3_inverse(portal_mat) * obj_mat;
 	relative_to_other_portal := mirror * obj_local;
 
 	fmat := oportal_mat * relative_to_other_portal;
@@ -597,13 +600,13 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	}
 	else {
 		og_vel := b2d.Body_GetLinearVelocity(occupant_id) / f32(PIXELS_TO_METRES_RATIO)
-		velocity := Vec4{og_vel.x, -og_vel.y, 0, 1}
+		velocity := Vec3{og_vel.x, -og_vel.y, 1}
 
 		// world_vel := matrix4_inverse(portal_mat) * velocity_mat;
 		// flipped_world_vel := world_vel * linalg.matrix4_rotate_f32(linalg.PI, Z_AXIS);
 
 		relative_to_other := 
-			(velocity * linalg.matrix4_inverse(portal_mat)) * oportal_mat
+			(velocity * linalg.matrix3_inverse(portal_mat)) * oportal_mat
 
 		vel := Vec2{relative_to_other[0], relative_to_other[1]}
 		// if linalg.length(vel) < 100 do vel = linalg.normalize(vel) * 100
@@ -615,7 +618,7 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 		b2d.Body_SetLinearVelocity(occupant_id, new_vel)
 
 		// TODO: do the same to angular velocity altho idk exactly if necessary?
-		b2d.Body_SetTransform(occupant_id, new_pos, {ntr.mat[0, 0], ntr.mat[0, 1]})
+		b2d.Body_SetTransform(occupant_id, new_pos, rl_to_b2_facing(ntr.facing))
 		// b2d.Body_SetLinearVelocity(occupant_id, Vec2(0))
 	}
 
@@ -888,9 +891,9 @@ update_portals :: proc() {
 			to_occupant_centre := phys_obj_pos(occupant.phys_id) - phys_obj_pos(portal.obj);
 			side := linalg.dot(to_occupant_centre, -transform.forward(phys_obj_transform(portal.obj)));
 
-			oportal_mat := other_portal_trans.mat;
-			portal_mat := portal_trans.mat;
-			obj_mat := occupant_trans.mat;
+			oportal_mat := transform.get_mat(other_portal_trans);
+			portal_mat := transform.get_mat(portal_trans);
+			obj_mat := transform.get_mat(occupant_trans);
 
 			// mirror := Mat4x4 {
 			// 	-1, 0,  0, 0,
@@ -898,11 +901,11 @@ update_portals :: proc() {
 			// 	0, 0, 	1, 0,
 			// 	0, 0, 0, 1,
 			// }
-			mirror := linalg.matrix4_rotate_f32(linalg.PI, transform.Y_AXIS);
-			for i in 0..<3 do mirror[i, 3] = 0
-			for i in 0..<3 do mirror[3, i] = 0
+			mirror := linalg.matrix3_rotate_f32(linalg.PI, transform.Y_AXIS);
+			for i in 0..<2 do mirror[i, 2] = 0
+			for i in 0..<2 do mirror[2, i] = 0
 
-			obj_local := linalg.matrix4_inverse(portal_mat) * obj_mat;
+			obj_local := linalg.matrix3_inverse(portal_mat) * obj_mat;
 			relative_to_other_portal := mirror * obj_local;
 
 			fmat := oportal_mat * relative_to_other_portal;

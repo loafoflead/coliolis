@@ -1,15 +1,25 @@
 package main
 
+when !#exists("../__gen/assets.odin") {
+	#panic("Assets missing! Generate them with the -assets flag!")
+}
+import "../__gen/" // run with -assets to fix
+
 // when !#config(__GEN_ASSETS__, false) {
 // 	#panic("Generate assets before building project")
+// 	ASSETS_GENERATED :: false
+// }
+// else {
+// 	ASSETS_GENERATED :: true
 // }
 
 import rl "thirdparty/raylib";
 import rlgl "thirdparty/raylib/rlgl"
 import b2d "thirdparty/box2d"
 import "core:math";
-
 import "core:math/linalg";
+
+import "core:slice"
 
 import "core:os";
 
@@ -40,6 +50,19 @@ get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
 }
 
+raw_fivew :: #load("../assets/5W.png")
+fivew: rl.Image
+load_gen :: proc() {
+	fivew = rl.LoadImageFromMemory(fileType = ".png", fileData = raw_data(raw_fivew), dataSize = cast(i32)len(raw_fivew))
+	if !rl.IsImageValid(fivew) {
+		panic("Loaded invalid image")
+	}
+	// log.info(slice.from_ptr(cast(^rl.Color)fivew.data, 10))
+}
+
+unload_gen :: proc() {
+	rl.UnloadImage(fivew)
+}
 
 Vec2 :: [2]f32;
 Rect :: [4]f32;
@@ -87,6 +110,10 @@ main :: proc() {
 	// TODO: make this not a global?
 	initialise_resources()
 	defer free_resources()
+
+	load_gen()
+	defer unload_gen()
+
 	rendering.initialise_camera(window_width, window_height, &resources.textures)
 
 	camera := &rendering.camera
@@ -113,7 +140,7 @@ main :: proc() {
 	dir_tex, ok = load_texture("nesw_sprite.png")
 	if !ok do os.exit(1)
 
-	
+	handle, fok := add_image(fivew); assert(fok)
 
 	game_load_level_from_tilemap(TILEMAP)
 
@@ -141,7 +168,7 @@ main :: proc() {
 	test_particle := rendering.Particle_Def {
 		draw_info = rendering.Particle_Draw_Info {
 			shape = .Square,
-			texture = dir_tex,
+			texture = handle,
 			scale = Vec2(10),
 			colour = Colour(255),
 			alpha_easing = .Bounce_In,

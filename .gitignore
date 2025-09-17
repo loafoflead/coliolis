@@ -9,5 +9,6 @@ test.tiled-*
 bin/*
 bin/
 build
+__gen/
 
 *.kra*

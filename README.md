@@ -48,6 +48,12 @@ build
 
 Then to build the project, simply run ./build. Thanks to innovative ```GO_REBUILD_URSELF(tm)``` technology, changes to the build script will cause it to automagically rebuild itself (so will moving it between directories but oh well).
 
+To just check, use ```./build -mode:check```, and to run ```./build -mode:run```. To add ggdb debug symbols, use ```-debug```, to check for unused variables use ```-vet```, and to rebuild assets use ```assets```.
+
+The above list probably isn't exhaustive as you're reading this, so to find a 'list' of all available subcommands check the build.odin script, specifically searching for the ```Cmd_Options``` structure and it's sub-structures(is that a thing???).
+
+That's the slight disadvantage of this style of build system, which is that it doesn't self-document, but the flexibility advantage and (if done correctly...) significant lesser complexity (as in, easier to simply express things that are complicated in build system scripting languages (like variables for some stupid reason (yes i hate specifically Cmake))) which i think just about outweighs the cons of a less 'readable' build script.
+
 ```
 $ ./build
 odin run src -out:bin/main

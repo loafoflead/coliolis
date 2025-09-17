@@ -57,6 +57,16 @@ load_texture :: proc(path: string) -> (Texture_Id, bool) {
 	return Texture_Id(index), success;
 }
 
+add_image :: proc(img: rl.Image) -> (Texture_Id, bool) {
+	tex := rl.LoadTextureFromImage(img)
+	success := rl.IsTextureValid(tex);
+	index := len(resources.textures);
+	if success {
+		append(&resources.textures, tex);
+	}
+	return Texture_Id(index), success;
+}
+
 load_tilemap :: proc(path: string) -> (id: Tilemap_Id = TILEMAP_INVALID, err: bool = true) {
 	fullpath := fmt.tprintf("%s/%s", ASSETS_PATH, path);
 	tilemap := tiled.parse_tilemap(fullpath, path_prefix = ASSETS_PATH) or_return;

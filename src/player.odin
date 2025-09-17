@@ -442,19 +442,22 @@ when PLAYER_STEPPING_UP {
 		// 	// setrot(player_obj, 0);
 		// }
 		// log.info(player.transform.rot)
-		if player.transform.rot < 0 && player.transform.rot > -linalg.PI {
-			transform.rotate(&player.transform, 0.1);
-		}
-		else if player.transform.rot > 0 && player.transform.rot < linalg.PI {
-			transform.rotate(&player.transform, -0.1);
-		}
-		if math.abs(player.transform.rot) < 0.1 {
-			// log.info("ABSOLUTE ZERO")
-			transform.setrot(&player.transform, 0)
-		}
-		else if math.abs(player.transform.rot - linalg.PI) < 0.1 {
-			transform.setrot(&player.transform, 0)
-		}
+when false {
+	#panic("TODO")
+	if transform.rot(player.transform) < 0 && transform.rot(player.transform) > -linalg.PI {
+		transform.rotate(&player.transform, 0.1);
+	}
+	else if player.transform.rot > 0 && player.transform.rot < linalg.PI {
+		transform.rotate(&player.transform, -0.1);
+	}
+	if math.abs(player.transform.rot) < 0.1 {
+		// log.info("ABSOLUTE ZERO")
+		transform.setrot(&player.transform, 0)
+	}
+	else if math.abs(player.transform.rot - linalg.PI) < 0.1 {
+		transform.setrot(&player.transform, 0)
+	}
+}
 	// }
 
 	return
