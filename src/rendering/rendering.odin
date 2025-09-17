@@ -17,6 +17,18 @@ end :: proc(slice: $Array_t/[]$Any_t) -> int {
 	return len(slice)-1
 }
 
+// Drawable_Facing :: enum {
+// 	Flip_Horiz,
+// 	Flip_Vert,
+// }
+
+// Drawable_Facing_Set :: bit_set[Drawable_Facing; u8]
+
+// @interface
+// Drawable2D :: struct {
+// 	facing: Drawable_Facing_Set,
+// }
+
 Transform :: transform.Transform
 Vec4 :: transform.Vec4
 

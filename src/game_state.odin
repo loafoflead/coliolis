@@ -66,6 +66,7 @@ Game_Object_Flags :: enum {
 
 Game_Object_Flagset :: bit_set[Game_Object_Flags; u32]
 
+@interface
 Game_Object :: struct {
 	on_update: Game_Object_On_Update_Function,
 	on_render: Game_Object_Render_Function,

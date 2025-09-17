@@ -202,7 +202,9 @@ main :: proc() {
 	opts: Cmd_Options
 	err := flags.parse(&opts, os.args[1:], allocator = context.temp_allocator)
 	if err != nil {
-		log.fatalf("Failed to parse command line args: %v", err)
+		log.error("Error parsing command line options: vvv")
+		flags.print_errors(Cmd_Options, err, os.args[0])
+		// log.fatalf(": %v", err)
 		return
 	}
 
@@ -262,6 +264,10 @@ main :: proc() {
 
 	vets : []string = {"-vet-using-stmt", "-vet-using-param", "-vet-style", "-vet-cast"}
 	command_append(&c, ..vets)
+
+	// this is entirely for me, for documentation purposes
+	flags : []string = {"-custom-attribute:interface"}
+	command_append(&c, ..flags)
 
 	if opts.vet {
 		command_append(&c, "-vet-unused")

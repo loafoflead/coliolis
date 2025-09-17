@@ -54,6 +54,10 @@ The above list probably isn't exhaustive as you're reading this, so to find a 'l
 
 That's the slight disadvantage of this style of build system, which is that it doesn't self-document, but the flexibility advantage and (if done correctly...) significant lesser complexity (as in, easier to simply express things that are complicated in build system scripting languages (like variables for some stupid reason (yes i hate specifically Cmake))) which i think just about outweighs the cons of a less 'readable' build script.
 
+### notes:
+
+The custom attribute ```interface``` doesn't do anything, it's just there for me to see at a glance (I hate writing IStruct_Name or I_Struct_Name).
+
 ```
 $ ./build
 odin run src -out:bin/main
