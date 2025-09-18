@@ -6,6 +6,7 @@ test.tiled-*
 *.tiled-session
 *.tiled-project
 *.tx
+*.kra
 bin/*
 bin/
 build

@@ -50,7 +50,7 @@ get_screen_centre :: proc() -> Vec2 {
 	return Vec2 { cast(f32) rl.GetScreenWidth() / 2.0, cast(f32) rl.GetScreenHeight() / 2.0 };
 }
 
-raw_fivew :: #load("../assets/5W.png")
+raw_fivew :: #load("../assets/image/5W.png")
 fivew: rl.Image
 load_gen :: proc() {
 	fivew = rl.LoadImageFromMemory(fileType = ".png", fileData = raw_data(raw_fivew), dataSize = cast(i32)len(raw_fivew))

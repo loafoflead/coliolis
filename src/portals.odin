@@ -89,10 +89,12 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 			collision.point += to_end
 		}
 
+		ray_dir := linalg.normalize(to_end)
+
 		append(&collisions, Portal_Ray_Hit{
 			collision = collision,
 			origin = og,
-			direction = linalg.normalize(to_end),
+			direction = ray_dir,
 		})
 
 		if !hit_portal {
@@ -100,8 +102,19 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		}
 
 		portal := portal_from_phys_id(collision.obj_id)
-		portal_mat := transform.get_mat(phys_obj_transform(collision.obj_id))
+		portal_trans := phys_obj_transform(collision.obj_id)
+		portal_mat := transform.get_mat(portal_trans)
 		oportal_mat := transform.get_mat(phys_obj_transform(portal_handler.portals[portal.linked].obj))
+
+		dist := linalg.length(phys_obj_pos(collision.obj_id) - collision.point)
+		
+		portal_line := transform.right(portal_trans)
+		ray_line := ray_dir
+
+		
+
+		// @TODO: make this find the point on the 'forward' line of the portal, because
+		// whatever random point we are hitting is basically useless
 
 		mirror := transform.Mat3x3 {
 			-1, -0, 0,
@@ -114,10 +127,10 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		obj_local := og4 * linalg.matrix3_inverse(portal_mat)
 		relative_to_other_portal := mirror * obj_local
 
-		// teleported := oportal_mat * relative_to_other_portal
+		teleported := oportal_mat * relative_to_other_portal
 
 		// rotated := dir4 * oportal_mat * linalg.matrix4_inverse(portal_mat)
-		teleported := oportal_mat * (mirror * (linalg.matrix3_inverse(og4) * portal_mat))
+		// teleported := oportal_mat * (mirror * (linalg.matrix3_inverse(og4) * portal_mat))
 
 		og = teleported[2].xy
 			// phys_obj_transform(portal_handler.portals[portal.linked].obj).pos

@@ -8,7 +8,8 @@ import vmem "core:mem/virtual"
 
 import rdr "rendering"
 
-ASSETS_PATH :: "./assets";
+IMAGE_ASSETS_PATH :: "./assets/image/";
+TILEMAP_ASSETS_PATH :: "./assets/tilemaps/";
 
 Texture_Id 		:: rdr.Texture_Id
 TEXTURE_INVALID :: rdr.TEXTURE_INVALID
@@ -46,7 +47,7 @@ texture :: proc(id: Texture_Id) -> (^rl.Texture2D, bool) #optional_ok {
 }
 
 load_texture :: proc(path: string) -> (Texture_Id, bool) {
-	fullpath := fmt.tprintf("%s/%s", ASSETS_PATH, path);
+	fullpath := fmt.tprintf("%s/%s", IMAGE_ASSETS_PATH, path);
 	cpath := strings.clone_to_cstring(fullpath);
 	tex := rl.LoadTexture(cpath);
 	success := rl.IsTextureValid(tex);
@@ -68,8 +69,8 @@ add_image :: proc(img: rl.Image) -> (Texture_Id, bool) {
 }
 
 load_tilemap :: proc(path: string) -> (id: Tilemap_Id = TILEMAP_INVALID, err: bool = true) {
-	fullpath := fmt.tprintf("%s/%s", ASSETS_PATH, path);
-	tilemap := tiled.parse_tilemap(fullpath, path_prefix = ASSETS_PATH) or_return;
+	fullpath := fmt.tprintf("%s/%s", TILEMAP_ASSETS_PATH, path);
+	tilemap := tiled.parse_tilemap(fullpath, path_prefix = TILEMAP_ASSETS_PATH) or_return;
 	
 	alloc := vmem.arena_allocator(&tilemap.arena)
 	textures := make_slice([]Texture_Id, len(tilemap.tilesets), allocator = alloc)
