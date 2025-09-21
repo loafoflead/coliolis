@@ -63,6 +63,38 @@ Portal_Ray_Hit :: struct {
 	origin, direction: Vec2,
 }
 
+EPSILON :: f32(0.000001)
+float_eq :: proc(a,b: f32, eps := EPSILON) -> bool {
+	return math.abs(a - b) < eps
+}
+
+// https://www.geeksforgeeks.org/dsa/program-for-point-of-intersection-of-two-lines/
+line_line_intersection :: proc(a, b: Vec2, c, d: Vec2) -> (res: Vec2, ok: bool)
+{
+	// Line AB represented as a1x + b1y = c1
+	a1 := b.y - a.y
+	b1 := a.x -b.x
+	c1 := a1*(a.x) + b1*(a.y)
+
+	// Line CD represented as a2x + b2y = c2
+	a2 := d.y - c.y
+	b2 := c.x - d.x
+	c2 := a2*(c.x)+ b2*(c.y)
+
+	determinant := a1*b2 - a2*b1
+
+	if float_eq(determinant, 0)
+	{
+		// The lines are parallel
+		return Vec2(0), false
+	}
+	
+	x := (b2*c1 - b1*c2)/determinant
+	y := (a1*c2 - a2*c1)/determinant
+
+	return Vec2{x, y}, true
+}
+
 portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}, layers: bit_set[Collision_Layer; u64] = COLLISION_LAYERS_ALL, triggers := true, allocator := context.temp_allocator) -> 
 	([dynamic]Portal_Ray_Hit, bool) 
 {
@@ -89,7 +121,8 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 			collision.point += to_end
 		}
 
-		ray_dir := linalg.normalize(to_end)
+		ray_mag := linalg.length(to_end)
+		ray_dir := to_end / ray_mag
 
 		append(&collisions, Portal_Ray_Hit{
 			collision = collision,
@@ -104,53 +137,71 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		portal := portal_from_phys_id(collision.obj_id)
 		portal_trans := phys_obj_transform(collision.obj_id)
 		portal_mat := transform.get_mat(portal_trans)
-		oportal_mat := transform.get_mat(phys_obj_transform(portal_handler.portals[portal.linked].obj))
-
-		dist := linalg.length(phys_obj_pos(collision.obj_id) - collision.point)
+		oportal_trans := phys_obj_transform(portal_handler.portals[portal.linked].obj)
+		oportal_mat := transform.get_mat(oportal_trans)
 		
-		portal_line := transform.right(portal_trans)
-		ray_line := ray_dir
+		portal_fwd := transform.right(portal_trans)
 
-		
+		portal_btm := portal_trans.pos - portal_fwd * (PORTAL_HEIGHT/2)
+		portal_top := portal_trans.pos + portal_fwd * (PORTAL_HEIGHT/2)
+		point_on_surface := line_line_intersection(og, og+to_end, portal_btm, portal_top) or_continue
+		d := linalg.length(point_on_surface - portal_trans.pos)
 
-		// @TODO: make this find the point on the 'forward' line of the portal, because
-		// whatever random point we are hitting is basically useless
+		if d > PORTAL_HEIGHT/2 do continue
 
-		mirror := transform.Mat3x3 {
-			-1, -0, 0,
-			0, -1, 0, 
-			0, 0, 1, 
-		}
+		side := math.sign(linalg.dot(portal_fwd, (portal_trans.pos - point_on_surface)))
 
-		t := transform.new(collision.point, 0)
-		og4 := transform.get_mat(&t)//Vec4 { collision.point.x, collision.point.y, 0, 1 }
-		obj_local := og4 * linalg.matrix3_inverse(portal_mat)
-		relative_to_other_portal := mirror * obj_local
+		teleported := oportal_trans.pos + d * side * transform.right(oportal_trans)
 
-		teleported := oportal_mat * relative_to_other_portal
+		// rendering.draw_line(point_on_surface, point_on_surface + transform.forward(portal_trans) * 50,  Colour{255, 100, 255, 255})		
+		// rendering.draw_line(portal_trans.pos, portal_trans.pos + collision.normal * 50, Colour{0, 255, 255, 255})		
+		// rendering.draw_line(collision.point, collision.point + collision.normal * 50, Colour{255, 0, 255, 255})		
+
+		// mirror := transform.Mat3x3 {
+		// 	-1, -0, 0,
+		// 	0, -1, 0, 
+		// 	0, 0, 1, 
+		// }
+
+		// t := transform.new(point_on_surface, 0)
+		// og4 := transform.get_mat(&t)//Vec4 { collision.point.x, collision.point.y, 0, 1 }
+		// obj_local := og4 * linalg.matrix3_inverse(portal_mat)
+		// relative_to_other_portal := obj_local
+
+		// teleported := relative_to_other_portal * oportal_mat
 
 		// rotated := dir4 * oportal_mat * linalg.matrix4_inverse(portal_mat)
 		// teleported := oportal_mat * (mirror * (linalg.matrix3_inverse(og4) * portal_mat))
 
-		og = teleported[2].xy
-			// phys_obj_transform(portal_handler.portals[portal.linked].obj).pos
-		collision.point = og + to_end
+		theta := linalg.vector_angle_between(og-point_on_surface, transform.forward(portal_trans))
+		delta := linalg.vector_angle_between(transform.forward(oportal_trans), transform.forward(portal_trans))
+		new_dir := transform.angle_to_dir(Rad(theta - delta + linalg.PI/2))
+
+		next_stop := teleported + new_dir * ray_mag
 
 		append(&collisions, Portal_Ray_Hit{
-			collision = collision,
-			origin = og,
-			direction = linalg.normalize(to_end),
+			collision = Ray_Collision {
+				point = next_stop,
+			},
+			origin = teleported,
+			direction = new_dir,
 		})
 
+		rendering.draw_line(teleported, teleported + new_dir * 100, Colour{100, 100, 255, 255}, 10)
 
-		dir := linalg.normalize(to_end)
+		// og = teleported
+		// to_end = new_dir * ray_mag
+
+		// dir := linalg.normalize(to_end)
 		// len := linalg.length(to_end)
 
-		dir4 := Vec3 {dir.x, dir.y, 1}
+		// dir4 := Vec3 {dir.x, dir.y, 1}
 
 
 		// teleported := Vec4(0)
-		rotated := dir4// * linalg.matrix4_rotate_f32(linalg.PI, transform.Z_AXIS)
+		// rotated := dir4 * linalg.matrix3_rotate_f32(linalg.PI, transform.Z_AXIS)
+		// rendering.draw_line(og, og + rotated.xy * 50, Colour{255, 0, 255, 255})		
+
 
 		// obj_local := og4 * linalg.matrix4_inverse(portal_mat);
 		// relative_to_other_portal := mirror * obj_local;
@@ -160,8 +211,8 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 		// rotated := dir4 * oportal_mat * linalg.matrix4_inverse(portal_mat)
 		// teleported := og4 * (oportal_mat * linalg.matrix4_inverse(portal_mat))
 
-		og = phys_obj_transform(portal_handler.portals[portal.linked].obj).pos//teleported.xy
-		to_end = transform.facing(phys_obj_transform(portal_handler.portals[portal.linked].obj)) * 100//rotated.xy
+		// og = phys_obj_transform(portal_handler.portals[portal.linked].obj).pos//teleported.xy
+		// to_end = transform.facing(phys_obj_transform(portal_handler.portals[portal.linked].obj)) * 100//rotated.xy
 		// cast_ray_in_world(teleported.xy, rotated.xy * len, exclude, layers, triggers, allocator)
 	}
 

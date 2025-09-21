@@ -224,9 +224,10 @@ draw_texture :: proc(
 	);
 }
 
-draw_line :: proc(start, end: Vec2, colour: Colour = Colour{255, 0,0,255}) {
+draw_line :: proc(start, end: Vec2, colour: Colour = Colour{255, 0,0,255}, thickness: f32 = 1) {
 	screen_start := world_pos_to_screen_pos(camera, start);
 	screen_end := world_pos_to_screen_pos(camera, end);
 
+	rl.DrawLineEx(screen_start, screen_end, thickness, cast(rl.Color)colour)
 	rl.DrawLineV(screen_start, screen_end, cast(rl.Color) colour);
 }
