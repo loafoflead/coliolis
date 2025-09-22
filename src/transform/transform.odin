@@ -1,3 +1,4 @@
+
 package transform
 
 import b2d "../thirdparty/box2d"
@@ -31,6 +32,10 @@ Transform :: struct {
 	// TODO: this pointer is invalidated if the parent is updated... :(
 	parent: ^Transform,
 }
+
+dir_to_angle :: proc(facing: Vec2) -> Rad {
+	return Rad(math.atan2(facing.y, facing.x))
+} 
 
 angle_to_dir_deg :: proc(degrees: f32) -> Vec2 {
 	return Vec2{math.cos(linalg.to_radians(degrees)), math.sin(linalg.to_radians(degrees))}

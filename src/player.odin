@@ -4,6 +4,8 @@ import vmem "core:mem/virtual"
 
 import "core:c/libc"
 import "core:log"
+import "core:fmt"
+import "core:strings"
 
 import "core:math"
 import "core:math/linalg"
@@ -148,12 +150,12 @@ player_capsule :: proc() -> b2d.Capsule {
 player_grounded_check :: proc() -> bool {
 	player := get_player()
 
-	target := player_pos() + transform.right(&player.transform) * 21
+	target := player_pos() - transform.right(&player.transform) * 21
 	filter := b2d.Shape_GetFilter(phys_obj_shape(player.obj))
 	layers := transmute(Collision_Set)filter.maskBits
 
 	_, hit := cast_ray_in_world(player_pos(), target - player_pos(), exclude = {player.obj}, layers = layers, triggers = false)
-	// draw_line(player_pos(), target)
+	draw_line(player_pos(), target)
 
 	// if hit do log.info("COWABUNGA")
 
@@ -224,6 +226,15 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 		// target = player.transform.pos + movement * PLAYER_SPEED * dt
 		// b2d.Body_SetLinearVelocity(player.obj, move * PLAYER_SPEED)
 	}
+	
+	DEBUG_TEXT_PLAYER :: false
+
+when DEBUG_TEXT_PLAYER {
+	text := strings.builder_make(allocator = context.temp_allocator)
+	strings.write_string(&text, fmt.tprintf("in_air: %v\n jumping: %v\n vel: %v", player.in_air, player.jumping, player.vel))
+	w_pos := rendering.world_pos_to_screen_pos(rendering.camera, player.transform.pos) + Vec2{20, 0}
+	rl.DrawText(strings.to_cstring(&text), i32(w_pos.x), i32(w_pos.y), fontSize = 20, color = rl.WHITE)	
+}
 
 	if player.in_air {
 		player.vel.x *= 0.95
@@ -231,6 +242,8 @@ update_player :: proc(player: Game_Object_Id, dt: f32) -> (should_delete: bool =
 	else {
 		player.vel.x *= 0.9
 	}
+
+	if math.abs(player.vel.x) < f32(0.9) do player.vel.x = 0 
 
 	player.vel.x = math.clamp(player.vel.x, -PLAYER_MAX_X_SPEED, PLAYER_MAX_X_SPEED)//math.sign(player.vel.x) * math.max(math.abs(player.vel.x), PLAYER_MAX_X_SPEED)
 	player.vel.y = math.clamp(player.vel.y, -PLAYER_MAX_Y_SPEED, PLAYER_MAX_Y_SPEED)//math.sign(player.vel.y) * math.max(math.abs(player.vel.y), PLAYER_MAX_Y_SPEED)

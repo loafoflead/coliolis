@@ -1,9 +1,9 @@
 package main
 
-when !#exists("../__gen/assets.odin") {
-	#panic("Assets missing! Generate them with the -assets flag!")
-}
-import "../__gen/" // run with -assets to fix
+// when !#exists("../__gen/assets.odin") {
+// 	#panic("Assets missing! Generate them with the -assets flag!")
+// }
+// import "../__gen/" // run with -assets to fix
 
 // when !#config(__GEN_ASSETS__, false) {
 // 	#panic("Generate assets before building project")
@@ -230,10 +230,10 @@ main :: proc() {
 
 		rendering.particle_spawn({50, 50}, 35, test_particle)
 
-		// draw_phys_world()
+		draw_phys_world()
 		render_game_objects(rendering.camera)
 		// draw_texture(dir_tex, pos=rl_to_b2d_pos(get_world_mouse_pos()), scale=0.1)
-		draw_tilemap(state_level().tilemap, {0., 0.});
+		// draw_tilemap(state_level().tilemap, {0., 0.});
 		draw_portals(selected_portal);
 		rendering.render_particles()
 

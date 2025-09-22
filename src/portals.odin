@@ -106,9 +106,14 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 	og := og
 	to_end := to_end
 
-	for _ in 0..<MAX_PORTAL_RAYCAST_DEPTH {
-		// TODO: this is shit but we need to accept triggers to be able to hit portals...
-		collision, hit := cast_ray_in_world(og, to_end, exclude, layers, triggers=true, specific_triggers=portal_objs[:])
+	for depth in 0..<MAX_PORTAL_RAYCAST_DEPTH {
+		ray_mag := linalg.length(to_end)
+		ray_dir := to_end / ray_mag
+
+		pog := og
+		if depth != 0 do pog = og + ray_dir * 2
+
+		collision, hit := cast_ray_in_world(pog, to_end, exclude, layers, triggers=true, specific_triggers=portal_objs[:])
 		if !hit do break
 
 		hit_portal: bool
@@ -117,12 +122,9 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 			if collision.obj_id == portal.obj do hit_portal = true 
 		}
 
-		if !hit_portal {
-			collision.point += to_end
-		}
-
-		ray_mag := linalg.length(to_end)
-		ray_dir := to_end / ray_mag
+		// if !hit_portal {
+		// 	collision.point += to_end
+		// }
 
 		append(&collisions, Portal_Ray_Hit{
 			collision = collision,
@@ -172,23 +174,38 @@ portal_aware_raycast :: proc(og, to_end: Vec2, exclude: []Physics_Object_Id = {}
 
 		// rotated := dir4 * oportal_mat * linalg.matrix4_inverse(portal_mat)
 		// teleported := oportal_mat * (mirror * (linalg.matrix3_inverse(og4) * portal_mat))
+		
 
-		theta := linalg.vector_angle_between(og-point_on_surface, transform.forward(portal_trans))
+		side = math.sign(linalg.dot(portal_fwd, point_on_surface-og))
+		col: Colour
+		if side < 0 do col = Colour{100, 100, 200, 255}
+		else do col = Colour{255, 100, 255, 255}
+
+		theta := linalg.vector_angle_between(og - point_on_surface, transform.forward(portal_trans))
+		ptl_angle := f32(transform.dir_to_angle(transform.forward(portal_trans)))
 		delta := linalg.vector_angle_between(transform.forward(oportal_trans), transform.forward(portal_trans))
-		new_dir := transform.angle_to_dir(Rad(theta - delta + linalg.PI/2))
+		new_dir := transform.angle_to_dir(Rad(side * theta + ptl_angle + delta))
 
-		next_stop := teleported + new_dir * ray_mag
+		// next_stop := teleported + new_dir * ray_mag
+		og = teleported
+		to_end = new_dir * ray_mag
 
-		append(&collisions, Portal_Ray_Hit{
-			collision = Ray_Collision {
-				point = next_stop,
-			},
-			origin = teleported,
-			direction = new_dir,
-		})
+		// append(&collisions, Portal_Ray_Hit{
+		// 	collision = Ray_Collision {
+		// 		point = next_stop,
+		// 	},
+		// 	origin = teleported,
+		// 	direction = new_dir,
+		// })
 
-		rendering.draw_line(teleported, teleported + new_dir * 100, Colour{100, 100, 255, 255}, 10)
+		DEBUG_PORTAL_RAYCAST :: false
 
+when DEBUG_PORTAL_RAYCAST {
+		rendering.draw_line(point_on_surface, point_on_surface + transform.forward(portal_trans) * 100, Colour{100, 100, 255, 255}, 10)
+		rendering.draw_line(point_on_surface, point_on_surface + transform.angle_to_dir(Rad(side * theta + ptl_angle)) * 100, col, 5)
+		rendering.draw_line(teleported, teleported + new_dir * 100, col, 5)
+		rendering.draw_line(teleported, teleported + new_dir * 100, Colour{100, 100, 255, 255}, 10)	
+}
 		// og = teleported
 		// to_end = new_dir * ray_mag
 
