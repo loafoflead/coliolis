@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="5" nextobjectid="25">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="5" nextobjectid="27">
  <editorsettings>
-  <export target="cube_intro.tmj" format="json"/>
+  <export target="tilemaps/cube_intro.tmj" format="json"/>
  </editorsettings>
- <tileset firstgid="1" source="colours.tsx"/>
- <tileset firstgid="5" source="example.tsx"/>
+ <tileset firstgid="1" source="tilemaps/colours.tsx"/>
+ <tileset firstgid="5" source="tilemaps/example.tsx"/>
  <layer id="1" name="collision" width="32" height="16" visible="0" locked="1">
   <properties>
    <property name="generate" value="static_collisiong"/>
@@ -48,7 +48,7 @@
 15,15,15,15,15,15,27,5,6,6,6,6,6,6,6,6,7,8,27,15,15,15,15,15,15,15,15,15,15,15,15,15
 </data>
  </layer>
- <objectgroup id="2" name="Object Layer 1" locked="1">
+ <objectgroup id="2" name="Object Layer 1">
   <object id="3" name="door" type="func" x="224" y="224" width="96" height="64">
    <properties>
     <property name="class" type="class" propertytype="Sliding_Door">
@@ -68,32 +68,14 @@
     </property>
    </properties>
   </object>
-  <object id="7" name="Entry" type="func" x="96" y="32" rotation="90">
-   <properties>
-    <property name="class" type="class" propertytype="Entry_Chute"/>
-   </properties>
-   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
-  </object>
-  <object id="11" name="Exit" type="func" x="576" y="416" rotation="180">
-   <properties>
-    <property name="class" type="class" propertytype="Exit_Chute">
-     <properties>
-      <property name="next_level" type="file" value="cube_portal.tmj"/>
-     </properties>
-    </property>
-   </properties>
-   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
-  </object>
   <object id="12" name="btn" type="func" x="416" y="224" rotation="270">
    <properties>
-    <property name="class" type="class" propertytype="Cube_Button">
-     <properties>
-      <property name="channel" propertytype="Event_Channels" value="Logic"/>
-      <property name="event" value="door"/>
-      <property name="facing" value=""/>
-      <property name="on_pressed" value="door"/>
-     </properties>
-    </property>
+    <property name="func" value="Cube_Button"/>
+    <property name="func_data">{
+&quot;on_pressed&quot;: [{
+  &quot;event&quot;: &quot;door&quot;,
+}],
+}</property>
    </properties>
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
@@ -111,6 +93,28 @@
       </property>
      </properties>
     </property>
+    <property name="func" value="Cube_Spawner"/>
+    <property name="func_data">{
+&quot;io&quot;: {
+&quot;inputs&quot;: [{
+	&quot;event&quot;: &quot;level_load&quot;,
+	&quot;kind&quot;: &quot;Toggle&quot;
+}],
+},
+}</property>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="25" name="Entry" type="func" x="96" y="32" rotation="90">
+   <properties>
+    <property name="func" value="Entry_Chute"/>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="26" name="Exit" type="func" x="576" y="416" rotation="180">
+   <properties>
+    <property name="func" value="Level_Exit"/>
+    <property name="func_data" type="file" value="tilemaps/cube_portal.tmj"/>
    </properties>
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>

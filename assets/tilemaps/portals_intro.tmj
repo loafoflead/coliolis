@@ -70,8 +70,8 @@
                  "type":"func",
                  "visible":true,
                  "width":0,
-                 "x":416,
-                 "y":416
+                 "x":320,
+                 "y":640
                 }, 
                 {
                  "height":0,
@@ -124,8 +124,8 @@
                  "type":"func",
                  "visible":true,
                  "width":0,
-                 "x":608,
-                 "y":256
+                 "x":544,
+                 "y":128
                 }, 
                 {
                  "height":0,
@@ -154,13 +154,9 @@
                         }],
                  "properties":[
                         {
-                         "name":"class",
-                         "propertytype":"Entry_Chute",
-                         "type":"class",
-                         "value":
-                            {
-
-                            }
+                         "name":"func",
+                         "type":"string",
+                         "value":"Entry_Chute"
                         }],
                  "rotation":90,
                  "type":"func",
@@ -196,13 +192,14 @@
                         }],
                  "properties":[
                         {
-                         "name":"class",
-                         "propertytype":"Exit_Chute",
-                         "type":"class",
-                         "value":
-                            {
-                             "next_level":"cube_intro.tmj"
-                            }
+                         "name":"func",
+                         "type":"string",
+                         "value":"Level_Exit"
+                        }, 
+                        {
+                         "name":"func_data",
+                         "type":"file",
+                         "value":"cube_intro.tmj"
                         }],
                  "rotation":180,
                  "type":"func",
@@ -210,6 +207,92 @@
                  "width":0,
                  "x":992,
                  "y":352
+                }, 
+                {
+                 "height":0,
+                 "id":46,
+                 "name":"ptl1",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
+                 "properties":[
+                        {
+                         "name":"func",
+                         "type":"string",
+                         "value":"Portal_Frame"
+                        }, 
+                        {
+                         "name":"func_data",
+                         "type":"string",
+                         "value":"{\n\"portal\": 1,\n\"io\": {\n\"inputs\": [{\n\t\"event\": \"level_load\",\n\t\"kind\": \"Toggle\"\n}],\n},\n}"
+                        }],
+                 "rotation":-90,
+                 "type":"func",
+                 "visible":true,
+                 "width":0,
+                 "x":416,
+                 "y":416
+                }, 
+                {
+                 "height":0,
+                 "id":47,
+                 "name":"ptl1",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }, 
+                        {
+                         "x":0,
+                         "y":-32
+                        }, 
+                        {
+                         "x":0,
+                         "y":32
+                        }, 
+                        {
+                         "x":32,
+                         "y":0
+                        }],
+                 "properties":[
+                        {
+                         "name":"func",
+                         "type":"string",
+                         "value":"Portal_Frame"
+                        }, 
+                        {
+                         "name":"func_data",
+                         "type":"string",
+                         "value":"{\n\"portal\": 2,\n\"io\": {\n\"inputs\": [{\n\t\"event\": \"level_load\",\n\t\"kind\": \"Toggle\"\n}],\n},\n}"
+                        }],
+                 "rotation":90,
+                 "type":"func",
+                 "visible":true,
+                 "width":0,
+                 "x":608,
+                 "y":256
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -319,7 +402,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":46,
+ "nextobjectid":48,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.2",

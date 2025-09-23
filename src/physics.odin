@@ -639,10 +639,8 @@ add_phys_object :: proc(
 }
 
 update_phys_world :: proc() {
-	for _ in 0..<PHYSICS_SUBSTEPS {
-		update_portals()
-		b2d.World_Step(physics.world, PHYSICS_TIMESTEP/PHYSICS_SUBSTEPS, 1)
-	}
+	update_portals()
+	b2d.World_Step(physics.world, PHYSICS_TIMESTEP, PHYSICS_SUBSTEPS)
 
 	sensor_events := b2d.World_GetSensorEvents(physics.world)
 

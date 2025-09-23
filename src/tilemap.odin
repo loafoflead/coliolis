@@ -2,6 +2,7 @@ package main;
 import rl "thirdparty/raylib";
 
 import "core:log"
+import "core:strings"
 
 import "core:encoding/json"
 import vmem "core:mem/virtual"
@@ -73,105 +74,82 @@ facing_from_json :: proc(json_value: json.Value) -> Vec2 {
 level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features, any_found: bool) {
 	tm := tilemap(id)
 
-	for &object in tm.objects {
+	OBJECTS: for &object in tm.objects {
 		pos := object.pos - Vec2(32/2)
 		// object.pos = rl_to_b2d_pos(object.pos)
 		if object.type == .Func {
-			for name, prop in object.properties {
-				#partial switch value in prop {
-				case string:
-					log.warnf("property '%s' with value '%s' will be ignored", name, value)
-				case tiled.Tilemap_Class:
-					arena := vmem.arena_allocator(&tm.arena)
-					err : json.Unmarshal_Error
-
-					switch value.classname {
-					case "Entry_Chute"		:
-						features.player_spawn = pos
-						features.player_spawn_facing = transform.angle_to_dir(object.rot)
-					case "Exit_Chute"		:
-						exit: Level_Exit
-						features.level_exit = pos
-						err = json.unmarshal_string(value.json_data, &exit, allocator = arena)
-						features.next_level = exit.next_level
-					case "Portal_Fixture"	:
-						frame: Portal_Fixture
-						err = json.unmarshal_string(value.json_data, &frame, allocator = arena)
-						frame.pos, frame.dims, frame.facing = pos, object.dims, transform.angle_to_dir(object.rot)
-						obj_prtl_frame_new(frame)
-					case "Cube_Button":
-						btn: Cube_Button
-						err = json.unmarshal_string(value.json_data, &btn, allocator = arena)
-						btn.pos, btn.dims, btn.facing = pos, object.dims, transform.angle_to_dir(object.rot)
-						obj_cube_btn_new(btn)
-					case "Cube_Spawner":
-						spwnr: Cube_Spawner
-						err = json.unmarshal_string(value.json_data, &spwnr, allocator = arena)
-						spwnr.pos, spwnr.dims, spwnr.facing = pos, object.dims, transform.angle_to_dir(object.rot)
-						obj_cube_spawner_new(spwnr)
-					case "Sliding_Door":
-						door : Sliding_Door
-						err = json.unmarshal_string(value.json_data, &door, allocator = arena)
-						door.pos = pos + object.dims/2
-						door.dims, door.facing = object.dims, transform.angle_to_dir(object.rot)
-						obj_sliding_door_new(door)
-					case "Trigger":
-						trigger : G_Trigger
-						err = json.unmarshal_string(value.json_data, &trigger, allocator = arena)
-						trigger.pos = pos + object.dims/2
-						trigger.dims = object.dims
-						obj_trigger_new(trigger)
+			func_class: string
+			func_data: string
+			PROPS: for name, prop in object.properties {
+				switch name {
+					case "func":
+						#partial switch value in prop {
+							case string:
+								func_class = value
+							case tiled.Tilemap_Enum:
+								func_class = value.value
+							case tiled.Tilemap_Class:
+								func_class = value.classname
+						}
+						continue PROPS
+					case "func_data":
+						#partial switch value in prop {
+							case string:
+								func_data = value
+							case:
+								log.warnf("func_data must be a Json string, not a %v", prop)
+								continue OBJECTS
+						}
 					case:
-						log.warnf("Unknown object class '%s'", value.classname)
-						continue
-					}
-					if err != nil {
-						log.panicf("Failed to unmarshal json data for object (impossible) from data '%s'", value.json_data)
-					}
-
-					// switch value.classname {
-					// case "Entry_Chute"		: 
-					// 	features.player_spawn = object.pos/* - Vec2{cast(f32)tm.tilewidth, cast(f32)tm.tileheight}*/
-					// 	features.player_spawn_facing = facing_from_json(value.json_value)
-					// case "Exit_Chute"		:
-					// 	next_lvl_found: bool
-					// 	features.level_exit = object.pos + object.dims / 2
-					// 	features.next_level, next_lvl_found = value.json_value["next_level"].(string)
-					// 	if !next_lvl_found {
-					// 		log.error("Level exit object does not specify a next level, will just respawn endlessly")
-					// 	}
-					// case "Portal_Fixture"	: 
-					// 	frame := Portal_Fixture{ 
-					// 		pos = object.pos,
-					// 		facing = facing_from_json(value.json_value["facing"]),
-					// 		portal = cast(i32) (value.json_value["portal"].(i64) or_else 0),
-					// 		condition = condition_from_json(value.json_value["condition"].(json.Object)) or_continue
-					// 	}
-					// 	obj_prtl_frame_new(frame)
-					// 	// append(&features.portal_fixtures, )
-					// case "Cube_Button":
-					// 	btn := Cube_Button{ 
-					// 		pos = object.pos,
-					// 		facing = facing_from_json(value.json_value),
-					// 		channel = channel_from_string(value.json_value["channel"].(string) or_else "") or_else .Logic,
-					// 		event = value.json_value["event"].(string) or_else ""
-					// 	}
-					// 	obj_cube_btn_new(btn)
-					// case "Sliding_Door":
-					// 	door := Sliding_Door {
-					// 		pos = object.pos + object.dims / 2,
-					// 		facing = facing_from_json(value.json_value),
-					// 		dims = object.dims,
-					// 		condition = condition_from_json(value.json_value["condition"].(json.Object)) or_continue
-					// 	}
-					// 	obj_sliding_door_new(door)
-					// case:
-					// 	log.warnf("Unknown object class '%s'", value.classname)
-					// 	continue
-					// }
+						log.warnf("Property '%s' of Tiled object with value (%v) will be ignored.", name, prop)
+						continue OBJECTS
 				}
-				any_found = true
 			}
+
+			func_class = strings.to_lower(func_class, allocator=context.temp_allocator)
+
+			arena := vmem.arena_allocator(&tm.arena)
+			err : json.Unmarshal_Error
+
+			switch func_class {
+				case "entry_chute":
+					features.player_spawn = pos
+					features.player_spawn_facing = transform.angle_to_dir(object.rot)
+				case "exit_chute", "level_exit", "exit":
+					features.level_exit = pos
+					features.next_level = func_data
+				case "portal_frame", "portal_fixture":
+					frame: Portal_Fixture
+					err = json.unmarshal_string(func_data, &frame, allocator = arena)
+					frame.pos, frame.dims, frame.facing = pos, object.dims, transform.angle_to_dir(object.rot)
+					obj_prtl_frame_new(frame)
+				case "cube_button":
+					btn: Cube_Button
+					err = json.unmarshal_string(func_data, &btn, allocator = arena)
+					btn.pos, btn.dims, btn.facing = pos, object.dims, transform.angle_to_dir(object.rot)
+					obj_cube_btn_new(btn)
+				case "cube_spawner":
+					spwnr: Cube_Spawner
+					err = json.unmarshal_string(func_data, &spwnr, allocator = arena)
+					spwnr.pos, spwnr.dims, spwnr.facing = pos, object.dims, transform.angle_to_dir(object.rot)
+					obj_cube_spawner_new(spwnr)
+				case "sliding_door":
+					door : Sliding_Door
+					err = json.unmarshal_string(func_data, &door, allocator = arena)
+					door.pos = pos + object.dims/2
+					door.dims, door.facing = object.dims, transform.angle_to_dir(object.rot)
+					obj_sliding_door_new(door)
+				case "trigger":
+					trigger : G_Trigger
+					err = json.unmarshal_string(func_data, &trigger, allocator = arena)
+					trigger.pos = pos + object.dims/2
+					trigger.dims = object.dims
+					obj_trigger_new(trigger)
+				case:
+					log.warnf("Unknown object class '%s'", func_class)
+					continue
+			}
+			if err != nil do log.panicf("Failed to unmarshal json data for object (impossible) from data '%s'", func_data)
 		}
 	}
 

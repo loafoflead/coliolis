@@ -361,6 +361,10 @@ main :: proc() {
 
 		rl.EndDrawing()
 
+		if rl.IsKeyPressed(rl.KeyboardKey.E) {
+			log.infof("%#v", game_events_this_frame())
+		}
+
 when DEBUG {
 		if rl.IsKeyPressed(rl.KeyboardKey.J) do debug_mode = !debug_mode
 

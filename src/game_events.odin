@@ -16,7 +16,7 @@ Game_Event_Category :: enum {
 }
 
 Game_Event_Category_Set :: bit_set[Game_Event_Category]
-Game_Event_Payload :: union{Activation_Event, Cube_Die, Level_Event}
+Game_Event_Payload :: union{Activation_Event, Cube_Die, Level_Event, Simple_Event}
 
 Game_Event :: struct {
 	sender: Game_Object_Id,
@@ -25,6 +25,8 @@ Game_Event :: struct {
 
 	payload: Game_Event_Payload,
 }
+
+Simple_Event :: struct{}
 
 Activation_Event :: struct {
 	activated: bool,
@@ -125,3 +127,7 @@ send_new_game_event :: proc(channel: string, payload: Game_Event_Payload) {
 }
 
 send_game_event :: proc{send_new_game_event, send_game_event_done}
+
+game_events_this_frame :: proc() -> []Game_Event {
+	return game_state.events.data[:]
+}

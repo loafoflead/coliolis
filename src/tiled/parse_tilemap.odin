@@ -237,7 +237,9 @@ tilemap_parse_property :: proc(arena: runtime.Allocator, property: Tilemap_Json_
 		else {
 			prop = property.value.(string)
 		}
-	case "color", "file", "float", "int", "bool":
+	case "file":
+		prop = property.value.(string)
+	case "color", "float", "int", "bool":
 		unimplemented("More data types for top level object properties")
 	case "object":
 		prop = cast(Tilemap_Object_Id)(property.value.(i64))

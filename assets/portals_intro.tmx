@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="46">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="48">
  <editorsettings>
-  <export target="portals_intro.tmj" format="json"/>
+  <export target="tilemaps/portals_intro.tmj" format="json"/>
  </editorsettings>
- <tileset firstgid="1" source="example.tsx"/>
- <tileset firstgid="82" source="colours.tsx"/>
+ <tileset firstgid="1" source="tilemaps/example.tsx"/>
+ <tileset firstgid="82" source="tilemaps/colours.tsx"/>
  <layer id="2" name="midground" width="32" height="16" opacity="0.78">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -25,8 +25,8 @@
 28,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,30,31
 </data>
  </layer>
- <objectgroup id="3" name="markers" locked="1">
-  <object id="36" name="ptl1" type="func" x="416" y="416" rotation="-90">
+ <objectgroup id="3" name="markers">
+  <object id="36" name="ptl1" type="func" x="320" y="640" rotation="-90">
    <properties>
     <property name="class" type="class" propertytype="Portal_Fixture">
      <properties>
@@ -49,7 +49,7 @@
    </properties>
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
-  <object id="37" name="ptl2" type="func" x="608" y="256" rotation="90">
+  <object id="37" name="ptl2" type="func" x="544" y="128" rotation="90">
    <properties>
     <property name="class" type="class" propertytype="Portal_Fixture">
      <properties>
@@ -74,22 +74,49 @@
   </object>
   <object id="38" name="Entry" type="func" x="128" y="256" rotation="90">
    <properties>
-    <property name="class" type="class" propertytype="Entry_Chute"/>
+    <property name="func" value="Entry_Chute"/>
    </properties>
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
   <object id="39" name="Exit" type="func" x="992" y="352" rotation="180">
    <properties>
-    <property name="class" type="class" propertytype="Exit_Chute">
-     <properties>
-      <property name="next_level" type="file" value="cube_intro.tmj"/>
-     </properties>
-    </property>
+    <property name="func" value="Level_Exit"/>
+    <property name="func_data" type="file" value="tilemaps/cube_intro.tmj"/>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="46" name="ptl1" type="func" x="416" y="416" rotation="-90">
+   <properties>
+    <property name="func" value="Portal_Frame"/>
+    <property name="func_data">{
+&quot;portal&quot;: 1,
+&quot;io&quot;: {
+&quot;inputs&quot;: [{
+	&quot;event&quot;: &quot;level_load&quot;,
+	&quot;kind&quot;: &quot;Toggle&quot;
+}],
+},
+}</property>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="47" name="ptl1" type="func" x="608" y="256" rotation="90">
+   <properties>
+    <property name="func" value="Portal_Frame"/>
+    <property name="func_data">{
+&quot;portal&quot;: 2,
+&quot;io&quot;: {
+&quot;inputs&quot;: [{
+	&quot;event&quot;: &quot;level_load&quot;,
+	&quot;kind&quot;: &quot;Toggle&quot;
+}],
+},
+}</property>
    </properties>
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
  </objectgroup>
- <objectgroup id="6" name="collision" locked="1">
+ <objectgroup id="6" name="collision">
   <object id="40" x="32" y="415" width="960" height="32">
    <properties>
     <property name="gen" propertytype="Generate" value="Static_Collision"/>
