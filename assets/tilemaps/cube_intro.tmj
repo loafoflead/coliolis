@@ -137,21 +137,6 @@
                         }],
                  "properties":[
                         {
-                         "name":"class",
-                         "propertytype":"Cube_Spawner",
-                         "type":"class",
-                         "value":
-                            {
-                             "condition":
-                                {
-                                 "channel":"Logic",
-                                 "event":"door",
-                                 "run_once":true,
-                                 "type":"Event"
-                                }
-                            }
-                        }, 
-                        {
                          "name":"func",
                          "type":"string",
                          "value":"Cube_Spawner"
@@ -159,7 +144,7 @@
                         {
                          "name":"func_data",
                          "type":"string",
-                         "value":"{\n\"io\": {\n\"inputs\": [{\n\t\"event\": \"level_load\",\n\t\"kind\": \"Toggle\"\n}],\n},\n}"
+                         "value":"{\n\"io\": {\n\"inputs\": [{\n\t\"event\": \"door\",\n\t\"kind\": \"Toggle\"\n}],\n},\n}"
                         }],
                  "rotation":90,
                  "type":"func",

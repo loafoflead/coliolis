@@ -81,23 +81,11 @@
   </object>
   <object id="13" name="spwner" type="func" x="224" y="32" rotation="90">
    <properties>
-    <property name="class" type="class" propertytype="Cube_Spawner">
-     <properties>
-      <property name="condition" type="class" propertytype="Condition">
-       <properties>
-        <property name="channel" propertytype="Event_Channels" value="Logic"/>
-        <property name="event" value="door"/>
-        <property name="run_once" type="bool" value="true"/>
-        <property name="type" propertytype="Condition_Type" value="Event"/>
-       </properties>
-      </property>
-     </properties>
-    </property>
     <property name="func" value="Cube_Spawner"/>
     <property name="func_data">{
 &quot;io&quot;: {
 &quot;inputs&quot;: [{
-	&quot;event&quot;: &quot;level_load&quot;,
+	&quot;event&quot;: &quot;door&quot;,
 	&quot;kind&quot;: &quot;Toggle&quot;
 }],
 },

@@ -571,10 +571,6 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	case Activation_Event, Simple_Event:
 		self := game_obj(self, Portal_Fixture)
 		res := input_receive_event(self, event)
-		log.info(res)
-		log.info(res &~ {.Became, .Active})
-		log.info(res & {.Became, .Active})
-		log.info(res - {.Became, .Active})
 		if res & {.Became, .Active} != {} do portal_goto(frame.portal, frame.pos, frame.facing)
 		// for input in self.inputs {
 		// 	if event_matches(event.name, input.event) {
@@ -586,7 +582,6 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 }
 
 spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
-	log.info("heyyy", event)
 	#partial switch payload in event.payload {
 	case Simple_Event:
 		self := game_obj(self, Cube_Spawner)
