@@ -104,7 +104,7 @@ game_load_level_from_tilemap :: proc(path: string) {
 	game_state.player = 0
 	initialise_portal_handler()
 
-	create_named_timer("game.level_loaded", 1, flags = {.Update_Automatically})
+	create_named_timer("game.level_loaded", 0.25, flags = {.Update_Automatically})
 	reset_timer("game.level_loaded")
 
 	// fmt.printfln("%#v", tilemap(test_map))

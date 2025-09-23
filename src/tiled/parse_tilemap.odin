@@ -21,6 +21,7 @@ TILEMAP_MAX_OBJECTS_PER_GROUP :: 10
 
 TILEMAP_OBJ_TYPE_MARKER :: "marker"
 TILEMAP_OBJTYPE_FUNC    :: "func"
+TILEMAP_OBJTYPE_TRIGGER :: "trigger"
 
 Tilemap_Json :: struct {	
 	tiledversion: string,
@@ -108,6 +109,7 @@ Tilemap :: struct {
 Tilemap_Object_Type :: enum {
 	Other = 0,
 	Marker,
+	Trigger,
 	Func,
 }
 
@@ -554,6 +556,7 @@ tilemap_obj_type_from_string :: proc(s: string) -> Tilemap_Object_Type {
 	switch s {
 	case TILEMAP_OBJ_TYPE_MARKER: return Tilemap_Object_Type.Marker
 	case TILEMAP_OBJTYPE_FUNC   : return .Func
+	case TILEMAP_OBJTYPE_TRIGGER: return .Trigger
 	case: 
 		log.debugf("Tilemap object type '%s' unknown", s)
 		return Tilemap_Object_Type.Other

@@ -405,16 +405,12 @@
                  "name":"vaporiser",
                  "properties":[
                         {
-                         "name":"class",
-                         "propertytype":"Trigger",
-                         "type":"class",
-                         "value":
-                            {
-                             "type":"Vaporise"
-                            }
+                         "name":"trigger",
+                         "type":"string",
+                         "value":"Vaporise"
                         }],
                  "rotation":0,
-                 "type":"func",
+                 "type":"trigger",
                  "visible":true,
                  "width":128,
                  "x":224,
@@ -422,7 +418,7 @@
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":false,
+         "visible":true,
          "x":0,
          "y":0
         }],

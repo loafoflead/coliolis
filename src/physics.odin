@@ -266,7 +266,8 @@ phys_obj_gobj_typed :: proc(id: Physics_Object_Id, $T: typeid) -> (gobj: ^T, gam
 phys_obj_gobj_untyped :: proc(id: Physics_Object_Id) -> (game_object: ^Game_Object, ok: bool) #optional_ok {
 	data := phys_obj_data(id) or_return
 	gobj_id, found := data.game_object.?
-	assert(found, "nonexistent gobj")
+	if !found do return nil, false
+	// assert(found, "nonexistent gobj")
 
 	game_object, ok = game_obj(gobj_id)
 

@@ -101,7 +101,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 								continue OBJECTS
 						}
 					case:
-						log.debugf("Property '%s' of Tiled object with value (%v) will be ignored.", name, prop)
+						log.debugf("Property '%s' of func object with value (%v) will be ignored.", name, prop)
 						continue OBJECTS
 				}
 			}
@@ -139,18 +139,60 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					door.pos = pos + object.dims/2
 					door.dims, door.facing = object.dims, transform.angle_to_dir(object.rot)
 					obj_sliding_door_new(door)
-				case "trigger":
-					trigger : G_Trigger
-					err = json.unmarshal_string(func_data, &trigger, allocator = arena)
-					trigger.pos = pos + object.dims/2
-					trigger.dims = object.dims
-					obj_trigger_new(trigger)
 				case:
 					log.debugf("Unknown object class encountered '%s', ignoring", func_class)
 					continue
 			}
 			if err != nil do log.panicf("Failed to unmarshal json data for object (impossible) from data '%s': %#v", func_data, err)
 			else do log.debugf("Created object of type '%s'", func_class)
+		}
+		else if object.type == .Trigger {
+			trigger_class: string
+			trigger_data: string
+			PROPS2: for name, prop in object.properties {
+				switch name {
+					case "trigger":
+						#partial switch value in prop {
+							case string:
+								trigger_class = value
+							case tiled.Tilemap_Enum:
+								trigger_class = value.value
+							case tiled.Tilemap_Class:
+								trigger_class = value.classname
+						}
+						continue PROPS2
+					case "trigger_data":
+						#partial switch value in prop {
+							case string:
+								trigger_data = value
+							case:
+								log.debugf("trigger_data must be a Json string, not a %v", prop)
+								continue OBJECTS
+						}
+					case:
+						log.debugf("Property '%s' of trigger object with value (%v) will be ignored.", name, prop)
+						continue OBJECTS
+				}
+			}
+
+			trigger_class = strings.to_lower(trigger_class, allocator=context.temp_allocator)
+
+			arena := vmem.arena_allocator(&tm.arena)
+			err : json.Unmarshal_Error
+
+			trigger : G_Trigger
+			trigger.pos = pos + object.dims/2
+			trigger.dims = object.dims
+			switch trigger_class {
+			case "kill":
+				trigger.type = .Kill
+			case "vaporise":
+				trigger.type = .Vaporise
+			case:
+				log.errorf("Trigger '%s' is not implemented.", trigger_class)
+			}
+			obj_trigger_new(trigger)
+			log.debugf("Created trigger of type '%v'", trigger.type)
 		}
 	}
 

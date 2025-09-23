@@ -207,16 +207,18 @@ main :: proc() {
 		// dont touch
 		update_portals()
 		
-		if run_physics do update_phys_world()
-		if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics
-		if rl.IsKeyPressed(rl.KeyboardKey.Q) do update_phys_world()
+		
 
 		update_game_state(dt)
 		// update_portals();
 		update_timers(dt)
 		rendering.update_particles(dt)
 
-		// if is_timer_done("game.level_loaded") do portal_goto(1, 400, 0)
+		if is_timer_done("game.level_loaded") {
+			if run_physics do update_phys_world()
+			if rl.IsKeyPressed(rl.KeyboardKey.P) do run_physics = !run_physics
+			if rl.IsKeyPressed(rl.KeyboardKey.Q) do update_phys_world()
+		}
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.GetColor(BACKGROUND_COLOUR))

@@ -177,6 +177,7 @@ G_Trigger :: struct {
 	using common: Level_Feature_Common,
 	type: G_Trigger_Type,
 	// TODO: callback?
+	TODO: on_trigger broadcast event
 }
 
 obj_cube_new :: proc(pos: Vec2, respawn_event: string = "") -> (id: Game_Object_Id) {
@@ -346,6 +347,18 @@ obj_prtl_frame_new :: proc(fixture: Portal_Fixture) -> (id: Game_Object_Id) {
 obj_trigger_new :: proc(trigger: G_Trigger) -> (id: Game_Object_Id) {
 	assert(game_state.initialised)
 
+	name: cstring
+	switch trigger.type {
+		case .Kill:
+			name = "trigger_kill"
+		case .Vaporise:
+			name = "trigger_vaporise"
+		case .Level_Exit:
+			name = "trigger_level_exit"
+		case:
+			name = "trigger_idk"
+	}
+
 	obj := add_phys_object_aabb(
 		pos = trigger.pos,
 		scale = trigger.dims,
@@ -353,7 +366,7 @@ obj_trigger_new :: proc(trigger: G_Trigger) -> (id: Game_Object_Id) {
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 		on_collision_enter = trigger_on_collide,
 		collide_with = PHYS_OBJ_DEFAULT_COLLIDE_WITH + {.Player},
-		name="trigger_?",
+		name=name,
 		// collide_with = {}
 	)
 
@@ -478,8 +491,9 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 			log.info("Player hit death trigger")
 		}
 	case .Vaporise:
-		gobj := phys_obj_gobj(collided)
-		if .Weak_To_Being_Vaporised in gobj.flags {
+		gobj, ok := phys_obj_gobj(collided)
+
+		if ok && .Weak_To_Being_Vaporised in gobj.flags {
 			queue_remove_game_obj(phys_obj_data(collided).game_object.?)
 		}
 	}
