@@ -16,7 +16,7 @@ Game_Event_Category :: enum {
 }
 
 Game_Event_Category_Set :: bit_set[Game_Event_Category]
-Game_Event_Payload :: union{Activation_Event, Cube_Die, Level_Event, Simple_Event}
+Game_Event_Payload :: union{Activation_Event, Cube_Die, Level_Event, Simple_Event, Boolean_Event}
 
 Game_Event :: struct {
 	sender: Game_Object_Id,
@@ -27,6 +27,7 @@ Game_Event :: struct {
 }
 
 Simple_Event :: struct{}
+Boolean_Event :: distinct bool
 
 Activation_Event :: struct {
 	activated: bool,

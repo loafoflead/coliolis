@@ -97,11 +97,11 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 							case string:
 								func_data = value
 							case:
-								log.warnf("func_data must be a Json string, not a %v", prop)
+								log.debugf("func_data must be a Json string, not a %v", prop)
 								continue OBJECTS
 						}
 					case:
-						log.warnf("Property '%s' of Tiled object with value (%v) will be ignored.", name, prop)
+						log.debugf("Property '%s' of Tiled object with value (%v) will be ignored.", name, prop)
 						continue OBJECTS
 				}
 			}
@@ -146,10 +146,11 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					trigger.dims = object.dims
 					obj_trigger_new(trigger)
 				case:
-					log.warnf("Unknown object class '%s'", func_class)
+					log.debugf("Unknown object class encountered '%s', ignoring", func_class)
 					continue
 			}
-			if err != nil do log.panicf("Failed to unmarshal json data for object (impossible) from data '%s'", func_data)
+			if err != nil do log.panicf("Failed to unmarshal json data for object (impossible) from data '%s': %#v", func_data, err)
+			else do log.debugf("Created object of type '%s'", func_class)
 		}
 	}
 

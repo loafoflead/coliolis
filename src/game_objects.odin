@@ -26,10 +26,13 @@ Puzzle_Input :: struct {
 	kind: Puzzle_Input_Kind,
 }
 
+// implicitly can also be nil
+Output_Payload :: union{bool}
+
 Puzzle_Output :: struct {
 	target: Element_Id,
 	event: string,
-	payload: union{string},
+	payload: Output_Payload,
 }
 
 Event_Recv_Result :: enum {
@@ -38,34 +41,45 @@ Event_Recv_Result :: enum {
 	Active,
 	Inactive,
 	Toggled,
+	Valid,
 }
 
-input_receive_event :: proc(pe: ^Puzzle_Element, event: ^Game_Event) -> (res: bit_set[Event_Recv_Result; u8]) {
+input_receive_event :: proc(pe: ^Puzzle_Element, event: ^Game_Event, modify_state := true) -> (res: bit_set[Event_Recv_Result; u8], payload: Output_Payload) {
 	prev_active := pe.active
+	new_active := pe.active
 	for input in pe.inputs {
 		if event_matches(event.name, input.event) {
+			res += {.Valid}
+			switch pl in event.payload {
+			case Boolean_Event:
+				payload = cast(bool)pl
+			case Simple_Event, Cube_Die, Level_Event, Activation_Event:
+				payload = nil
+			}
 			switch input.kind {
 			case .Toggle:
-				pe.active = !pe.active
+				new_active = !pe.active
 			case .Set_Active:
-				pe.active = true
+				new_active = true
 			case .Set_Inactive:
-				pe.active = false
+				new_active = false
 			}
 		}
 	}
 
-	if pe.active != prev_active do res += {.Became}
+	if new_active != prev_active do res += {.Became}
 	else do res += {.Stayed}
 
-	if pe.active {
+	if new_active {
 		res += {.Active}
 	}
 	else {
 		res += {.Inactive}
 	}
 
-	if pe.active == !prev_active do res += {.Toggled} 
+	if new_active == !prev_active do res += {.Toggled} 
+
+	if modify_state do pe.active = new_active
 
 	return
 }
@@ -74,8 +88,8 @@ trigger_output :: proc(output: Puzzle_Output) {
 	payload: Game_Event_Payload
 
 	switch v in output.payload {
-	case string:
-		unimplemented("trigger_output use different kinds of payloads")
+	case bool:
+		payload = Boolean_Event(v)
 	case nil: 
 		payload = Simple_Event{}
 	}
@@ -149,8 +163,7 @@ SLIDING_DOOR_SPEED_MS :: f32(5.0)
 
 Sliding_Door :: struct {
 	using common: Level_Feature_Common,
-	condition: Condition,
-	open: bool,
+	using io: Puzzle_Element,
 	open_percent: f32,
 }
 
@@ -538,7 +551,7 @@ sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bo
 	origin := door.pos
 	target := door.pos + door.dims * door.facing 
 
-	if door.open {
+	if door.active {
 		door.open_percent += SLIDING_DOOR_SPEED_MS * dt
 	}
 	else {
@@ -556,11 +569,13 @@ sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bo
 }
 
 sliding_door_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
-	#partial switch payload in event.payload {
-	case Simple_Event:
-		door := game_obj(self, Sliding_Door)
-		if event_matches(event.name, door.condition.event) {
-			door.open = true
+	// TODO: is this outer switch necessary with all that input_receive_event is doing?
+	#partial switch _ in event.payload {
+	case Boolean_Event:
+		self := game_obj(self, Sliding_Door)
+		res, payload := input_receive_event(self, event, modify_state=false)
+		if res & {.Valid} != {} {
+			self.active = payload.(bool) or_else panic("Big whoopsie in event handling")
 		}
 	}
 }
@@ -570,7 +585,7 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
 	case Activation_Event, Simple_Event:
 		self := game_obj(self, Portal_Fixture)
-		res := input_receive_event(self, event)
+		res, _ := input_receive_event(self, event)
 		if res & {.Became, .Active} != {} do portal_goto(frame.portal, frame.pos, frame.facing)
 		// for input in self.inputs {
 		// 	if event_matches(event.name, input.event) {
@@ -583,9 +598,9 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 
 spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
-	case Simple_Event:
+	case Simple_Event, Boolean_Event:
 		self := game_obj(self, Cube_Spawner)
-		result := input_receive_event(self, event)
+		result, _ := input_receive_event(self, event)
 		if result & {.Active} != {} && is_timer_done(self.timer) {
 			obj_cube_new(self.pos + self.facing * 32, self.inputs[0].event)
 			// reset_timer(self.timer)
@@ -597,7 +612,7 @@ spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
 		log.error("huh")
 		self := game_obj(self, Cube_Spawner)
 
-		result := input_receive_event(self, event)
+		result, _ := input_receive_event(self, event)
 
 		if result & {.Active} != {} {
 			obj_cube_new(self.pos + self.facing * 32, self.inputs[0].event)

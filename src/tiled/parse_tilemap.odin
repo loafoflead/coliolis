@@ -214,14 +214,16 @@ tilemap_parse_property :: proc(arena: runtime.Allocator, property: Tilemap_Json_
 	case "class":
 		builda, alloc_err := strings.builder_make(len=0, cap=0, allocator = arena)
 		if alloc_err != nil {
-			log.panicf("%v", alloc_err)
+			log.errorf("%v", alloc_err)
+			return nil, false
 		}
 
 		opt: json.Marshal_Options
 
 		err := json.marshal_to_builder(&builda, property.value, &opt)		
 		if err != nil {
-			log.panicf("Failed to marshal json value (impossible): %v", property.value)
+			log.errorf("Failed to marshal json value (impossible): %v", property.value)
+			return nil, false
 		}
 		prop = Tilemap_Class{
 			classname = property.propertytype,
@@ -244,7 +246,7 @@ tilemap_parse_property :: proc(arena: runtime.Allocator, property: Tilemap_Json_
 	case "object":
 		prop = cast(Tilemap_Object_Id)(property.value.(i64))
 	case:
-		log.warnf("Unsupported object property type '%s'", property.type)
+		log.debugf("Unsupported object property type '%s'", property.type)
 		ok = false
 	}
 
@@ -553,7 +555,7 @@ tilemap_obj_type_from_string :: proc(s: string) -> Tilemap_Object_Type {
 	case TILEMAP_OBJ_TYPE_MARKER: return Tilemap_Object_Type.Marker
 	case TILEMAP_OBJTYPE_FUNC   : return .Func
 	case: 
-		log.warnf("Tilemap object type '%s' unknown", s)
+		log.debugf("Tilemap object type '%s' unknown", s)
 		return Tilemap_Object_Type.Other
 	}
 }

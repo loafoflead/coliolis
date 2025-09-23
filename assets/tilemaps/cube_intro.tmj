@@ -43,22 +43,14 @@
                  "name":"door",
                  "properties":[
                         {
-                         "name":"class",
-                         "propertytype":"Sliding_Door",
-                         "type":"class",
-                         "value":
-                            {
-                             "condition":
-                                {
-                                 "activated_by":5,
-                                 "activated_when":"event",
-                                 "channel":"Logic",
-                                 "event":"door",
-                                 "type":"Event"
-                                },
-                             "facing":"",
-                             "facing_x":1
-                            }
+                         "name":"func",
+                         "type":"string",
+                         "value":"Sliding_Door"
+                        }, 
+                        {
+                         "name":"func_data",
+                         "type":"string",
+                         "value":"{\n\"io\": {\n\"inputs\": [{\n\t\"event\": \"door\",\n\t\"kind\": \"Payload\",\n}],\n},\n}"
                         }],
                  "rotation":0,
                  "type":"func",
@@ -101,7 +93,7 @@
                         {
                          "name":"func_data",
                          "type":"string",
-                         "value":"{\n\"on_pressed\": [{\n  \"event\": \"door\",\n}],\n}"
+                         "value":"{\n\"on_pressed\": [{\n  \"event\": \"door\",\n  \"payload\": true,\n}],\n\"on_unpressed\": [{\n  \"event\": \"door\",\n  \"payload\": false,\n}],\n}"
                         }],
                  "rotation":270,
                  "type":"func",
