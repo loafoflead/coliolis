@@ -11,5 +11,6 @@ bin/*
 bin/
 build
 __gen/
+test.odin
 
 *.kra*

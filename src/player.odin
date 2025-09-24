@@ -32,6 +32,8 @@ PORTAL_RANGE :: 500
 PLAYER_REACH :: 80
 SNAP_LIMIT   :: 40
 
+COLLIDER_BIGGERNESS :: 0.05
+
 Player :: struct {
 	// logic_obj: Physics_Object_Id,
 	// dynamic_obj: Physics_Object_Id,
@@ -75,7 +77,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	data.transform = transform.new(0, 0)
 	body_def.userData = data
 	body_def.name = "player"
-	body_def.type = b2d.BodyType.kinematicBody
+	body_def.type = b2d.BodyType.staticBody
 
 	player.obj = b2d.CreateBody(physics.world, body_def)
 
@@ -89,7 +91,9 @@ player_new :: proc(texture: Texture_Id) -> Player {
 	}
 	shape.enableSensorEvents = true
 
-	_ = b2d.CreateCapsuleShape(player.obj, shape, player_capsule())
+	capsule := player_static_collider_capsule()
+
+	_ = b2d.CreateCapsuleShape(player.obj, shape, capsule)
 
 	// player.logic_obj = add_phys_object_aabb(
 	// 	pos = get_screen_centre(), 
@@ -131,6 +135,14 @@ get_player :: proc "contextless" () -> ^Player {
 	return g
 }
 
+player_static_collider_capsule :: proc() -> b2d.Capsule {
+	capsule := player_capsule()
+	capsule.radius += COLLIDER_BIGGERNESS
+	capsule.center2 += Vec2{0, COLLIDER_BIGGERNESS}
+	capsule.center1 += Vec2{0, COLLIDER_BIGGERNESS}
+	return capsule
+}
+
 player_capsule :: proc() -> b2d.Capsule {
 	mover : b2d.Capsule
 	// if game_state.player != 0 && get_player().teleporting {
@@ -151,8 +163,8 @@ player_grounded_check :: proc() -> bool {
 	player := get_player()
 
 	target := player_pos() - transform.right(&player.transform) * 21
-	filter := b2d.Shape_GetFilter(phys_obj_shape(player.obj))
-	layers := transmute(Collision_Set)filter.maskBits
+	// filter := b2d.Shape_GetFilter(phys_obj_shape(player.obj))
+	layers := Collision_Set{.Default}//transmute(Collision_Set)filter.maskBits
 
 	_, hit := cast_ray_in_world(player_pos(), target - player_pos(), exclude = {player.obj}, layers = layers, triggers = false)
 	draw_line(player_pos(), target)
@@ -265,8 +277,10 @@ when DEBUG_TEXT_PLAYER {
 	Mover_Context :: struct {
 		planes: [10]b2d.CollisionPlane,
 		idx: int,
+		player_body: Physics_Object_Id,
 	}
 	mctx: Mover_Context
+	mctx.player_body = player.obj
 
 	result_proc := proc "c" (shapeId: b2d.ShapeId, plane: ^b2d.PlaneResult, ctx: rawptr) -> bool {
 		if ctx == nil {
@@ -274,11 +288,16 @@ when DEBUG_TEXT_PLAYER {
 			libc.abort()
 			// log.panicf("bad bad booboo")
 		}
+		mctx := cast(^Mover_Context)ctx
 		// libc.printf("crazy? i was crazy once\n")
 
-		if b2d.Shape_IsSensor(shapeId) do return true
+		body := b2d.Shape_GetBody(shapeId)
+		if body == mctx.player_body do return false
+		if b2d.Shape_IsSensor(shapeId) do return false
+		// body_ty := b2d.Body_GetType(body)
+		// to avoid cubes clipping straight into me...
+		// if body_ty == .dynamicBody do return true
 
-		mctx := cast(^Mover_Context)ctx
 
 		max_push := f32(9999999999) // TODO: f32.Max or whaddeva
 		clip_velocity := true
@@ -292,8 +311,8 @@ when DEBUG_TEXT_PLAYER {
 	}
 	body_filter := b2d.Shape_GetFilter(phys_obj_shape(player.obj))
 	filter := b2d.DefaultQueryFilter()
-	filter.maskBits = body_filter.maskBits
-	filter.categoryBits = transmute(u64)Collision_Set{.Default}
+	filter.maskBits = transmute(u64)Collision_Set{.Default}
+	// filter.categoryBits = transmute(u64)Collision_Set{.Default}
 	tolerance := f32(0.01) // ?
 
 	for i:=0; i < PLAYER_MOVE_SUBSTEPS; i+=1 {
@@ -421,40 +440,11 @@ when PLAYER_STEPPING_UP {
 	}
 }
 
-	// if move != 0.0 && is_timer_done(&player.step_timer) {
-	// 	// b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, wake = true)
-	// 	new_vel := b2d.Body_GetLinearVelocity(player_obj)
-	// 	new_vel.x = move * PLAYER_HORIZ_ACCEL
-	// 	b2d.Body_ApplyForceToCenter(player_obj, Vec2{move * PLAYER_HORIZ_ACCEL, 0}, false)
-	// 	// b2d.Body_SetLinearVelocity(player_obj, new_vel)
-	// 	// player_obj.acc.x = move * PLAYER_HORIZ_ACCEL;
-	// }
-	// else {
-	// 	cur_vel := b2d.Body_GetLinearVelocity(player_obj)
-	// 	if math.abs(cur_vel.x) > 1 {
-	// 		force := Vec2{
-	// 			cur_vel.x,
-	// 			0
-	// 		}
-	// 		b2d.Body_ApplyForceToCenter(player_obj, -rl_to_b2d_pos(force * 60 * PLAYER_WEIGHT), wake=false)
-	// 	}
-	// }
-
 	if rl.IsKeyPressed(rl.KeyboardKey.L) {
 		player.portals_unlocked += 1
 		log.info(player.portals_unlocked)
 	}
 
-	// else {
-		// if math.abs(player.transform.rot) > 0.1 {
-		// 	// rotate(player_obj, player_obj.rot * 0.01);
-		// 	rotate(&player.transform, player.transform.rot * -0.05);
-		// }
-		// else {
-		// 	player.transform = transform.new(player.transform.pos, 0);
-		// 	// setrot(player_obj, 0);
-		// }
-		// log.info(player.transform.rot)
 when false {
 	#panic("TODO")
 	if transform.rot(player.transform) < 0 && transform.rot(player.transform) > -linalg.PI {
@@ -484,6 +474,15 @@ draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
 	capsule := player_capsule()
 	player := game_obj(player, Player)
 
+	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center1)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
+	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center2)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
+
+	capsule = player_static_collider_capsule()	
+	colour = {255, 0, 0, 90}
+
+	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center1)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
+	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center2)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
+
 	mpos := rendering.get_world_mouse_pos()
 	og := get_player().transform.pos
 	to_end := mpos - og
@@ -502,20 +501,4 @@ draw_player :: proc(player: Game_Object_Id, _: Camera2D) {
 	} else {
 		draw_line(og, mpos, colour=Colour{255, 0, 0, 255})
 	}
-	// portal_aware_raycast(get_player().transform.pos, get_player().transform.pos - mpos)
-
-	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center1)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
-	rendering.draw_circle(transform.transform_point(&player.transform, b2d_to_rl_pos(capsule.center2)), capsule.radius / f32(PIXELS_TO_METRES_RATIO), colour)
-	// draw_circle(player_pos() + capsule.center1 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO))
-	// draw_circle(player_pos() + capsule.center2 / f32(PIXELS_TO_METRES_RATIO), capsule.radius / f32(PIXELS_TO_METRES_RATIO))
-	// player := game_obj(player, Player)
-	// obj:=phys_obj(player.obj);
-	
-	// r := phys_obj_to_rect(obj).zw;
-	// draw_phys_obj(get_player().obj, colour=Colour{255, 0, 0, 255});
-	
-	// draw_phys_obj(get_player().obj, colour, lines = false);
-	// draw_rectangle_transform(obj, phys_obj_to_rect(obj), texture_id=player.texture);
-	// draw_texture(player.texture, obj.pos, pixel_scale=phys_obj_to_rect(obj).zw);	
-	// draw_rectangle(obj.pos - r/2, r);	
 }

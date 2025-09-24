@@ -58,7 +58,7 @@ Collision_Layer :: enum u64 {
 Collision_Set :: bit_set[Collision_Layer; u64]
 COLLISION_LAYERS_ALL: bit_set[Collision_Layer; u64] : {.Default, .Player, .Portal_Surface, .L0, .L1};
 
-PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer; u64] { .Default }
+PHYS_OBJ_DEFAULT_COLLIDE_WITH :: bit_set[Collision_Layer; u64] { .Default, .Player }
 PHYS_OBJ_DEFAULT_COLLISION_LAYERS 	  :: bit_set[Collision_Layer; u64] { .Default }
 
 PHYS_OBJ_DEFAULT_FLAGS :: bit_set[Physics_Object_Flag] {}
