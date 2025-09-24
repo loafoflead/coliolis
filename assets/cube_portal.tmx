@@ -73,7 +73,7 @@
    </properties>
    <polygon points="0,0 0,-128 -32,-128 -32,0"/>
   </object>
-  <object id="19" name="btn" type="func" x="192" y="160" rotation="270">
+  <object id="19" name="btn" type="func" x="96" y="160" rotation="270">
    <properties>
     <property name="func" value="Cube_Button"/>
     <property name="func_data">{
