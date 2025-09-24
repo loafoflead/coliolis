@@ -52,6 +52,7 @@ Player :: struct {
 	jumping: bool,
 	coyote_timer: Timer,
 	teleporting: bool,
+	collide_with: Collision_Set,
 
 	portals_unlocked: int,
 }
@@ -89,6 +90,7 @@ player_new :: proc(texture: Texture_Id) -> Player {
 		transmute(u64)Collision_Set{.Default},
 		0,
 	}
+	player.collide_with = Collision_Set{.Default}
 	shape.enableSensorEvents = true
 
 	capsule := player_static_collider_capsule()
@@ -164,7 +166,7 @@ player_grounded_check :: proc() -> bool {
 
 	target := player_pos() - transform.right(&player.transform) * 21
 	// filter := b2d.Shape_GetFilter(phys_obj_shape(player.obj))
-	layers := Collision_Set{.Default}//transmute(Collision_Set)filter.maskBits
+	layers := player.collide_with//transmute(Collision_Set)filter.maskBits
 
 	_, hit := cast_ray_in_world(player_pos(), target - player_pos(), exclude = {player.obj}, layers = layers, triggers = false)
 	draw_line(player_pos(), target)
@@ -292,8 +294,8 @@ when DEBUG_TEXT_PLAYER {
 		// libc.printf("crazy? i was crazy once\n")
 
 		body := b2d.Shape_GetBody(shapeId)
-		if body == mctx.player_body do return false
-		if b2d.Shape_IsSensor(shapeId) do return false
+		if body == mctx.player_body do return true
+		if b2d.Shape_IsSensor(shapeId) do return true
 		// body_ty := b2d.Body_GetType(body)
 		// to avoid cubes clipping straight into me...
 		// if body_ty == .dynamicBody do return true
@@ -311,7 +313,7 @@ when DEBUG_TEXT_PLAYER {
 	}
 	body_filter := b2d.Shape_GetFilter(phys_obj_shape(player.obj))
 	filter := b2d.DefaultQueryFilter()
-	filter.maskBits = transmute(u64)Collision_Set{.Default}
+	filter.maskBits = transmute(u64)player.collide_with
 	// filter.categoryBits = transmute(u64)Collision_Set{.Default}
 	tolerance := f32(0.01) // ?
 

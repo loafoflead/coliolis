@@ -735,41 +735,34 @@ prtl_collide_begin :: proc(self, collided: Physics_Object_Id, self_shape, other_
 		if occupant.phys_id == collided do return
 	}
 
-	if ty != b2d.BodyType.staticBody {
+	shape := phys_obj_shape(collided)
+	cur_filter := b2d.Shape_GetFilter(shape)
+	collides : Collision_Set = transmute(Collision_Set)cur_filter.maskBits
 
-		shape := phys_obj_shape(collided)
-		cur_filter := b2d.Shape_GetFilter(shape)
-		collides := transmute(bit_set[Collision_Layer; u64])cur_filter.maskBits
+	to_occupant_centre := phys_obj_pos(collided) - phys_obj_pos(self);
+	side := linalg.dot(to_occupant_centre, -transform.forward(phys_obj_transform(self)));
 
-		to_occupant_centre := phys_obj_pos(collided) - phys_obj_pos(self);
-		side := linalg.dot(to_occupant_centre, -transform.forward(phys_obj_transform(self)));
-
-		occupant := Portal_Occupant {
-			phys_id = collided,
-			layers = collides,
-			// TODO: this will eventually overflow the timers so maybe
-			// just make it updated in the update func
-			tp_timer = get_temp_timer(0.25, flags={.Update_Automatically}),
-			last_side = side,
-		}
-	
-		b2d.Shape_SetFilter(shape, b2d.Filter {
-			categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
-			maskBits = transmute(u64)Collision_Set{.L0},
-		})
-
-		append(&portal.occupants, occupant)
-		// portal.occupant = collided;
-
-		// TODO: the only real way to fix buggines when walking up to a portal
-		// from a direction is to instead disable all colliders intersecting this portal
-
-		// 	shape, phys_shape_filter(
-		// 	{},
-		// 	collides,
-		// ))
+	if collided == get_player().obj {
+		collides = get_player().collide_with
+		get_player().collide_with = Collision_Set{.L0}
 	}
-	// }
+
+	occupant := Portal_Occupant {
+		phys_id = collided,
+		layers = collides,
+		// TODO: this will eventually overflow the timers so maybe
+		// just make it updated in the update func
+		tp_timer = get_temp_timer(0.25, flags={.Update_Automatically}),
+		last_side = side,
+	}
+
+	b2d.Shape_SetFilter(shape, b2d.Filter {
+		categoryBits = cur_filter.categoryBits, //transmute(u64)bit_set[Collision_Layer;u64]{.L0},
+		maskBits = transmute(u64)Collision_Set{.L0},
+	})
+
+
+	append(&portal.occupants, occupant)
 }
 
 prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_shape: b2d.ShapeId) {
@@ -792,11 +785,13 @@ prtl_collide_end :: proc(self, collided: Physics_Object_Id, self_shape, other_sh
 			log.error("resetting collision")
 			shape := phys_obj_shape(occupant.phys_id)
 			cur_filter := b2d.Shape_GetFilter(shape)
+
 			b2d.Shape_SetFilter(shape, b2d.Filter {
 				categoryBits = cur_filter.categoryBits,//transmute(u64)portal.occupant_layers,
 				maskBits = transmute(u64)occupant.layers,
 			})
 			if game_state.player == phys_obj_data(occupant.phys_id).game_object.? {
+				get_player().collide_with = occupant.layers
 				get_player().teleporting = false
 			}
 		}
@@ -886,7 +881,7 @@ update_portals :: proc() {
 			body := b2d.Shape_GetBody(contact)
 			known: bool
 			ty := b2d.Body_GetType(body)
-			if (ty == b2d.BodyType.kinematicBody && get_player().obj != body) || ty == b2d.BodyType.staticBody do continue
+			if (ty == b2d.BodyType.staticBody && get_player().obj != body) || ty == b2d.BodyType.kinematicBody do continue
 			if .Portal_Traveller not_in phys_obj_gobj(body).flags do continue
 
 			for occ in portal.occupants {
