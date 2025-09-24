@@ -48,7 +48,9 @@ input_receive_event :: proc(pe: ^Puzzle_Element, event: ^Game_Event, modify_stat
 	prev_active := pe.active
 	new_active := pe.active
 	for input in pe.inputs {
+		// log.infof("%#v", input)
 		if event_matches(event.name, input.event) {
+			// log.info("passes")
 			res += {.Valid}
 			switch pl in event.payload {
 			case Boolean_Event:
@@ -84,7 +86,7 @@ input_receive_event :: proc(pe: ^Puzzle_Element, event: ^Game_Event, modify_stat
 	return
 }
 
-trigger_output :: proc(output: Puzzle_Output) {
+trigger_output :: proc(output: Puzzle_Output, sender:= GAME_OBJECT_INVALID) {
 	payload: Game_Event_Payload
 
 	switch v in output.payload {
@@ -97,6 +99,7 @@ trigger_output :: proc(output: Puzzle_Output) {
 	log.info(output)
 
 	send_game_event(Game_Event {
+		sender = sender,
 		name = output.event,
 		payload = payload,
 	})
@@ -177,7 +180,7 @@ G_Trigger :: struct {
 	using common: Level_Feature_Common,
 	type: G_Trigger_Type,
 	// TODO: callback?
-	TODO: on_trigger broadcast event
+	// TODO: on_trigger broadcast event
 }
 
 obj_cube_new :: proc(pos: Vec2, respawn_event: string = "") -> (id: Game_Object_Id) {
@@ -316,6 +319,7 @@ obj_cube_spawner_new :: proc(spwner: Cube_Spawner) -> (id: Game_Object_Id) {
 
 	spwner := spwner
 	spwner.timer = get_temp_timer(1, flags = {.Update_Automatically})
+	set_timer_done(spwner.timer)
 
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
@@ -437,6 +441,7 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 
 cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 	btn, _ := phys_obj_gobj(self, Cube_Button)
+	self_id := phys_obj_gobj_id(self)
 	other_gobj := phys_obj_gobj(collided)
 
 	if .Weigh_Down_Buttons in other_gobj.flags {
@@ -445,13 +450,14 @@ cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 		if btn.occupants_count == 1 {
 			btn.active = true
 
-			for outpt in btn.on_pressed do trigger_output(outpt)
+			for outpt in btn.on_pressed do trigger_output(outpt, sender = self_id)
 		}
 	}
 }
 
 cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 	btn, _ := phys_obj_gobj(self, Cube_Button)
+	self_id := phys_obj_gobj_id(self)
 	other_gobj := phys_obj_gobj(collided)
 
 	// TODO: this may be a logic error bc it doesnt check if the thing leaving is 
@@ -465,10 +471,10 @@ cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 		if btn.occupants_count == 0 {
 			btn.active = false
 
-			for outpt in btn.on_pressed do trigger_output(outpt)
+			for outpt in btn.on_pressed do trigger_output(outpt, sender = self_id)
 			for outpt in btn.on_unpressed {
 				if outpt.event != "" {
-					trigger_output(outpt)
+					trigger_output(outpt, sender = self_id)
 				}
 			}
 		}
@@ -477,12 +483,13 @@ cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 
 trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 	trigger, _ := phys_obj_gobj(self, G_Trigger)
+	self_id := phys_obj_gobj_id(self)
 
 	switch trigger.type {
 	case .Level_Exit:
 		if collided == get_player().obj {
 			log.info("Player hit level exit")
-			send_game_event("lvl", Level_Event.End)
+			send_game_event("lvl", Level_Event.End, sender = self_id)
 		}
 	case .Kill:
 		if collided == get_player().obj {
@@ -522,6 +529,7 @@ when PHYSICS_BUTTON {
 		if !btn.pressed {
 			btn.pressed = true
 			send_game_event(Game_Event {
+				sender = self,
 				name = btn.on_pressed,
 				payload = Activation_Event {
 					activated = true,
@@ -533,6 +541,7 @@ when PHYSICS_BUTTON {
 		if btn.pressed {
 			btn.pressed = false
 			send_game_event(Game_Event {
+				sender = self,
 				name = btn.on_pressed,
 				payload = Activation_Event {
 					activated = false,
@@ -540,6 +549,7 @@ when PHYSICS_BUTTON {
 			})
 			if btn.on_unpressed != "" {
 				send_game_event(Game_Event {
+					sender = self,
 					name = btn.on_unpressed,
 					payload = Activation_Event {
 						activated = true,
@@ -597,7 +607,7 @@ sliding_door_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	frame := game_obj(self, Portal_Fixture)
 	#partial switch payload in event.payload {
-	case Activation_Event, Simple_Event:
+	case Activation_Event, Simple_Event, Level_Event:
 		self := game_obj(self, Portal_Fixture)
 		res, _ := input_receive_event(self, event)
 		if res & {.Became, .Active} != {} do portal_goto(frame.portal, frame.pos, frame.facing)
@@ -612,15 +622,16 @@ prtl_frame_event_recv :: proc(self: Game_Object_Id, event: ^Game_Event) {
 
 spawner_recv_event :: proc(self: Game_Object_Id, event: ^Game_Event) {
 	#partial switch payload in event.payload {
-	case Simple_Event, Boolean_Event:
+	case Simple_Event, Boolean_Event, Level_Event:
 		self := game_obj(self, Cube_Spawner)
-		result, _ := input_receive_event(self, event)
+		result, _ := input_receive_event(self, event, modify_state=false)
+		// NOTE: this wasn't working bc the timer wasn't done 
+		// while it was recving a spawn event
 		if result & {.Active} != {} && is_timer_done(self.timer) {
 			obj_cube_new(self.pos + self.facing * 32, self.inputs[0].event)
 			// reset_timer(self.timer)
 			self.timer.flags -= {.Update_Automatically}
 			reset_timer(self.timer)
-			self.active = false
 		}
 	case Cube_Die:
 		log.error("huh")
@@ -660,12 +671,13 @@ door_render :: proc(self: Game_Object_Id, _: Camera2D) {
 	draw_phys_obj(gobj.obj.?)
 }
 
-cube_on_kill :: proc(self: Game_Object_Id) {
-	self := game_obj(self, Cube)
+cube_on_kill :: proc(self_id: Game_Object_Id) {
+	self := game_obj(self_id, Cube)
 
 	if self.respawn_event == "" do return 
 
 	send_game_event(Game_Event {
+		sender = self_id,
 		name = self.respawn_event,
 		payload = Cube_Die {
 			event_name = self.respawn_event,

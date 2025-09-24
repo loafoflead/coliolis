@@ -232,7 +232,7 @@ update_game_state :: proc(dt: f32) {
 	if is_timer_just_done("game.level_loaded") {
 		send_game_event(Game_Event {
 			name = "level_load",
-			payload = Activation_Event { activated = true },
+			payload = Level_Event.Load,
 		})
 	}
 

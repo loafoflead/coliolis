@@ -21,7 +21,6 @@ Game_Event_Payload :: union{Activation_Event, Cube_Die, Level_Event, Simple_Even
 Game_Event :: struct {
 	sender: Game_Object_Id,
 	name: string,
-	categories: Game_Event_Category_Set,
 
 	payload: Game_Event_Payload,
 }
@@ -112,7 +111,6 @@ send_game_event_done :: proc(event: Game_Event) {
 	for e_name in events {
 		event := Game_Event {
 			name = e_name,
-			categories = event.categories,
 			payload = event.payload,
 			sender = event.sender,
 		}
@@ -120,10 +118,11 @@ send_game_event_done :: proc(event: Game_Event) {
 	}
 }
 
-send_new_game_event :: proc(channel: string, payload: Game_Event_Payload) {
+send_new_game_event :: proc(channel: string, payload: Game_Event_Payload, sender := GAME_OBJECT_INVALID) {
 	send_game_event_done(Game_Event {
 		name = channel,
 		payload = payload,
+		sender = sender,
 	})
 }
 

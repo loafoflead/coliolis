@@ -274,6 +274,14 @@ phys_obj_gobj_untyped :: proc(id: Physics_Object_Id) -> (game_object: ^Game_Obje
 	return
 }
 
+phys_obj_gobj_id :: proc(id: Physics_Object_Id) -> (oid: Game_Object_Id, ok: bool) #optional_ok {
+	data := phys_obj_data(id) or_return
+	gobj_id, found := data.game_object.?
+	if !found do return {}, false
+
+	return gobj_id, true
+}
+
 phys_obj_gobj :: proc{phys_obj_gobj_typed, phys_obj_gobj_untyped}
 
 phys_obj_data :: proc(id: Physics_Object_Id) -> (^Phys_Body_Data, bool) #optional_ok {
