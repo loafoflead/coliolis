@@ -486,8 +486,8 @@ initialise_portal_handler :: proc() {
 			// 	({20,  0} + Vec2{-10, 10}),
 			// 	({20 ,  -20} + Vec2{-10, 10}),
 			// },
-			pos = {0, -40},
-			scale = Vec2 { 12, 10.0 },
+			pos = {0, -60},
+			scale = Vec2 { 40, 6.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0, .Default},
 			friction = 1,
@@ -500,8 +500,8 @@ initialise_portal_handler :: proc() {
 			// 	({20 ,  20} - Vec2(10)),
 			// 	// {10 , 10},
 			// },
-			pos = {0, 40},
-			scale = Vec2 { 12, 10.0 },
+			pos = {0, 60},
+			scale = Vec2 { 40, 6.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0, .Default},
 			friction = 1,
@@ -686,21 +686,50 @@ teleport_occupant :: proc(occupant: Portal_Occupant, portal: ^Portal, other_port
 	}
 	else {
 		og_vel := b2d.Body_GetLinearVelocity(occupant_id) / f32(PIXELS_TO_METRES_RATIO)
-		velocity := linalg.normalize(Vec3{og_vel.x, -og_vel.y, 1})
+		mag := linalg.length(Vec2{og_vel.x, -og_vel.y})
+		velocity := Vec2{og_vel.x, -og_vel.y}
+
+		side := math.sign(linalg.dot(transform.right(portal_trans), velocity))
+
+		
+
+		atan2_360 :: proc(v: Vec2) -> f32 {
+			nothing := proc() {}
+
+			theta := f32(transform.dir_to_angle(v))
+			// https://www.wikihow.com/Find-Direction-of-a-Vector
+			// i fucking hate that my source for this is wikihow but im too lazy to figure it out myself
+			if v.x > 0 && v.y > 0 do nothing()
+			else if v.x > 0 && v.y < 0 do theta -= 2*linalg.PI
+			else if v.x < 0 && v.y < 0 || v.x < 0 && v.y > 0 {
+				theta -= linalg.PI
+			}
+			return theta
+		}
+
+		theta := atan2_360(velocity)
+		ptl_angle := atan2_360(transform.forward(portal_trans))
+		
+		delta := linalg.vector_angle_between(transform.forward(other_portal_trans), transform.forward(portal_trans))
+
+		new_dir := transform.angle_to_dir(Rad(theta + ptl_angle + delta + linalg.PI/2))
+
+		new_vel := new_dir * mag * f32(PIXELS_TO_METRES_RATIO)
+		new_vel.y = -new_vel.y
 
 		// world_vel := matrix4_inverse(portal_mat) * velocity_mat;
 		// flipped_world_vel := world_vel * linalg.matrix4_rotate_f32(linalg.PI, Z_AXIS);
 
-		relative_to_other := 
-			oportal_mat * (velocity * linalg.matrix3_inverse(portal_mat))
-		relative_to_other = linalg.normalize(relative_to_other)
+		// relative_to_other := 
+		// 	oportal_mat * (velocity * linalg.matrix3_inverse(portal_mat))
+		// relative_to_other = linalg.normalize(relative_to_other)
 
-		vel := Vec2{relative_to_other[0], relative_to_other[1]} * linalg.length(og_vel)
-		// if linalg.length(vel) < 100 do vel = linalg.normalize(vel) * 100
+		// vel := Vec2{relative_to_other[0], relative_to_other[1]} * linalg.length(og_vel)
+		// // if linalg.length(vel) < 100 do vel = linalg.normalize(vel) * 100
 
-		new_vel := vel * f32(PIXELS_TO_METRES_RATIO)
+		// new_vel := vel * f32(PIXELS_TO_METRES_RATIO)
 		new_pos := rl_to_b2d_pos(ntr.pos)
-		new_vel.y = -new_vel.y
+		// new_vel.y = -new_vel.y
 
 		b2d.Body_SetLinearVelocity(occupant_id, new_vel)
 

@@ -295,7 +295,7 @@ when DEBUG_TEXT_PLAYER {
 
 		body := b2d.Shape_GetBody(shapeId)
 		if body == mctx.player_body do return true
-		if b2d.Shape_IsSensor(shapeId) do return true
+		if b2d.Shape_IsSensor(shapeId) do return false
 		// body_ty := b2d.Body_GetType(body)
 		// to avoid cubes clipping straight into me...
 		// if body_ty == .dynamicBody do return true

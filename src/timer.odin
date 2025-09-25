@@ -64,7 +64,7 @@ create_named_timer :: proc(name: string, duration: f32, current: f32 = 0, flags:
 }
 
 get_temp_timer :: proc(duration: f32, current: f32 = 0, flags: bit_set[Timer_Flags] = {}) -> ^Timer {
-	if timers.timer_index >= NUM_UNNAMED_TIMERS {
+	if timers.timer_index > NUM_UNNAMED_TIMERS-50 {
 		log.warn("[WARNING]: Overflowed temp timers");
 		timers.timer_index = 0;
 	}
