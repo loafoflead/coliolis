@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="12">
+ <editorsettings>
+  <export target="tilemaps/laser_intro.tmj" format="json"/>
+ </editorsettings>
+ <tileset firstgid="1" source="tilemaps/example.tsx"/>
+ <layer id="1" name="Tile Layer 1" width="30" height="30" locked="1">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="3" name="collision">
+  <object id="2" x="288" y="608" width="256" height="32">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="3" x="256" y="416" width="32" height="224">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="4" x="256" y="384" width="288" height="32">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="5" x="544" y="576" width="32" height="64">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="7" x="576" y="576" width="384" height="32">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="8" x="544" y="384" width="416" height="32">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+  <object id="10" x="928" y="416" width="32" height="160">
+   <properties>
+    <property name="gen" propertytype="Generate" value="Static_Collision"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="2" name="boojs">
+  <object id="1" name="Entry" type="func" x="416" y="416" rotation="90">
+   <properties>
+    <property name="func" value="Entry_Chute"/>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="6" name="lasr_emitter" type="func" x="544" y="592" rotation="180">
+   <properties>
+    <property name="func" value="Laser_Emitter"/>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="9" name="door" type="func" x="736" y="480" width="96" height="64" rotation="90">
+   <properties>
+    <property name="func" value="Sliding_Door"/>
+    <property name="func_data">{
+&quot;io&quot;: {
+&quot;inputs&quot;: [{
+	&quot;source&quot;: &quot;emitter&quot;,
+	&quot;kind&quot;: &quot;Oppose_Source&quot;,	
+}],
+},
+}</property>
+   </properties>
+  </object>
+  <object id="11" name="lasr_receiver" type="func" x="288" y="592">
+   <properties>
+    <property name="func" value="Laser_Receiver"/>
+    <property name="func_data">{
+&quot;io&quot;: {
+ &quot;outputs&quot;: [{
+  &quot;target&quot;: &quot;emitter&quot;,
+ }]
+}
+}</property>
+   </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+ </objectgroup>
+</map>

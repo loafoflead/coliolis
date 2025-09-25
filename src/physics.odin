@@ -251,14 +251,15 @@ draw_phys_world :: proc() {
 	}
 }
 
-phys_obj_gobj_typed :: proc(id: Physics_Object_Id, $T: typeid) -> (gobj: ^T, game_object: ^Game_Object) {
+phys_obj_gobj_typed :: proc(id: Physics_Object_Id, $T: typeid) -> (gobj: ^T, game_object: ^Game_Object, ok: bool) {
 	data := phys_obj_data(id)
-	ok: bool
 	gobj_id, found := data.game_object.?
-	assert(found, "mistyped game object request")
+	assert(found, "Physics object without gameobject (no bueno)")
 
-	gobj, ok = game_obj(gobj_id, T)
-	game_object, ok = game_obj(gobj_id)
+	gobj = game_obj(gobj_id, T) or_return
+	game_object = game_obj(gobj_id) or_return
+
+	ok = true
 
 	return
 }
@@ -440,6 +441,7 @@ add_phys_object_polygon :: proc(
 	mass:  f32 = 0,
 	vertices: []Vec2,
 	pos:   Vec2 = Vec2{},
+	facing: Vec2 = Vec2{1, 0},
 	on_collision_enter: Phys_Collide_Callback = nil, 
 	on_collision_exit : Phys_Collide_Callback = nil,
 	friction: f32 = DEFAULT_FRICTION,
@@ -466,6 +468,7 @@ add_phys_object_polygon :: proc(
 		mass, 
 		polygon, 
 		pos, 
+		facing,
 		on_collision_enter, 
 		on_collision_exit, 
 		friction, 
@@ -484,6 +487,7 @@ add_phys_object_aabb :: proc(
 	mass:  f32 = 0,
 	scale: Vec2,
 	pos:   Vec2 = Vec2{},
+	facing: Vec2 = Vec2{1, 0},
 	on_collision_enter: Phys_Collide_Callback = nil, 
 	on_collision_exit : Phys_Collide_Callback = nil,
 	friction: f32 = DEFAULT_FRICTION,
@@ -514,6 +518,7 @@ add_phys_object_aabb :: proc(
 		mass, 
 		box, 
 		pos, 
+		facing,
 		on_collision_enter, 
 		on_collision_exit, 
 		friction, 
@@ -533,6 +538,7 @@ add_phys_object :: proc(
 	mass:  f32 = 0,
 	polygon: b2d.Polygon,
 	pos:   Vec2 = Vec2{},
+	facing: Vec2 = Vec2{1, 0},
 	on_collision_enter: Phys_Collide_Callback = nil, 
 	on_collision_exit : Phys_Collide_Callback = nil,
 	friction: f32 = DEFAULT_FRICTION,
@@ -562,6 +568,9 @@ add_phys_object :: proc(
 
 	body_def := b2d.DefaultBodyDef()
 	body_def.position = rl_to_b2d_pos(pos)
+	facing := facing 
+	facing.y = -facing.y
+	body_def.rotation = transmute(b2d.Rot)facing
 	body_def.name = name
 
 	if .Never_Sleep in flags {

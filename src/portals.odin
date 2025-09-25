@@ -59,7 +59,7 @@ portal_dims :: proc() -> Vec2 {
 }
 
 Portal_Ray_Hit :: struct {
-	collision: Ray_Collision,
+	using collision: Ray_Collision,
 	origin, direction: Vec2,
 }
 

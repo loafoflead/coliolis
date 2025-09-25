@@ -123,11 +123,21 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					err = json.unmarshal_string(func_data, &frame, allocator = arena)
 					frame.pos, frame.dims, frame.facing = pos, object.dims, transform.angle_to_dir(object.rot)
 					obj_prtl_frame_new(frame)
+				case "laser_emitter", "laser":
+					le: Laser_Emitter
+					// err = json.unmarshal_string(func_data, &le, allocator = arena)
+					le.pos, le.dims, le.facing = pos, object.dims, transform.angle_to_dir(object.rot)
+					obj_laser_emitter_new(le)
 				case "cube_button":
 					btn: Cube_Button
 					err = json.unmarshal_string(func_data, &btn, allocator = arena)
 					btn.pos, btn.dims, btn.facing = pos, object.dims, transform.angle_to_dir(object.rot)
 					obj_cube_btn_new(btn)
+				case "laser_receiver", "laser_recv":
+					recv: Laser_Receiver
+					err = json.unmarshal_string(func_data, &recv, allocator = arena)
+					recv.pos, recv.dims, recv.facing = pos, object.dims, transform.angle_to_dir(object.rot)
+					obj_laser_receiver_new(recv)
 				case "cube_spawner":
 					spwnr: Cube_Spawner
 					err = json.unmarshal_string(func_data, &spwnr, allocator = arena)
@@ -145,6 +155,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 			}
 			if err != nil do log.panicf("Failed to unmarshal json data for object (impossible) from data '%s': %#v", func_data, err)
 			else do log.debugf("Created object of type '%s'", func_class)
+			any_found = true
 		}
 		else if object.type == .Trigger {
 			trigger_class: string
@@ -191,6 +202,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 			case:
 				log.errorf("Trigger '%s' is not implemented.", trigger_class)
 			}
+			any_found = true
 			obj_trigger_new(trigger)
 			log.debugf("Created trigger of type '%v'", trigger.type)
 		}

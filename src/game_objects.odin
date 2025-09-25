@@ -3,6 +3,12 @@ package main
 import b2d "thirdparty/box2d"
 import "core:math/ease"
 import "core:log"
+import "core:fmt"
+
+import "core:strings"
+
+import "rendering"
+import rl "thirdparty/raylib"
 
 Puzzle_Element :: struct {
 	inputs: []Puzzle_Input,
@@ -16,12 +22,14 @@ Puzzle_Input_Kind :: enum {
 	Toggle = 0,
 	Set_Active,
 	Set_Inactive,
+	Match_Source, // match the source's activity
+	Oppose_Source, // be the opposite of the source's activity
 }
 
 Element_Id :: Game_Object_Id
 
 Puzzle_Input :: struct {
-	source: Element_Id,
+	source: string,
 	event: string,
 	kind: Puzzle_Input_Kind,
 }
@@ -30,7 +38,7 @@ Puzzle_Input :: struct {
 Output_Payload :: union{bool}
 
 Puzzle_Output :: struct {
-	target: Element_Id,
+	target: string,
 	event: string,
 	payload: Output_Payload,
 }
@@ -65,6 +73,8 @@ input_receive_event :: proc(pe: ^Puzzle_Element, event: ^Game_Event, modify_stat
 				new_active = true
 			case .Set_Inactive:
 				new_active = false
+			case .Match_Source, .Oppose_Source:
+				log.warnf("Puzzle element input that expected an event is configured to update from a source.")
 			}
 		}
 	}
@@ -104,6 +114,23 @@ trigger_output :: proc(output: Puzzle_Output, sender:= GAME_OBJECT_INVALID) {
 		payload = payload,
 	})
 }
+
+element_outputs_update :: proc(pe: Puzzle_Element) {
+	for output in pe.outputs {
+		if output.target != "" && output.target in game_state.sources {
+			game_state.sources[output.target] = pe.active
+		}
+	}
+}
+
+update_outputs :: proc(outputs: []Puzzle_Output, state: bool) {
+	for output in outputs {
+		if output.target != "" && output.target in game_state.sources {
+			game_state.sources[output.target] = state
+		}
+	}
+}
+
 // FEATURES CONFIG
 
 // button is a physically simulated joint
@@ -139,7 +166,14 @@ Cube_Button :: struct {
 
 Laser_Emitter :: struct {
 	using common: Level_Feature_Common,
+	using io: Puzzle_Element,
+}
 
+Laser_Receiver :: struct {
+	using common: Level_Feature_Common,
+	using io: Puzzle_Element,
+
+	last_powered_tick: u64,
 }
 
 Cube :: struct {
@@ -216,6 +250,7 @@ obj_sliding_door_new :: proc(door: Sliding_Door) -> (id: Game_Object_Id) {
 	obj := add_phys_object_aabb(
 		pos = door.pos,
 		scale = door.dims,
+		facing = door.facing,
 		flags = {.Non_Kinematic},
 		collision_layers = PHYS_OBJ_DEFAULT_COLLISION_LAYERS,
 		name="sliding_door",
@@ -309,7 +344,47 @@ when PHYSICS_BUTTON {
 		on_render = cube_btn_render,
 		on_update = update_cube_btn,
 	})
+	register_puzzle_outputs(btn.on_pressed, id)
+	register_puzzle_outputs(btn.on_unpressed, id, default=true)
 	pair_physics(id, obj)
+
+	return // id
+}
+
+obj_laser_receiver_new :: proc(recv: Laser_Receiver) -> (id: Game_Object_Id) {
+	assert(game_state.initialised)
+
+	obj := add_phys_object_aabb(
+		pos = recv.pos - recv.dims * recv.facing - Vec2{0, 16},
+		facing = recv.facing,
+		scale = {20, 32*1.5},
+		flags = {.Fixed_Rotation, .Non_Kinematic},
+		collide_with = PHYS_OBJ_DEFAULT_COLLIDE_WITH,
+		name="laser_recv",
+	)
+
+	id = Game_Object_Id(len(game_state.objects))
+	append(&game_state.objects, Game_Object {
+		data = recv,
+		on_update = laser_receiver_update,
+	})
+	register_puzzle_element(recv, id)
+	pair_physics(id, obj)
+
+	return // id
+}
+
+obj_laser_emitter_new :: proc(le: Laser_Emitter) -> (id: Game_Object_Id) {
+	assert(game_state.initialised)
+
+	le := le
+
+	id = Game_Object_Id(len(game_state.objects))
+	append(&game_state.objects, Game_Object {
+		data = le,
+		on_update = laser_emitter_update,
+	})
+	events_subscribe(id)
 
 	return // id
 }
@@ -324,7 +399,6 @@ obj_cube_spawner_new :: proc(spwner: Cube_Spawner) -> (id: Game_Object_Id) {
 	id = Game_Object_Id(len(game_state.objects))
 	append(&game_state.objects, Game_Object {
 		data = spwner,
-		// TODO: on_event instead for the logic stuff
 		on_event = spawner_recv_event,
 	})
 	events_subscribe(id)
@@ -440,7 +514,7 @@ obj_player_new :: proc(tex: Texture_Id) -> Game_Object_Id {
 }
 
 cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
-	btn, _ := phys_obj_gobj(self, Cube_Button)
+	btn, _, _ := phys_obj_gobj(self, Cube_Button)
 	self_id := phys_obj_gobj_id(self)
 	other_gobj := phys_obj_gobj(collided)
 
@@ -456,7 +530,7 @@ cube_btn_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 }
 
 cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
-	btn, _ := phys_obj_gobj(self, Cube_Button)
+	btn, _, _ := phys_obj_gobj(self, Cube_Button)
 	self_id := phys_obj_gobj_id(self)
 	other_gobj := phys_obj_gobj(collided)
 
@@ -482,7 +556,7 @@ cube_btn_exit :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
 }
 
 trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId) {
-	trigger, _ := phys_obj_gobj(self, G_Trigger)
+	trigger, _, _ := phys_obj_gobj(self, G_Trigger)
 	self_id := phys_obj_gobj_id(self)
 
 	switch trigger.type {
@@ -506,6 +580,49 @@ trigger_on_collide :: proc(self, collided: Physics_Object_Id, _, _: b2d.ShapeId)
 	}
 }
 
+laser_emitter_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool) {
+	le := game_obj(self, Laser_Emitter)
+
+	LASER_RANGE :: 32*10
+
+	cols, hit := portal_aware_raycast(le.pos, le.facing * LASER_RANGE/*, exclude = {get_player().obj}*/)
+	if hit {
+		draw_line(cols[0].origin, cols[0].collision.point, colour=Colour{0, 255, 0, 255})
+		for i in 0..<len(cols) {
+			col := cols[i]
+			draw_line(col.origin, col.collision.point, colour=Colour{0, 255, 0, 255})
+		}
+	} else {
+		draw_line(le.pos, le.facing * LASER_RANGE, colour=Colour{255, 0, 0, 255})
+	}
+
+	for col in cols {
+		recv, _, ok := phys_obj_gobj(col.obj_id, Laser_Receiver)
+		if !ok do continue
+
+		recv.last_powered_tick = game_state.ticks
+	}
+
+	return
+}
+
+laser_receiver_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool) {
+	recv := game_obj(self, Laser_Receiver)
+	self := game_obj(self)
+
+	if recv.last_powered_tick == game_state.ticks do recv.io.active = true
+	else do recv.io.active = false
+
+	element_outputs_update(recv)
+
+	text := strings.builder_make(allocator = context.temp_allocator)
+	strings.write_string(&text, fmt.tprintf("%v\n%v", recv.io.active, recv.last_powered_tick))
+	w_pos := rendering.world_pos_to_screen_pos(rendering.camera, phys_obj_pos(self.obj.?))
+	rl.DrawText(strings.to_cstring(&text), i32(w_pos.x), i32(w_pos.y), fontSize = 20, color = rl.WHITE)
+
+	return
+}
+
 update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	// frame := game_obj(self, Portal_Fixture)
 
@@ -519,9 +636,12 @@ update_prtl_frame :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool
 }
 
 update_cube_btn :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
-	// btn := game_obj(self, Cube_Button)
+	btn := game_obj(self, Cube_Button)
 
 	if !is_timer_done("game.level_loaded") do return
+
+	update_outputs(btn.on_pressed, btn.active)
+	update_outputs(btn.on_unpressed, !btn.active)
 
 when PHYSICS_BUTTON {
 	j_transl := b2d.PrismaticJoint_GetTranslation(btn.joint)

@@ -36,6 +36,8 @@ GAMEOBJS_DELETED_PER_FRAME 		:: 16
 
 Game_State :: struct {
 	initialised: bool,
+	ticks: u64, // how many ticks since last reinitialisation
+
 	objects: [dynamic]Game_Object,
 	to_delete: queue.Queue(Game_Object_Id),
 
@@ -45,9 +47,11 @@ Game_State :: struct {
 	messages: queue.Queue(Game_Object_Message),
 	events: queue.Queue(Game_Event),
 	event_subscribers: [dynamic]Game_Object_Id,
+
+	sources: map[string]bool, // TODO: this is probably condensable
 }
 
-Game_Object_Type :: union{Cube_Spawner, G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door, Cube}
+Game_Object_Type :: union{Cube_Spawner, G_Trigger, Player, Portal_Fixture, Cube_Button, Sliding_Door, Cube, Laser_Emitter, Laser_Receiver}
 
 Game_Object_Flags :: enum {
 	Weigh_Down_Buttons,
@@ -80,6 +84,7 @@ initialise_game_state :: proc() {
 	queue.init(&game_state.events)
 	// }
 	game_state.initialised = true
+	game_state.ticks = 0
 }
 
 free_game_state :: proc() {
@@ -101,6 +106,8 @@ game_load_level_from_tilemap :: proc(path: string) {
 	queue.clear(&game_state.events)
 	queue.clear(&game_state.messages)
 	clear(&game_state.event_subscribers)
+	game_state.ticks = 0
+
 	game_state.player = 0
 	initialise_portal_handler()
 
@@ -182,11 +189,42 @@ pair_physics :: proc(gobj: Game_Object_Id, phobj: Physics_Object_Id) {
 	phys_obj_data(phobj).game_object = gobj
 }
 
+register_puzzle_element :: proc(pe: Puzzle_Element, gobj_id: Game_Object_Id) {
+	assert(game_state.initialised)
+
+	for output in pe.outputs {
+		if output.target != "" {
+			if output.target in game_state.sources {
+				log.errorf("Puzzle element of gameobject(%i) uses already registered source channel '%s'", output.target)
+				continue
+			}
+			game_state.sources[output.target] = pe.active
+		}
+	}
+}
+
+register_puzzle_outputs :: proc(outputs: []Puzzle_Output, gobj_id: Game_Object_Id, default := false) {
+	assert(game_state.initialised)
+
+	for output in outputs {
+		if output.target != "" {
+			if output.target in game_state.sources {
+				log.errorf("Puzzle element of gameobject(%i) uses already registered source channel '%s'", output.target)
+				continue
+			}
+			game_state.sources[output.target] = default
+		}
+	}
+}
+
 queue_remove_game_obj :: proc(id: Game_Object_Id) {
 	queue.push_front(&game_state.to_delete, id)
 }
 
 update_game_state :: proc(dt: f32) {
+	// this just prevents awkward issues for laser_receiver
+	game_state.ticks += 1
+
 	to_delete := make([dynamic]int)
 	for obj, i in game_state.objects {
 		should_delete := false

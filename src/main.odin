@@ -42,7 +42,8 @@ debug_print: bool = false;
 
 BACKGROUND_COLOUR :: 0x181818;
 TILEMAP :: 
-	"portals_intro.tmj"
+	"laser_intro.tmj"
+	// "portals_intro.tmj"
 	// "cube_intro.tmj" 
 	// "cube_portal.tmj"
 
@@ -365,6 +366,7 @@ main :: proc() {
 
 		if rl.IsKeyPressed(rl.KeyboardKey.E) {
 			log.infof("%#v", game_events_this_frame())
+			log.infof("%#v", game_state.sources)
 		}
 
 when DEBUG {

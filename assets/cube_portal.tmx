@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="20" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="26">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="20" height="16" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="27">
  <editorsettings>
   <export target="tilemaps/cube_portal.tmj" format="json"/>
  </editorsettings>
@@ -141,7 +141,7 @@
   <object id="23" name="Exit" type="func" x="608" y="96" rotation="180">
    <properties>
     <property name="func" value="Level_Exit"/>
-    <property name="func_data" type="file" value="tilemaps/cube_portal.tmj"/>
+    <property name="func_data" type="file" value="tilemaps/laser_intro.tmj"/>
    </properties>
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>

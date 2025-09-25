@@ -517,7 +517,7 @@
                         {
                          "name":"func_data",
                          "type":"file",
-                         "value":"cube_portal.tmj"
+                         "value":"laser_intro.tmj"
                         }],
                  "rotation":180,
                  "type":"func",
@@ -614,7 +614,7 @@
          "y":0
         }],
  "nextlayerid":3,
- "nextobjectid":26,
+ "nextobjectid":27,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.2",
