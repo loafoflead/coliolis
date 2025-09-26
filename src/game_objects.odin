@@ -52,6 +52,21 @@ Event_Recv_Result :: enum {
 	Valid,
 }
 
+inputs_update_to_sources :: proc(inputs: []Puzzle_Input) -> (active: bool) {
+	// TODO: work out some form of priority for events vs sources
+	for input in inputs {
+		if input.source != "" {
+			src_active, ok := game_state.sources[input.source]
+			active |= src_active
+			if !ok {
+				log.errorf("Game object has uninitialised or nonexistent source: '%s'", input.source)
+			}
+		}
+	}
+
+	return
+}
+
 input_receive_event :: proc(pe: ^Puzzle_Element, event: ^Game_Event, modify_state := true) -> (res: bit_set[Event_Recv_Result; u8], payload: Output_Payload) {
 	prev_active := pe.active
 	new_active := pe.active
@@ -689,6 +704,9 @@ else {
 
 sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	door := game_obj(self, Sliding_Door)
+
+	active := inputs_update_to_sources(door.io.inputs)
+	door.io.active = active
 
 	obj := game_obj(self).obj.?
 
