@@ -1,8 +1,10 @@
 package main;
-import rl "thirdparty/raylib";
+import rl "thirdparty/raylib"
+import b2d "thirdparty/box2d"
 
 import "core:log"
 import "core:strings"
+import "core:math"
 
 import "core:encoding/json"
 import vmem "core:mem/virtual"
@@ -125,7 +127,7 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 					obj_prtl_frame_new(frame)
 				case "laser_emitter", "laser":
 					le: Laser_Emitter
-					// err = json.unmarshal_string(func_data, &le, allocator = arena)
+					err = json.unmarshal_string(func_data, &le, allocator = arena)
 					le.pos, le.dims, le.facing = pos, object.dims, transform.angle_to_dir(object.rot)
 					obj_laser_emitter_new(le)
 				case "cube_button":
@@ -146,14 +148,30 @@ level_features_from_tilemap :: proc(id: Tilemap_Id) -> (features: Level_Features
 				case "sliding_door":
 					door : Sliding_Door
 					err = json.unmarshal_string(func_data, &door, allocator = arena)
-					door.pos = pos + object.dims/2
-					door.dims, door.facing = object.dims, transform.angle_to_dir(object.rot)
+					door.pos = pos
+					door.facing = transform.angle_to_dir(object.rot)
+					
+					vertices := object.vertices[1:]
+					for &vert in vertices {
+						vert = rl_to_b2d_pos(vert)
+					}
+					hull := b2d.ComputeHull(vertices)
+					radius := f32(0.0)
+					polygon := b2d.MakePolygon(hull, radius)
+					aabb := b2d.ComputePolygonAABB(polygon, b2d.Transform{q={1,0}})
+					aabb.lowerBound += Vec2(100000)
+					aabb.upperBound += Vec2(100000)
+					door.dims.x = math.abs(aabb.upperBound.x - aabb.lowerBound.x)
+					door.dims.y = math.abs(aabb.upperBound.y - aabb.lowerBound.y)
+
+					door.dims = door.dims / f32(PIXELS_TO_METRES_RATIO)
+					log.info(door.dims)
 					obj_sliding_door_new(door)
 				case:
 					log.debugf("Unknown object class encountered '%s', ignoring", func_class)
 					continue
 			}
-			if err != nil do log.panicf("Failed to unmarshal json data for object (impossible) from data '%s': %#v", func_data, err)
+			if err != nil do log.errorf("Failed to unmarshal json data for object (impossible) from data '%s': %#v", func_data, err)
 			else do log.debugf("Created object of type '%s'", func_class)
 			any_found = true
 		}

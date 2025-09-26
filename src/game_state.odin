@@ -106,6 +106,9 @@ game_load_level_from_tilemap :: proc(path: string) {
 	queue.clear(&game_state.events)
 	queue.clear(&game_state.messages)
 	clear(&game_state.event_subscribers)
+	clear(&game_state.sources)
+	game_state.sources["level.true"] = true
+	game_state.sources["level.false"] = false
 	game_state.ticks = 0
 
 	game_state.player = 0

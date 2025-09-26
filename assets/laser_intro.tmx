@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="12">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="30" height="30" tilewidth="32" tileheight="32" infinite="0" nextlayerid="4" nextobjectid="15">
  <editorsettings>
   <export target="tilemaps/laser_intro.tmj" format="json"/>
  </editorsettings>
@@ -85,21 +85,16 @@
   <object id="6" name="lasr_emitter" type="func" x="544" y="592" rotation="180">
    <properties>
     <property name="func" value="Laser_Emitter"/>
-   </properties>
-   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
-  </object>
-  <object id="9" name="door" type="func" x="736" y="480" width="96" height="64" rotation="90">
-   <properties>
-    <property name="func" value="Sliding_Door"/>
     <property name="func_data">{
 &quot;io&quot;: {
-&quot;inputs&quot;: [{
-	&quot;source&quot;: &quot;emitter&quot;,
-	&quot;kind&quot;: &quot;Oppose_Source&quot;,	
-}],
-},
+ &quot;inputs&quot;: [{
+  &quot;source&quot;: &quot;level.true&quot;,
+  &quot;kind&quot;: &quot;Match_Source&quot;,
+ }]
+}
 }</property>
    </properties>
+   <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
   </object>
   <object id="11" name="lasr_receiver" type="func" x="288" y="592">
    <properties>
@@ -113,6 +108,21 @@
 }</property>
    </properties>
    <polygon points="0,0 32,0 0,-32 0,32 32,0"/>
+  </object>
+  <object id="14" name="door" type="func" x="736" y="496">
+   <properties>
+    <property name="func" value="Sliding_Door"/>
+    <property name="func_data">{
+&quot;io&quot;: {
+&quot;inputs&quot;: [{
+	&quot;source&quot;: &quot;emitter&quot;,
+	&quot;kind&quot;: &quot;Oppose_Source&quot;,	
+}],
+},
+&quot;dir&quot;: [0, 1],
+}</property>
+   </properties>
+   <polygon points="0,0 -32,-80 32,-80 32,80 -32,80 -32,-80"/>
   </object>
  </objectgroup>
 </map>

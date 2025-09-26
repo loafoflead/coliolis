@@ -33,6 +33,12 @@ Transform :: struct {
 	parent: ^Transform,
 }
 
+
+// yoinked from box2d/math_function
+rotate_vector :: proc (q: Vec2, v: Vec2) -> Vec2 {
+	return {q.x * v.x - q.y * v.y, q.y * v.x + q.x * v.y}
+}
+
 dir_to_angle :: proc(facing: Vec2) -> Rad {
 	return Rad(math.atan2(facing.y, facing.x))
 } 
@@ -173,6 +179,8 @@ transform_point :: proc(transform: ^Transform, point: Vec2) -> Vec2 #no_bounds_c
 	res := get_mat(transform) * Vec3 { point.x, point.y, 1 };
 	return res.xy;
 }
+
+import "core:fmt"
 
 from_matrix :: proc(mat: Mat3x3) -> Transform {
 	t := Transform {

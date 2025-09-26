@@ -487,7 +487,7 @@ initialise_portal_handler :: proc() {
 			// 	({20 ,  -20} + Vec2{-10, 10}),
 			// },
 			pos = {0, -60},
-			scale = Vec2 { 40, 6.0 },
+			scale = Vec2 { 13, 40.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0, .Default},
 			friction = 1,
@@ -501,7 +501,7 @@ initialise_portal_handler :: proc() {
 			// 	// {10 , 10},
 			// },
 			pos = {0, 60},
-			scale = Vec2 { 40, 6.0 },
+			scale = Vec2 { 13, 40.0 },
 			flags = {.Non_Kinematic}, 
 			collision_layers = {.L0, .Default},
 			friction = 1,
@@ -864,9 +864,9 @@ update_portals :: proc() {
 			for edge in portal_handler.edge_colliders {
 				phys_obj_transform(edge).parent = phys_obj_transform(portal.obj)
 				// phys_obj_goto(edge, phys_obj_pos(portal.obj))
-				world := transform.to_world(phys_obj_transform(edge))
-				phys_obj_goto(edge, world.pos)
-				// phys_obj_goto_parent(edge)
+				// world := transform.to_world(phys_obj_transform(edge))
+				// phys_obj_goto(edge, world.pos)
+				phys_obj_goto_parent(edge)
 				// phys_obj_goto_transform(edge, world)
 			}
 		}

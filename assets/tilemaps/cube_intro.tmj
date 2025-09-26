@@ -38,28 +38,6 @@
          "name":"Object Layer 1",
          "objects":[
                 {
-                 "height":64,
-                 "id":3,
-                 "name":"door",
-                 "properties":[
-                        {
-                         "name":"func",
-                         "type":"string",
-                         "value":"Sliding_Door"
-                        }, 
-                        {
-                         "name":"func_data",
-                         "type":"string",
-                         "value":"{\n\"io\": {\n\"inputs\": [{\n\t\"event\": \"door\",\n\t\"kind\": \"Payload\",\n}],\n},\n}"
-                        }],
-                 "rotation":0,
-                 "type":"func",
-                 "visible":true,
-                 "width":96,
-                 "x":224,
-                 "y":224
-                }, 
-                {
                  "height":0,
                  "id":12,
                  "name":"btn",
@@ -225,6 +203,53 @@
                  "width":0,
                  "x":576,
                  "y":416
+                }, 
+                {
+                 "height":0,
+                 "id":27,
+                 "name":"door",
+                 "polygon":[
+                        {
+                         "x":0,
+                         "y":0
+                        }, 
+                        {
+                         "x":-48,
+                         "y":-32
+                        }, 
+                        {
+                         "x":48,
+                         "y":-32
+                        }, 
+                        {
+                         "x":48,
+                         "y":32
+                        }, 
+                        {
+                         "x":-48,
+                         "y":32
+                        }, 
+                        {
+                         "x":-48,
+                         "y":-32
+                        }],
+                 "properties":[
+                        {
+                         "name":"func",
+                         "type":"string",
+                         "value":"Sliding_Door"
+                        }, 
+                        {
+                         "name":"func_data",
+                         "type":"string",
+                         "value":"{\n\"io\": {\n\"inputs\": [{\n\t\"event\": \"door\",\n\t\"kind\": \"Payload\",\n}],\n},\n\"dir\": [1, 0],\n}"
+                        }],
+                 "rotation":0,
+                 "type":"func",
+                 "visible":true,
+                 "width":0,
+                 "x":272,
+                 "y":256
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -423,7 +448,7 @@
          "y":0
         }],
  "nextlayerid":5,
- "nextobjectid":27,
+ "nextobjectid":28,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.2",

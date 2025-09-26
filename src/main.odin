@@ -42,9 +42,9 @@ debug_print: bool = false;
 
 BACKGROUND_COLOUR :: 0x181818;
 TILEMAP :: 
-	"laser_intro.tmj"
+	// "laser_intro.tmj"
 	// "portals_intro.tmj"
-	// "cube_intro.tmj" 
+	"cube_intro.tmj" 
 	// "cube_portal.tmj"
 
 get_screen_centre :: proc() -> Vec2 {

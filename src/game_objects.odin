@@ -2,12 +2,14 @@ package main
 
 import b2d "thirdparty/box2d"
 import "core:math/ease"
+import "core:math/linalg"
 import "core:log"
 import "core:fmt"
 
 import "core:strings"
 
 import "rendering"
+import "transform"
 import rl "thirdparty/raylib"
 
 Puzzle_Element :: struct {
@@ -52,14 +54,27 @@ Event_Recv_Result :: enum {
 	Valid,
 }
 
-inputs_update_to_sources :: proc(inputs: []Puzzle_Input) -> (active: bool) {
+inputs_update_to_sources :: proc(inputs: []Puzzle_Input) -> (active: bool, any_sources: bool) {
 	// TODO: work out some form of priority for events vs sources
 	for input in inputs {
 		if input.source != "" {
 			src_active, ok := game_state.sources[input.source]
-			active |= src_active
+
+			switch input.kind {
+			case .Toggle, .Set_Active, .Set_Inactive:
+				log.errorf("Input of type 'source' cannot be of kind '%v'", input.kind)
+			case .Match_Source:
+				active |= src_active
+			case .Oppose_Source:
+				active |= !src_active
+			}
+
+
 			if !ok {
 				log.errorf("Game object has uninitialised or nonexistent source: '%s'", input.source)
+			}
+			else {
+				any_sources = true
 			}
 		}
 	}
@@ -211,11 +226,12 @@ Portal_Fixture :: struct {
 	portal: i32,
 }
 
-SLIDING_DOOR_SPEED_MS :: f32(5.0)
+SLIDING_DOOR_SPEED_MS :: f32(140.0)
 
 Sliding_Door :: struct {
 	using common: Level_Feature_Common,
 	using io: Puzzle_Element,
+	dir: Vec2,
 	open_percent: f32,
 }
 
@@ -600,22 +616,27 @@ laser_emitter_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: b
 
 	LASER_RANGE :: 32*10
 
-	cols, hit := portal_aware_raycast(le.pos, le.facing * LASER_RANGE/*, exclude = {get_player().obj}*/)
-	if hit {
-		draw_line(cols[0].origin, cols[0].collision.point, colour=Colour{0, 255, 0, 255})
-		for i in 0..<len(cols) {
-			col := cols[i]
-			draw_line(col.origin, col.collision.point, colour=Colour{0, 255, 0, 255})
+	active, any_sources := inputs_update_to_sources(le.io.inputs)
+	if any_sources do le.io.active = active
+
+	if le.io.active {
+		cols, hit := portal_aware_raycast(le.pos, le.facing * LASER_RANGE/*, exclude = {get_player().obj}*/)
+		if hit {
+			draw_line(cols[0].origin, cols[0].collision.point, colour=Colour{0, 255, 0, 255})
+			for i in 0..<len(cols) {
+				col := cols[i]
+				draw_line(col.origin, col.collision.point, colour=Colour{0, 255, 0, 255})
+			}
+		} else {
+			draw_line(le.pos, le.facing * LASER_RANGE, colour=Colour{255, 0, 0, 255})
 		}
-	} else {
-		draw_line(le.pos, le.facing * LASER_RANGE, colour=Colour{255, 0, 0, 255})
-	}
 
-	for col in cols {
-		recv, _, ok := phys_obj_gobj(col.obj_id, Laser_Receiver)
-		if !ok do continue
+		for col in cols {
+			recv, _, ok := phys_obj_gobj(col.obj_id, Laser_Receiver)
+			if !ok do continue
 
-		recv.last_powered_tick = game_state.ticks
+			recv.last_powered_tick = game_state.ticks
+		}
 	}
 
 	return
@@ -705,19 +726,21 @@ else {
 sliding_door_update :: proc(self: Game_Object_Id, dt: f32) -> (should_delete: bool = false) {
 	door := game_obj(self, Sliding_Door)
 
-	active := inputs_update_to_sources(door.io.inputs)
-	door.io.active = active
+	active, any_sources := inputs_update_to_sources(door.io.inputs)
+	if any_sources do door.io.active = active
 
 	obj := game_obj(self).obj.?
 
 	origin := door.pos
-	target := door.pos + door.dims * door.facing 
+	target := door.pos + door.dir * door.dims
+
+	speed := 1/linalg.length(door.dims*door.dir) * SLIDING_DOOR_SPEED_MS 
 
 	if door.active {
-		door.open_percent += SLIDING_DOOR_SPEED_MS * dt
+		door.open_percent += speed * dt
 	}
 	else {
-		door.open_percent -= SLIDING_DOOR_SPEED_MS * dt
+		door.open_percent -= speed * dt
 	}
 
 	if door.open_percent < 0 do door.open_percent = 0
